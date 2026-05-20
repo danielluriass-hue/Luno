@@ -9,6 +9,7 @@ import HabitosPage from './pages/HabitosPage'
 import NotasPage from './pages/NotasPage'
 import MetasPage from './pages/MetasPage'
 import RutinasPage from './pages/RutinasPage'
+import ConfigPage from './pages/ConfigPage'
 
 export default function App() {
   const [session, setSession] = useState(undefined)
@@ -41,6 +42,7 @@ export default function App() {
     NOTAS: <NotasPage user={user} />,
     METAS: <MetasPage user={user} />,
     RUTINAS: <RutinasPage user={user} />,
+    CONFIG: <ConfigPage user={user} />,
   }
 
   return (

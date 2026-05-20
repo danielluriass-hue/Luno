@@ -63,20 +63,25 @@ export default function Sidebar({ page, setPage, user }) {
       </nav>
 
       {/* User */}
-      <div style={{ paddingTop: '16px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '9px' }}>
-        <div style={{
-          width: '28px', height: '28px', borderRadius: '50%', background: 'var(--accent-soft)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: 'var(--accent)', fontWeight: '600', fontSize: '11px', flexShrink: 0,
+      <div style={{ paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
+        <button onClick={() => setPage('CONFIG')} style={{
+          display: 'flex', alignItems: 'center', gap: '9px', width: '100%',
+          padding: '8px 8px', borderRadius: '10px', border: 'none',
+          background: page === 'CONFIG' ? 'var(--accent-soft)' : 'transparent',
+          marginBottom: '10px',
         }}>
-          {initials}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: '12px', fontWeight: '500', color: 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</div>
-          <button onClick={() => supabase.auth.signOut()} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '11px', padding: 0 }}>
-            Salir
-          </button>
-        </div>
+          <div style={{
+            width: '28px', height: '28px', borderRadius: '50%', background: 'var(--accent-soft)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--accent)', fontWeight: '600', fontSize: '11px', flexShrink: 0,
+          }}>
+            {initials}
+          </div>
+          <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+            <div style={{ fontSize: '12px', fontWeight: '500', color: 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Configuración</div>
+          </div>
+        </button>
       </div>
     </div>
   )
