@@ -33,85 +33,64 @@ export default function AuthPage() {
     setLoading(false)
   }
 
+  const inp = {
+    width: '100%', padding: '10px 13px', borderRadius: '8px',
+    background: '#f5f5f3', border: '1px solid rgba(0,0,0,0.1)',
+    color: '#111', fontSize: '14px', marginBottom: '12px',
+  }
+
   return (
-    <div style={{
-      minHeight: '100vh', display: 'flex', alignItems: 'center',
-      justifyContent: 'center', background: 'var(--bg)', padding: '24px',
-    }}>
-      <div style={{
-        width: '100%', maxWidth: '400px',
-        background: 'var(--card-bg)', borderRadius: '20px',
-        border: '1px solid var(--border-card)', padding: '36px 32px',
-      }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f5f3', padding: '24px' }}>
+      <div style={{ width: '100%', maxWidth: '380px' }}>
         {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '9px', marginBottom: '28px' }}>
-          <div style={{ width: '26px', height: '26px', borderRadius: '7px', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="white">
-              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-            </svg>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '36px' }}>
+          <div style={{ width: '26px', height: '26px', borderRadius: '7px', background: '#5856d6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
           </div>
-          <span style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-1)', letterSpacing: '-0.02em' }}>Luno</span>
+          <span style={{ fontSize: '16px', fontWeight: '600', color: '#111', letterSpacing: '-0.02em' }}>Luno</span>
         </div>
 
-        <h2 style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-1)', marginBottom: '4px', letterSpacing: '-0.02em' }}>
+        <h1 style={{ fontSize: '26px', fontWeight: '700', color: '#111', letterSpacing: '-0.03em', marginBottom: '4px' }}>
           {mode === 'login' ? 'Inicia sesión' : 'Crea tu cuenta'}
-        </h2>
-        <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '24px' }}>
+        </h1>
+        <p style={{ fontSize: '14px', color: '#999', marginBottom: '28px' }}>
           {mode === 'login' ? 'Bienvenido de vuelta' : 'Empieza a organizar tu día'}
         </p>
 
-        {error && (
-          <div style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.15)', borderRadius: '10px', padding: '10px 14px', fontSize: '13px', color: '#f87171', marginBottom: '16px' }}>
-            {error}
-          </div>
-        )}
-        {success && (
-          <div style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.15)', borderRadius: '10px', padding: '10px 14px', fontSize: '13px', color: '#34d399', marginBottom: '16px' }}>
-            {success}
-          </div>
-        )}
+        {error && <div style={{ background: '#fff0f0', border: '1px solid #ffd0d0', borderRadius: '8px', padding: '10px 13px', fontSize: '13px', color: '#cc0000', marginBottom: '16px' }}>{error}</div>}
+        {success && <div style={{ background: '#f0fff4', border: '1px solid #c3f0d0', borderRadius: '8px', padding: '10px 13px', fontSize: '13px', color: '#007a33', marginBottom: '16px' }}>{success}</div>}
 
         <form onSubmit={handleSubmit}>
           {mode === 'register' && (
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{ fontSize: '12px', color: 'var(--text-2)', display: 'block', marginBottom: '5px' }}>Nombre</label>
-              <input type="text" placeholder="Tu nombre" value={name} onChange={e => setName(e.target.value)} required
-                style={{ width: '100%', padding: '10px 13px', borderRadius: '10px', background: 'var(--inner-bg)', border: '1px solid var(--border-card)', color: 'var(--text-1)', fontSize: '14px' }} />
-            </div>
+            <>
+              <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '5px' }}>Nombre</label>
+              <input style={inp} type="text" placeholder="Tu nombre" value={name} onChange={e => setName(e.target.value)} required />
+            </>
           )}
-          <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '12px', color: 'var(--text-2)', display: 'block', marginBottom: '5px' }}>Correo electrónico</label>
-            <input type="email" placeholder="correo@ejemplo.com" value={email} onChange={e => setEmail(e.target.value)} required
-              style={{ width: '100%', padding: '10px 13px', borderRadius: '10px', background: 'var(--inner-bg)', border: '1px solid var(--border-card)', color: 'var(--text-1)', fontSize: '14px' }} />
-          </div>
-          <div style={{ marginBottom: mode === 'login' ? '8px' : '20px' }}>
-            <label style={{ fontSize: '12px', color: 'var(--text-2)', display: 'block', marginBottom: '5px' }}>Contraseña</label>
-            <input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required
-              style={{ width: '100%', padding: '10px 13px', borderRadius: '10px', background: 'var(--inner-bg)', border: '1px solid var(--border-card)', color: 'var(--text-1)', fontSize: '14px' }} />
-          </div>
+          <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '5px' }}>Correo electrónico</label>
+          <input style={inp} type="email" placeholder="correo@ejemplo.com" value={email} onChange={e => setEmail(e.target.value)} required />
+          <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '5px' }}>Contraseña</label>
+          <input style={{ ...inp, marginBottom: mode === 'login' ? '6px' : '20px' }} type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
 
           {mode === 'login' && (
             <div style={{ textAlign: 'right', marginBottom: '20px' }}>
-              <button type="button" onClick={handleReset}
-                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '12px' }}>
-                ¿Olvidaste tu contraseña?
-              </button>
+              <button type="button" onClick={handleReset} style={{ background: 'none', border: 'none', color: '#999', fontSize: '12px' }}>¿Olvidaste tu contraseña?</button>
             </div>
           )}
 
           <button type="submit" disabled={loading} style={{
-            width: '100%', padding: '11px', borderRadius: '10px', border: 'none',
-            background: 'var(--accent)', color: '#fff', fontWeight: '600',
-            fontSize: '14px', opacity: loading ? 0.6 : 1,
+            width: '100%', padding: '11px', borderRadius: '8px', border: 'none',
+            background: '#5856d6', color: '#fff', fontWeight: '600', fontSize: '14px',
+            opacity: loading ? 0.6 : 1, letterSpacing: '-0.01em',
           }}>
             {loading ? 'Cargando...' : mode === 'login' ? 'Entrar' : 'Crear cuenta'}
           </button>
         </form>
 
-        <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '13px', color: 'var(--text-muted)' }}>
+        <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '13px', color: '#999' }}>
           {mode === 'login' ? '¿No tienes cuenta? ' : '¿Ya tienes cuenta? '}
           <button onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); setSuccess('') }}
-            style={{ background: 'none', border: 'none', color: 'var(--text-2)', fontWeight: '500', fontSize: '13px' }}>
+            style={{ background: 'none', border: 'none', color: '#555', fontWeight: '500', fontSize: '13px' }}>
             {mode === 'login' ? 'Regístrate' : 'Inicia sesión'}
           </button>
         </p>
