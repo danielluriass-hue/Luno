@@ -33,102 +33,88 @@ export default function AuthPage() {
     setLoading(false)
   }
 
-  const input = {
-    width: '100%', padding: '10px 14px', borderRadius: '10px',
-    background: 'var(--card-bg)', border: '1px solid var(--border-card)',
-    color: 'var(--text-1)', fontSize: '14px', marginBottom: '12px',
-    transition: 'border 0.15s',
-  }
-
-  const label = {
-    fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px',
-    display: 'block', letterSpacing: '0.02em',
-  }
-
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', background: 'var(--bg)' }}>
-      {/* Panel izquierdo decorativo */}
+    <div style={{
+      minHeight: '100vh', display: 'flex', alignItems: 'center',
+      justifyContent: 'center', background: 'var(--bg)', padding: '24px',
+    }}>
       <div style={{
-        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        borderRight: '1px solid var(--border)', padding: '48px',
-        flexDirection: 'column', gap: '32px',
+        width: '100%', maxWidth: '400px',
+        background: 'var(--card-bg)', borderRadius: '20px',
+        border: '1px solid var(--border-card)', padding: '36px 32px',
       }}>
-        <div style={{ maxWidth: '320px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '40px' }}>
-            <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-              </svg>
-            </div>
-            <span style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-1)', letterSpacing: '-0.03em' }}>Luno</span>
+        {/* Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '9px', marginBottom: '28px' }}>
+          <div style={{ width: '26px', height: '26px', borderRadius: '7px', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="white">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
           </div>
-          <h2 style={{ fontSize: '26px', fontWeight: '700', color: 'var(--text-1)', letterSpacing: '-0.03em', marginBottom: '12px', lineHeight: '1.3' }}>
-            Tu día,<br />organizado.
-          </h2>
-          <p style={{ fontSize: '14px', color: 'var(--text-muted)', lineHeight: '1.7' }}>
-            Agenda, tareas, hábitos, notas y metas — todo en un solo lugar, solo para ti.
-          </p>
+          <span style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-1)', letterSpacing: '-0.02em' }}>Luno</span>
         </div>
-      </div>
 
-      {/* Panel derecho — formulario */}
-      <div style={{ width: '420px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 40px' }}>
-        <div style={{ width: '100%' }}>
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>
-            {mode === 'login' ? 'Bienvenido de vuelta' : 'Crear cuenta'}
-          </p>
-          <h3 style={{ fontSize: '22px', fontWeight: '700', color: 'var(--text-1)', marginBottom: '28px', letterSpacing: '-0.02em' }}>
-            {mode === 'login' ? 'Inicia sesión' : 'Regístrate gratis'}
-          </h3>
+        <h2 style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-1)', marginBottom: '4px', letterSpacing: '-0.02em' }}>
+          {mode === 'login' ? 'Inicia sesión' : 'Crea tu cuenta'}
+        </h2>
+        <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '24px' }}>
+          {mode === 'login' ? 'Bienvenido de vuelta' : 'Empieza a organizar tu día'}
+        </p>
 
-          {error && (
-            <div style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.15)', borderRadius: '10px', padding: '10px 14px', fontSize: '13px', color: '#f87171', marginBottom: '16px' }}>
-              {error}
+        {error && (
+          <div style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.15)', borderRadius: '10px', padding: '10px 14px', fontSize: '13px', color: '#f87171', marginBottom: '16px' }}>
+            {error}
+          </div>
+        )}
+        {success && (
+          <div style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.15)', borderRadius: '10px', padding: '10px 14px', fontSize: '13px', color: '#34d399', marginBottom: '16px' }}>
+            {success}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          {mode === 'register' && (
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ fontSize: '12px', color: 'var(--text-2)', display: 'block', marginBottom: '5px' }}>Nombre</label>
+              <input type="text" placeholder="Tu nombre" value={name} onChange={e => setName(e.target.value)} required
+                style={{ width: '100%', padding: '10px 13px', borderRadius: '10px', background: 'var(--inner-bg)', border: '1px solid var(--border-card)', color: 'var(--text-1)', fontSize: '14px' }} />
             </div>
           )}
-          {success && (
-            <div style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.15)', borderRadius: '10px', padding: '10px 14px', fontSize: '13px', color: '#34d399', marginBottom: '16px' }}>
-              {success}
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ fontSize: '12px', color: 'var(--text-2)', display: 'block', marginBottom: '5px' }}>Correo electrónico</label>
+            <input type="email" placeholder="correo@ejemplo.com" value={email} onChange={e => setEmail(e.target.value)} required
+              style={{ width: '100%', padding: '10px 13px', borderRadius: '10px', background: 'var(--inner-bg)', border: '1px solid var(--border-card)', color: 'var(--text-1)', fontSize: '14px' }} />
+          </div>
+          <div style={{ marginBottom: mode === 'login' ? '8px' : '20px' }}>
+            <label style={{ fontSize: '12px', color: 'var(--text-2)', display: 'block', marginBottom: '5px' }}>Contraseña</label>
+            <input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required
+              style={{ width: '100%', padding: '10px 13px', borderRadius: '10px', background: 'var(--inner-bg)', border: '1px solid var(--border-card)', color: 'var(--text-1)', fontSize: '14px' }} />
+          </div>
+
+          {mode === 'login' && (
+            <div style={{ textAlign: 'right', marginBottom: '20px' }}>
+              <button type="button" onClick={handleReset}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '12px' }}>
+                ¿Olvidaste tu contraseña?
+              </button>
             </div>
           )}
 
-          <form onSubmit={handleSubmit}>
-            {mode === 'register' && (
-              <>
-                <label style={label}>Nombre</label>
-                <input style={input} type="text" placeholder="Tu nombre" value={name} onChange={e => setName(e.target.value)} required />
-              </>
-            )}
-            <label style={label}>Correo electrónico</label>
-            <input style={input} type="email" placeholder="correo@ejemplo.com" value={email} onChange={e => setEmail(e.target.value)} required />
-            <label style={label}>Contraseña</label>
-            <input style={input} type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
+          <button type="submit" disabled={loading} style={{
+            width: '100%', padding: '11px', borderRadius: '10px', border: 'none',
+            background: 'var(--accent)', color: '#fff', fontWeight: '600',
+            fontSize: '14px', opacity: loading ? 0.6 : 1,
+          }}>
+            {loading ? 'Cargando...' : mode === 'login' ? 'Entrar' : 'Crear cuenta'}
+          </button>
+        </form>
 
-            {mode === 'login' && (
-              <div style={{ textAlign: 'right', marginTop: '-4px', marginBottom: '16px' }}>
-                <button type="button" onClick={handleReset} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '12px', cursor: 'pointer' }}>
-                  ¿Olvidaste tu contraseña?
-                </button>
-              </div>
-            )}
-
-            <button type="submit" disabled={loading} style={{
-              width: '100%', padding: '11px', borderRadius: '10px', border: 'none',
-              background: 'var(--accent)', color: '#fff', fontWeight: '600', fontSize: '14px',
-              marginTop: '4px', opacity: loading ? 0.6 : 1, letterSpacing: '-0.01em',
-            }}>
-              {loading ? 'Cargando...' : mode === 'login' ? 'Entrar' : 'Crear cuenta'}
-            </button>
-          </form>
-
-          <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '13px', color: 'var(--text-muted)' }}>
-            {mode === 'login' ? '¿No tienes cuenta? ' : '¿Ya tienes cuenta? '}
-            <button onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); setSuccess('') }}
-              style={{ background: 'none', border: 'none', color: 'var(--text-2)', fontWeight: '500', fontSize: '13px', cursor: 'pointer' }}>
-              {mode === 'login' ? 'Regístrate' : 'Inicia sesión'}
-            </button>
-          </p>
-        </div>
+        <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '13px', color: 'var(--text-muted)' }}>
+          {mode === 'login' ? '¿No tienes cuenta? ' : '¿Ya tienes cuenta? '}
+          <button onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); setSuccess('') }}
+            style={{ background: 'none', border: 'none', color: 'var(--text-2)', fontWeight: '500', fontSize: '13px' }}>
+            {mode === 'login' ? 'Regístrate' : 'Inicia sesión'}
+          </button>
+        </p>
       </div>
     </div>
   )
