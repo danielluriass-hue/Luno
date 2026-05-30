@@ -75,56 +75,33 @@ function SessionModal({ onClose, onSave, initial }) {
               }}>+ Agregar</button>
             </div>
 
-            {isMobile ? (
-              exercises.map((ex, i) => (
-                <div key={i} style={{ background: 'var(--inner-bg)', borderRadius: '10px', padding: '12px', marginBottom: '8px', position: 'relative' }}>
-                  <input value={ex.exercise_name} onChange={e => setEx(i, 'exercise_name', e.target.value)} placeholder="Ejercicio (ej. Sentadilla)"
-                    style={{ ...inp, marginBottom: '8px', paddingRight: exercises.length > 1 ? '28px' : undefined }} />
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                    {[
-                      { field: 'sets', label: 'Series', placeholder: '4', type: 'number', step: '1' },
-                      { field: 'reps', label: 'Reps', placeholder: '12', type: 'number', step: '1' },
-                      { field: 'weight_kg', label: 'Carga (lbs)', placeholder: '60', type: 'number', step: '0.5' },
-                      { field: 'rest_seconds', label: 'Descanso (min)', placeholder: '90', type: 'number', step: '1' },
-                    ].map(({ field, label, placeholder, type, step }) => (
-                      <div key={field}>
-                        <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
-                        <input type={type} min="0" step={step} value={ex[field]}
-                          onChange={e => setEx(i, field, e.target.value)} placeholder={placeholder}
-                          style={{ ...inp, textAlign: 'center' }} />
-                      </div>
-                    ))}
-                  </div>
-                  {exercises.length > 1 && (
-                    <button type="button" onClick={() => removeEx(i)} style={{
-                      position: 'absolute', top: '10px', right: '10px',
-                      background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '16px', padding: '0', lineHeight: 1,
-                    }}>×</button>
-                  )}
-                </div>
-              ))
-            ) : (
-              <>
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 60px 60px 80px 80px 28px', gap: '6px', marginBottom: '6px' }}>
-                  {['Ejercicio', 'Series', 'Reps', 'Carga (lbs)', 'Descanso (min)', ''].map(h => (
-                    <div key={h} style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: h === '' ? 'center' : 'left' }}>{h}</div>
+            {exercises.map((ex, i) => (
+              <div key={i} style={{ background: 'var(--inner-bg)', borderRadius: '10px', padding: '12px', marginBottom: '8px', position: 'relative' }}>
+                <input value={ex.exercise_name} onChange={e => setEx(i, 'exercise_name', e.target.value)} placeholder="Ejercicio (ej. Sentadilla)"
+                  style={{ ...inp, marginBottom: '8px', paddingRight: exercises.length > 1 ? '28px' : undefined }} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                  {[
+                    { field: 'sets',         label: 'Series',          placeholder: '4',  step: '1'   },
+                    { field: 'reps',         label: 'Reps',            placeholder: '12', step: '1'   },
+                    { field: 'weight_kg',    label: 'Carga (lbs)',     placeholder: '60', step: '0.5' },
+                    { field: 'rest_seconds', label: 'Descanso (min)',  placeholder: '90', step: '1'   },
+                  ].map(({ field, label, placeholder, step }) => (
+                    <div key={field}>
+                      <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
+                      <input type="number" min="0" step={step} value={ex[field]}
+                        onChange={e => setEx(i, field, e.target.value)} placeholder={placeholder}
+                        style={{ ...inp, textAlign: 'center' }} />
+                    </div>
                   ))}
                 </div>
-                {exercises.map((ex, i) => (
-                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 60px 60px 80px 80px 28px', gap: '6px', marginBottom: '6px' }}>
-                    <input value={ex.exercise_name} onChange={e => setEx(i, 'exercise_name', e.target.value)} placeholder="Sentadilla" style={inp} />
-                    <input type="number" min="0" value={ex.sets} onChange={e => setEx(i, 'sets', e.target.value)} placeholder="4" style={{ ...inp, textAlign: 'center' }} />
-                    <input type="number" min="0" value={ex.reps} onChange={e => setEx(i, 'reps', e.target.value)} placeholder="12" style={{ ...inp, textAlign: 'center' }} />
-                    <input type="number" min="0" step="0.5" value={ex.weight_kg} onChange={e => setEx(i, 'weight_kg', e.target.value)} placeholder="60" style={{ ...inp, textAlign: 'center' }} />
-                    <input type="number" min="0" value={ex.rest_seconds} onChange={e => setEx(i, 'rest_seconds', e.target.value)} placeholder="90" style={{ ...inp, textAlign: 'center' }} />
-                    <button type="button" onClick={() => removeEx(i)} style={{
-                      background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '14px', padding: '0',
-                      opacity: exercises.length === 1 ? 0.3 : 1,
-                    }} disabled={exercises.length === 1}>×</button>
-                  </div>
-                ))}
-              </>
-            )}
+                {exercises.length > 1 && (
+                  <button type="button" onClick={() => removeEx(i)} style={{
+                    position: 'absolute', top: '10px', right: '10px',
+                    background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '18px', padding: '0', lineHeight: 1,
+                  }}>×</button>
+                )}
+              </div>
+            ))}
           </div>
 
           {/* Notes */}
