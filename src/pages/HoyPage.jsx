@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import CalendarioView from './CalendarioView'
 
 const todayStr = () => new Date().toISOString().split('T')[0]
 const dayName = () => new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
@@ -77,6 +78,7 @@ export default function HoyPage({ user }) {
     { key: 'HOY', label: 'Hoy' },
     { key: 'SEMANA', label: 'Semana' },
     { key: 'MES', label: 'Mes' },
+    { key: 'CALENDARIO', label: '📅 Calendario' },
   ]
 
   return (
@@ -105,8 +107,10 @@ export default function HoyPage({ user }) {
         </div>
       </div>
 
+      {period === 'CALENDARIO' && <CalendarioView user={user} />}
+
       {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '16px' }}>
+      {period !== 'CALENDARIO' && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '16px' }}>
         {[
           { label: period === 'HOY' ? 'Eventos hoy' : period === 'SEMANA' ? 'Eventos semana' : 'Eventos mes', value: events.length, color: 'var(--accent)' },
           { label: period === 'HOY' ? 'Tareas pendientes' : 'Tareas completadas', value: period === 'HOY' ? tasks.length : completedTasks.length, color: '#ff9500' },
@@ -184,7 +188,7 @@ export default function HoyPage({ user }) {
             </div>
           ))
         }
-      </div>
+      </div>}
     </div>
   )
 }
