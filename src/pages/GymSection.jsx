@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-const ROUTINES = ['Pecho', 'Tríceps', 'Hombro', 'Espalda', 'Abdomen', 'Glúteo', 'Femoral', 'Cuádriceps']
+const ROUTINES = ['Pecho', 'Tríceps', 'Hombro', 'Espalda', 'Abdomen', 'Glúteo', 'Femoral', 'Cuádriceps', 'Cardio']
 const emptyEx = () => ({ exercise_name: '', sets: '', reps: '', weight_kg: '', rest_seconds: '' })
 
 function SessionModal({ onClose, onSave, initial }) {
