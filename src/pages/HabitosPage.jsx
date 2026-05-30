@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 const today = () => new Date().toISOString().split('T')[0]
 const ICONS = ['💧','🏃','📚','🧘','🥗','😴','💊','🏋️','✍️','🎯','🧹','🎵']
 const COLORS = ['#10b981','#818cf8','#f87171','#fbbf24','#f472b6','#38bdf8']
-const emptyForm = { name: '', icon: '⭐', color: '#10b981', frequency: 'diario' }
+const emptyForm = { name: '', icon: '⭐', color: '#10b981', frequency: 'diario', description: '' }
 
 export default function HabitosPage({ user }) {
   const [habits, setHabits] = useState([])
@@ -136,12 +136,15 @@ export default function HabitosPage({ user }) {
             </button>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-1)' }}>{h.name}</div>
+              {h.description && (
+                <div style={{ fontSize: '11px', color: 'var(--text-2)', marginTop: '1px' }}>{h.description}</div>
+              )}
               <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
                 🔥 {streak} días · {weekDone}/7 esta semana
               </div>
             </div>
             <div style={{ display: 'flex', gap: '4px' }}>
-              <button onClick={() => { setForm({ name: h.name, icon: h.icon, color: h.color, frequency: h.frequency }); setEditing(h.id); setShowForm(true) }}
+              <button onClick={() => { setForm({ name: h.name, icon: h.icon, color: h.color, frequency: h.frequency, description: h.description || '' }); setEditing(h.id); setShowForm(true) }}
                 style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '13px' }}>✏️</button>
               <button onClick={() => del(h.id)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '13px' }}>🗑️</button>
             </div>
@@ -166,6 +169,12 @@ export default function HabitosPage({ user }) {
                 <label style={{ fontSize: '12px', color: 'var(--text-2)', display: 'block', marginBottom: '5px' }}>Nombre *</label>
                 <input required value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
                   style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', background: 'var(--inner-bg)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: '13px' }} />
+              </div>
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-2)', display: 'block', marginBottom: '5px' }}>Descripción</label>
+                <textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+                  placeholder="¿En qué consiste este hábito?" rows={2}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', background: 'var(--inner-bg)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: '13px', resize: 'none', fontFamily: 'inherit' }} />
               </div>
               <div style={{ marginBottom: '14px' }}>
                 <label style={{ fontSize: '12px', color: 'var(--text-2)', display: 'block', marginBottom: '8px' }}>Ícono</label>
