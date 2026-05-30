@@ -22,7 +22,7 @@ const NAV = [
   { key: 'MEJORAS', label: 'Mejoras'  },
 ]
 
-export default function Sidebar({ page, setPage, user, darkMode, toggleDark }) {
+export default function Sidebar({ page, setPage, user, darkMode, toggleDark, isMobile, onClose }) {
   const initials = (user?.user_metadata?.full_name || user?.email || 'U')
     .split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
   const name = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuario'
@@ -36,12 +36,17 @@ export default function Sidebar({ page, setPage, user, darkMode, toggleDark }) {
     }}>
       {/* Logo */}
       <div style={{ padding: '0 8px', marginBottom: '40px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <div style={{ width: '24px', height: '24px', borderRadius: '6px', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ width: '24px', height: '24px', borderRadius: '6px', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="white">
             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
           </svg>
         </div>
-        <span style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-1)', letterSpacing: '-0.02em' }}>miagendaus</span>
+        <span style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-1)', letterSpacing: '-0.02em', flex: 1 }}>miagendaus</span>
+        {isMobile && (
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px', display: 'flex' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        )}
       </div>
 
       {/* Nav */}
