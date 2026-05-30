@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useIsMobile } from '../lib/useIsMobile'
 
 const today = () => new Date().toISOString().split('T')[0]
 const ICONS = ['💧','🏃','📚','🧘','🥗','😴','💊','🏋️','✍️','🎯','🧹','🎵']
@@ -7,6 +8,7 @@ const COLORS = ['#10b981','#818cf8','#f87171','#fbbf24','#f472b6','#38bdf8']
 const emptyForm = { name: '', icon: '⭐', color: '#10b981', frequency: 'diario', description: '' }
 
 export default function HabitosPage({ user }) {
+  const isMobile = useIsMobile()
   const [habits, setHabits] = useState([])
   const [logs, setLogs] = useState([])
   const [form, setForm] = useState(emptyForm)
@@ -93,33 +95,36 @@ export default function HabitosPage({ user }) {
       {/* Semana header */}
       <div style={{ ...card, marginBottom: '16px' }}>
         <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Últimos 7 días</div>
-        <div style={{ display: 'grid', gridTemplateColumns: `180px repeat(7, 1fr)`, gap: '6px', alignItems: 'center' }}>
-          <div />
-          {last7.map(d => (
-            <div key={d} style={{ textAlign: 'center', fontSize: '10px', color: d === todayStr ? 'var(--accent)' : 'var(--text-muted)', fontWeight: d === todayStr ? '700' : '400' }}>
-              {new Date(d + 'T12:00').toLocaleDateString('es-ES', { weekday: 'short' }).slice(0, 2).toUpperCase()}
-              <br />
-              <span style={{ fontSize: '11px' }}>{new Date(d + 'T12:00').getDate()}</span>
-            </div>
-          ))}
-
-          {habits.map(h => (
-            <>
-              <div key={`n${h.id}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--text-1)' }}>
-                <span>{h.icon}</span> {h.name}
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: `${isMobile ? '120px' : '180px'} repeat(7, ${isMobile ? '36px' : '1fr'})`, gap: '6px', alignItems: 'center', minWidth: isMobile ? '400px' : 'auto' }}>
+            <div />
+            {last7.map(d => (
+              <div key={d} style={{ textAlign: 'center', fontSize: '10px', color: d === todayStr ? 'var(--accent)' : 'var(--text-muted)', fontWeight: d === todayStr ? '700' : '400' }}>
+                {new Date(d + 'T12:00').toLocaleDateString('es-ES', { weekday: 'short' }).slice(0, 2).toUpperCase()}
+                <br />
+                <span style={{ fontSize: '11px' }}>{new Date(d + 'T12:00').getDate()}</span>
               </div>
-              {last7.map(d => {
-                const done = logs.some(l => l.habit_id === h.id && l.date === d)
-                const isToday = d === todayStr
-                return (
-                  <button key={`${h.id}${d}`} onClick={isToday ? () => toggle(h) : undefined}
-                    style={{ width: '28px', height: '28px', borderRadius: '8px', margin: '0 auto', display: 'block', border: `2px solid ${done ? h.color : 'var(--border)'}`, background: done ? h.color : 'transparent', cursor: isToday ? 'pointer' : 'default', color: '#fff', fontSize: '12px' }}>
-                    {done ? '✓' : ''}
-                  </button>
-                )
-              })}
-            </>
-          ))}
+            ))}
+
+            {habits.map(h => (
+              <>
+                <div key={`n${h.id}`} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: isMobile ? '12px' : '13px', color: 'var(--text-1)', overflow: 'hidden' }}>
+                  <span style={{ flexShrink: 0 }}>{h.icon}</span>
+                  <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{h.name}</span>
+                </div>
+                {last7.map(d => {
+                  const done = logs.some(l => l.habit_id === h.id && l.date === d)
+                  const isToday = d === todayStr
+                  return (
+                    <button key={`${h.id}${d}`} onClick={isToday ? () => toggle(h) : undefined}
+                      style={{ width: isMobile ? '30px' : '28px', height: isMobile ? '30px' : '28px', borderRadius: '8px', margin: '0 auto', display: 'block', border: `2px solid ${done ? h.color : 'var(--border)'}`, background: done ? h.color : 'transparent', cursor: isToday ? 'pointer' : 'default', color: '#fff', fontSize: '12px' }}>
+                      {done ? '✓' : ''}
+                    </button>
+                  )
+                })}
+              </>
+            ))}
+          </div>
         </div>
       </div>
 

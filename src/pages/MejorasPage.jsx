@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import GymSection from './GymSection'
 import TroteSection from './TroteSection'
+import { useIsMobile } from '../lib/useIsMobile'
 
 const FIELDS = [
   { key: 'weight',       label: 'Peso',           unit: 'lbs', step: '0.1', goodDown: true,  color: '#7b79f7' },
@@ -71,6 +72,7 @@ function LineChart({ data, field, color, unit }) {
 }
 
 export default function MejorasPage({ user }) {
+  const isMobile = useIsMobile()
   const [tab, setTab] = useState('mediciones')
   const [entries, setEntries] = useState([])
   const [form, setForm] = useState(emptyForm)
@@ -138,7 +140,7 @@ export default function MejorasPage({ user }) {
       {tab === 'gym' && <GymSection user={user} />}
       {tab === 'trote' && <TroteSection user={user} />}
 
-      {tab === 'mediciones' && <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
+      {tab === 'mediciones' && <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '20px', alignItems: 'flex-start' }}>
 
       {/* LEFT — main content */}
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -162,7 +164,7 @@ export default function MejorasPage({ user }) {
                 {previous && <span> · vs {new Date(previous.date + 'T12:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}</span>}
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '10px' }}>
               {FIELDS.map(f => {
                 const c = latest[f.key]
                 const p = previous?.[f.key]
@@ -193,7 +195,7 @@ export default function MejorasPage({ user }) {
         {entries.length > 0 && (
           <div style={{ ...card }}>
             <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Historial</div>
-            <div style={{ overflowX: 'auto' }}>
+            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                 <thead>
                   <tr>
@@ -249,7 +251,7 @@ export default function MejorasPage({ user }) {
 
       {/* RIGHT — gráfico */}
       {entries.length >= 2 && (
-        <div style={{ width: '300px', flexShrink: 0 }}>
+        <div style={{ width: isMobile ? '100%' : '300px', flexShrink: 0 }}>
           <div style={{ ...card, position: 'sticky', top: '24px' }}>
             <div style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '14px' }}>Tendencia</div>
 
@@ -268,7 +270,7 @@ export default function MejorasPage({ user }) {
             </div>
 
             {/* Gráfico */}
-            <div style={{ overflowX: 'auto' }}>
+            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
               <LineChart data={entries} field={chartField} color={selectedField.color} unit={selectedField.unit} />
             </div>
 
