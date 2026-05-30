@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import GymSection from './GymSection'
 
 const FIELDS = [
-  { key: 'weight',       label: 'Peso',           unit: 'kg',  step: '0.1', goodDown: true,  color: '#7b79f7' },
+  { key: 'weight',       label: 'Peso',           unit: 'lbs', step: '0.1', goodDown: true,  color: '#7b79f7' },
   { key: 'body_fat',     label: 'Grasa corporal', unit: '%',   step: '0.1', goodDown: true,  color: '#f87171' },
   { key: 'visceral_fat', label: 'Grasa visceral', unit: 'pts', step: '1',   goodDown: true,  color: '#fb923c' },
   { key: 'waist_cm',     label: 'Cintura',        unit: 'cm',  step: '0.5', goodDown: true,  color: '#fbbf24' },

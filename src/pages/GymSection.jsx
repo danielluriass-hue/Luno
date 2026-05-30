@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-const ROUTINES = ['Pierna', 'Pecho / Tríceps', 'Espalda / Bíceps', 'Hombro', 'Full Body', 'Cardio', 'Glúteo']
+const ROUTINES = ['Pecho', 'Tríceps', 'Hombro', 'Espalda', 'Abdomen', 'Glúteo', 'Femoral', 'Cuádriceps']
 const emptyEx = () => ({ exercise_name: '', sets: '', reps: '', weight_kg: '', rest_seconds: '' })
 
 function SessionModal({ onClose, onSave, initial }) {
   const [date, setDate] = useState(initial?.date || new Date().toISOString().split('T')[0])
-  const [routine, setRoutine] = useState(initial?.routine_name || '')
+  const [selected, setSelected] = useState(() => initial?.routine_name ? initial.routine_name.split(' · ') : [])
   const [notes, setNotes] = useState(initial?.notes || '')
   const [exercises, setExercises] = useState(initial?.exercises?.length ? initial.exercises : [emptyEx()])
+
+  const toggleRoutine = (r) => setSelected(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r])
 
   const setEx = (i, field, val) => setExercises(prev => prev.map((e, idx) => idx === i ? { ...e, [field]: val } : e))
   const addEx = () => setExercises(prev => [...prev, emptyEx()])
@@ -16,8 +18,8 @@ function SessionModal({ onClose, onSave, initial }) {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    if (!routine.trim()) return
-    onSave({ date, routine_name: routine.trim(), notes, exercises })
+    if (selected.length === 0) return
+    onSave({ date, routine_name: selected.join(' · '), notes, exercises })
   }
 
   const inp = { padding: '8px 10px', borderRadius: '8px', background: 'var(--inner-bg)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: '12px', width: '100%' }
@@ -29,28 +31,36 @@ function SessionModal({ onClose, onSave, initial }) {
           {initial ? 'Editar sesión' : 'Nueva sesión'}
         </h3>
         <form onSubmit={handleSubmit}>
-          {/* Date + Routine */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
-            <div>
-              <label style={{ fontSize: '11px', color: 'var(--text-2)', display: 'block', marginBottom: '5px' }}>Fecha *</label>
-              <input type="date" required value={date} onChange={e => setDate(e.target.value)} style={inp} />
-            </div>
-            <div>
-              <label style={{ fontSize: '11px', color: 'var(--text-2)', display: 'block', marginBottom: '5px' }}>Rutina *</label>
-              <input required value={routine} onChange={e => setRoutine(e.target.value)} placeholder="Ej. Pierna" style={inp} />
-            </div>
+          {/* Date */}
+          <div style={{ marginBottom: '14px' }}>
+            <label style={{ fontSize: '11px', color: 'var(--text-2)', display: 'block', marginBottom: '5px' }}>Fecha *</label>
+            <input type="date" required value={date} onChange={e => setDate(e.target.value)} style={{ ...inp, width: '50%' }} />
           </div>
 
-          {/* Routine chips */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '16px' }}>
-            {ROUTINES.map(r => (
-              <button key={r} type="button" onClick={() => setRoutine(r)} style={{
-                padding: '4px 10px', borderRadius: '20px', fontSize: '11px', cursor: 'pointer',
-                border: `1.5px solid ${routine === r ? 'var(--accent)' : 'var(--border)'}`,
-                background: routine === r ? 'var(--accent-soft)' : 'transparent',
-                color: routine === r ? 'var(--accent)' : 'var(--text-muted)', fontWeight: routine === r ? '600' : '400',
-              }}>{r}</button>
-            ))}
+          {/* Routine multi-select */}
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ fontSize: '11px', color: 'var(--text-2)', display: 'block', marginBottom: '8px' }}>
+              Grupos musculares * <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>(selección múltiple)</span>
+            </label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px' }}>
+              {ROUTINES.map(r => {
+                const active = selected.includes(r)
+                return (
+                  <button key={r} type="button" onClick={() => toggleRoutine(r)} style={{
+                    padding: '6px 14px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer',
+                    border: `1.5px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                    background: active ? 'var(--accent-soft)' : 'transparent',
+                    color: active ? 'var(--accent)' : 'var(--text-muted)',
+                    fontWeight: active ? '700' : '400', transition: 'all 0.12s',
+                  }}>{active ? '✓ ' : ''}{r}</button>
+                )
+              })}
+            </div>
+            {selected.length > 0 && (
+              <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                Seleccionado: <span style={{ color: 'var(--accent)', fontWeight: '600' }}>{selected.join(' · ')}</span>
+              </div>
+            )}
           </div>
 
           {/* Exercises table */}
@@ -65,7 +75,7 @@ function SessionModal({ onClose, onSave, initial }) {
 
             {/* Header */}
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 60px 60px 80px 80px 28px', gap: '6px', marginBottom: '6px' }}>
-              {['Ejercicio', 'Series', 'Reps', 'Carga (kg)', 'Descanso (s)', ''].map(h => (
+              {['Ejercicio', 'Series', 'Reps', 'Carga (lbs)', 'Descanso (min)', ''].map(h => (
                 <div key={h} style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: h === '' ? 'center' : 'left' }}>{h}</div>
               ))}
             </div>
@@ -242,7 +252,7 @@ export default function GymSection({ user }) {
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                         <thead>
                           <tr>
-                            {['Ejercicio', 'Series', 'Reps', 'Carga', 'Descanso'].map(h => (
+                            {['Ejercicio', 'Series', 'Reps', 'Carga (lbs)', 'Descanso (min)'].map(h => (
                               <th key={h} style={{ textAlign: h === 'Ejercicio' ? 'left' : 'center', padding: '5px 8px', color: 'var(--text-muted)', fontWeight: '500', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
                             ))}
                           </tr>
@@ -254,10 +264,10 @@ export default function GymSection({ user }) {
                               <td style={{ padding: '9px 8px', textAlign: 'center', color: 'var(--text-2)', borderBottom: '1px solid var(--border)' }}>{ex.sets ?? '—'}</td>
                               <td style={{ padding: '9px 8px', textAlign: 'center', color: 'var(--text-2)', borderBottom: '1px solid var(--border)' }}>{ex.reps ?? '—'}</td>
                               <td style={{ padding: '9px 8px', textAlign: 'center', color: 'var(--accent)', fontWeight: '600', borderBottom: '1px solid var(--border)' }}>
-                                {ex.weight_kg != null ? `${ex.weight_kg} kg` : '—'}
+                                {ex.weight_kg != null ? `${ex.weight_kg} lbs` : '—'}
                               </td>
                               <td style={{ padding: '9px 8px', textAlign: 'center', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}>
-                                {ex.rest_seconds != null ? `${ex.rest_seconds}s` : '—'}
+                                {ex.rest_seconds != null ? `${ex.rest_seconds} min` : '—'}
                               </td>
                             </tr>
                           ))}
