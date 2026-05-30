@@ -14,7 +14,9 @@ import ConfigPage from './pages/ConfigPage'
 
 export default function App() {
   const [session, setSession] = useState(undefined)
-  const [page, setPage] = useState('HOY')
+  const [page, setPage] = useState(() => localStorage.getItem('luno_page') || 'HOY')
+
+  useEffect(() => { localStorage.setItem('luno_page', page) }, [page])
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true')
 
   useEffect(() => {
