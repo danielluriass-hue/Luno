@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import GymSection from './GymSection'
+import TroteSection from './TroteSection'
 
 const FIELDS = [
   { key: 'weight',       label: 'Peso',           unit: 'lbs', step: '0.1', goodDown: true,  color: '#7b79f7' },
@@ -122,7 +123,7 @@ export default function MejorasPage({ user }) {
       <div style={{ marginBottom: '24px' }}>
         <h1 style={{ fontSize: '28px', fontWeight: '800', letterSpacing: '-0.03em', marginBottom: '16px' }}>Mejoras</h1>
         <div style={{ display: 'flex', gap: '4px', background: 'var(--inner-bg)', borderRadius: '12px', padding: '4px', width: 'fit-content' }}>
-          {[{ key: 'mediciones', label: 'Mediciones' }, { key: 'gym', label: '🏋️ Gym' }].map(t => (
+          {[{ key: 'mediciones', label: 'Mediciones' }, { key: 'gym', label: '🏋️ Gym' }, { key: 'trote', label: '🏃 Trote' }].map(t => (
             <button key={t.key} onClick={() => setTab(t.key)} style={{
               padding: '8px 20px', borderRadius: '9px', border: 'none', fontSize: '13px', fontWeight: '500', cursor: 'pointer',
               background: tab === t.key ? 'var(--card-bg)' : 'transparent',
@@ -135,6 +136,7 @@ export default function MejorasPage({ user }) {
       </div>
 
       {tab === 'gym' && <GymSection user={user} />}
+      {tab === 'trote' && <TroteSection user={user} />}
 
       {tab === 'mediciones' && <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
 
