@@ -39,7 +39,7 @@ export default function Sidebar({ page, setPage, user }) {
             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
           </svg>
         </div>
-        <span style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-1)', letterSpacing: '-0.02em' }}>Luno</span>
+        <span style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-1)', letterSpacing: '-0.02em' }}>miagendaus</span>
       </div>
 
       {/* Nav */}

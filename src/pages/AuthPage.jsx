@@ -47,7 +47,7 @@ export default function AuthPage() {
           <div style={{ width: '26px', height: '26px', borderRadius: '7px', background: '#5856d6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
           </div>
-          <span style={{ fontSize: '16px', fontWeight: '600', color: '#111', letterSpacing: '-0.02em' }}>Luno</span>
+          <span style={{ fontSize: '16px', fontWeight: '600', color: '#111', letterSpacing: '-0.02em' }}>miagendaus</span>
         </div>
 
         <h1 style={{ fontSize: '26px', fontWeight: '700', color: '#111', letterSpacing: '-0.03em', marginBottom: '4px' }}>
