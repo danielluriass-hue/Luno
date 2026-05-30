@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 const ACTIVITIES = [
-  { key: 'caminar', label: 'Caminar', icon: '🚶' },
-  { key: 'trotar',  label: 'Trotar',  icon: '🏃' },
-  { key: 'correr',  label: 'Correr',  icon: '⚡' },
+  { key: 'caminar',       label: 'Caminar',      icon: '🚶' },
+  { key: 'trotar',        label: 'Trotar',        icon: '🏃' },
+  { key: 'correr',        label: 'Correr',        icon: '⚡' },
+  { key: 'bicicleta_gym', label: 'Bicicleta Gym', icon: '🚴' },
+  { key: 'eliptica',      label: 'Elíptica',      icon: '🔄' },
 ]
 
 const FATIGUE = [
@@ -41,7 +43,7 @@ function CardioModal({ onClose, onSave, initial }) {
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
       <div style={{ background: 'var(--card-bg)', borderRadius: '20px', padding: '28px', width: '480px', maxHeight: '92vh', overflowY: 'auto', border: '1px solid var(--border-card)' }}>
         <h3 style={{ marginBottom: '20px', fontWeight: '700', color: 'var(--text-1)', fontSize: '16px' }}>
-          {initial ? 'Editar sesión' : 'Nueva sesión de cardio'}
+          {initial ? 'Editar sesión' : 'Nueva sesión'}
         </h3>
         <form onSubmit={handleSubmit}>
 
@@ -175,7 +177,7 @@ export default function TroteSection({ user }) {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Registro de cardio y trote</p>
+        <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Registro de cardio</p>
         <button onClick={() => { setEditing(null); setShowModal(true) }}
           style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '12px', padding: '9px 16px', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>
           + Nueva sesión

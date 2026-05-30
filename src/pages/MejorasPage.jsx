@@ -125,7 +125,7 @@ export default function MejorasPage({ user }) {
       <div style={{ marginBottom: '24px' }}>
         <h1 style={{ fontSize: '28px', fontWeight: '800', letterSpacing: '-0.03em', marginBottom: '16px' }}>Mejoras</h1>
         <div style={{ display: 'flex', gap: '4px', background: 'var(--inner-bg)', borderRadius: '12px', padding: '4px', width: 'fit-content' }}>
-          {[{ key: 'mediciones', label: 'Mediciones' }, { key: 'gym', label: '🏋️ Gym' }, { key: 'trote', label: '🏃 Trote' }].map(t => (
+          {[{ key: 'mediciones', label: 'Mediciones' }, { key: 'gym', label: '🏋️ Gym' }, { key: 'trote', label: '🏃 Cardio' }].map(t => (
             <button key={t.key} onClick={() => setTab(t.key)} style={{
               padding: '8px 20px', borderRadius: '9px', border: 'none', fontSize: '13px', fontWeight: '500', cursor: 'pointer',
               background: tab === t.key ? 'var(--card-bg)' : 'transparent',
