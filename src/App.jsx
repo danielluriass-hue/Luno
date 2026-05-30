@@ -9,17 +9,24 @@ import HabitosPage from './pages/HabitosPage'
 import NotasPage from './pages/NotasPage'
 import MetasPage from './pages/MetasPage'
 import RutinasPage from './pages/RutinasPage'
+import MejorasPage from './pages/MejorasPage'
 import ConfigPage from './pages/ConfigPage'
 
 export default function App() {
   const [session, setSession] = useState(undefined)
   const [page, setPage] = useState('HOY')
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true')
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => setSession(s))
     return () => subscription.unsubscribe()
   }, [])
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', darkMode)
+    localStorage.setItem('darkMode', darkMode)
+  }, [darkMode])
 
   if (session === undefined) {
     return (
@@ -35,19 +42,20 @@ export default function App() {
   const user = session.user
 
   const pages = {
-    HOY: <HoyPage user={user} />,
-    AGENDA: <AgendaPage user={user} />,
-    TAREAS: <TareasPage user={user} />,
+    HOY:     <HoyPage user={user} />,
+    AGENDA:  <AgendaPage user={user} />,
+    TAREAS:  <TareasPage user={user} />,
     HABITOS: <HabitosPage user={user} />,
-    NOTAS: <NotasPage user={user} />,
-    METAS: <MetasPage user={user} />,
+    NOTAS:   <NotasPage user={user} />,
+    METAS:   <MetasPage user={user} />,
     RUTINAS: <RutinasPage user={user} />,
-    CONFIG: <ConfigPage user={user} />,
+    MEJORAS: <MejorasPage user={user} />,
+    CONFIG:  <ConfigPage user={user} />,
   }
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
-      <Sidebar page={page} setPage={setPage} user={user} />
+      <Sidebar page={page} setPage={setPage} user={user} darkMode={darkMode} toggleDark={() => setDarkMode(d => !d)} />
       <main style={{ flex: 1, padding: '36px 40px', overflowY: 'auto', maxHeight: '100vh' }}>
         {pages[page]}
       </main>
