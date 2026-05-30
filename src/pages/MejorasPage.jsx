@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import GymSection from './GymSection'
 
 const FIELDS = [
   { key: 'weight',       label: 'Peso',           unit: 'kg',  step: '0.1', goodDown: true,  color: '#7b79f7' },
@@ -69,6 +70,7 @@ function LineChart({ data, field, color, unit }) {
 }
 
 export default function MejorasPage({ user }) {
+  const [tab, setTab] = useState('mediciones')
   const [entries, setEntries] = useState([])
   const [form, setForm] = useState(emptyForm)
   const [showForm, setShowForm] = useState(false)
@@ -115,14 +117,32 @@ export default function MejorasPage({ user }) {
   const card = { background: 'var(--card-bg)', borderRadius: '16px', border: '1px solid var(--border-card)', padding: '20px 22px' }
 
   return (
-    <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', maxWidth: '1100px' }}>
+    <div style={{ maxWidth: '1100px' }}>
+      {/* Header + Tabs */}
+      <div style={{ marginBottom: '24px' }}>
+        <h1 style={{ fontSize: '28px', fontWeight: '800', letterSpacing: '-0.03em', marginBottom: '16px' }}>Mejoras</h1>
+        <div style={{ display: 'flex', gap: '4px', background: 'var(--inner-bg)', borderRadius: '12px', padding: '4px', width: 'fit-content' }}>
+          {[{ key: 'mediciones', label: 'Mediciones' }, { key: 'gym', label: '🏋️ Gym' }].map(t => (
+            <button key={t.key} onClick={() => setTab(t.key)} style={{
+              padding: '8px 20px', borderRadius: '9px', border: 'none', fontSize: '13px', fontWeight: '500', cursor: 'pointer',
+              background: tab === t.key ? 'var(--card-bg)' : 'transparent',
+              color: tab === t.key ? 'var(--text-1)' : 'var(--text-muted)',
+              boxShadow: tab === t.key ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+              transition: 'all 0.12s',
+            }}>{t.label}</button>
+          ))}
+        </div>
+      </div>
+
+      {tab === 'gym' && <GymSection user={user} />}
+
+      {tab === 'mediciones' && <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
 
       {/* LEFT — main content */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <div>
-            <h1 style={{ fontSize: '28px', fontWeight: '800', letterSpacing: '-0.03em' }}>Mejoras</h1>
-            <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '3px' }}>Mediciones corporales semanales</p>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Mediciones corporales semanales</p>
           </div>
           <button onClick={() => { setForm(emptyForm); setEditing(null); setShowForm(true) }}
             style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '12px', padding: '10px 18px', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>
@@ -273,6 +293,8 @@ export default function MejorasPage({ user }) {
           </div>
         </div>
       )}
+
+      </div>}
 
       {/* Modal */}
       {showForm && (
