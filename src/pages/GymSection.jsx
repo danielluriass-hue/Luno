@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useIsMobile } from '../lib/useIsMobile'
 
 const ROUTINES = ['Pecho', 'Tríceps', 'Hombro', 'Espalda', 'Abdomen', 'Glúteo', 'Femoral', 'Cuádriceps', 'Cardio']
 const emptyEx = () => ({ exercise_name: '', sets: '', reps: '', weight_kg: '', rest_seconds: '' })
 
 function SessionModal({ onClose, onSave, initial }) {
+  const isMobile = useIsMobile()
   const [date, setDate] = useState(initial?.date || new Date().toISOString().split('T')[0])
   const [selected, setSelected] = useState(() => initial?.routine_name ? initial.routine_name.split(' · ') : [])
   const [notes, setNotes] = useState(initial?.notes || '')
@@ -26,7 +28,7 @@ function SessionModal({ onClose, onSave, initial }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-      <div style={{ background: 'var(--card-bg)', borderRadius: '20px', padding: '28px', width: '620px', maxHeight: '92vh', overflowY: 'auto', border: '1px solid var(--border-card)' }}>
+      <div style={{ background: 'var(--card-bg)', borderRadius: '20px', padding: isMobile ? '20px 16px' : '28px', width: '620px', maxWidth: 'calc(100vw - 24px)', maxHeight: '92vh', overflowY: 'auto', border: '1px solid var(--border-card)' }}>
         <h3 style={{ marginBottom: '20px', fontWeight: '700', color: 'var(--text-1)', fontSize: '16px' }}>
           {initial ? 'Editar sesión' : 'Nueva sesión'}
         </h3>
@@ -63,7 +65,7 @@ function SessionModal({ onClose, onSave, initial }) {
             )}
           </div>
 
-          {/* Exercises table */}
+          {/* Exercises */}
           <div style={{ marginBottom: '14px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
               <label style={{ fontSize: '11px', color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ejercicios</label>
@@ -73,26 +75,56 @@ function SessionModal({ onClose, onSave, initial }) {
               }}>+ Agregar</button>
             </div>
 
-            {/* Header */}
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 60px 60px 80px 80px 28px', gap: '6px', marginBottom: '6px' }}>
-              {['Ejercicio', 'Series', 'Reps', 'Carga (lbs)', 'Descanso (min)', ''].map(h => (
-                <div key={h} style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: h === '' ? 'center' : 'left' }}>{h}</div>
-              ))}
-            </div>
-
-            {exercises.map((ex, i) => (
-              <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 60px 60px 80px 80px 28px', gap: '6px', marginBottom: '6px' }}>
-                <input value={ex.exercise_name} onChange={e => setEx(i, 'exercise_name', e.target.value)} placeholder="Sentadilla" style={inp} />
-                <input type="number" min="0" value={ex.sets} onChange={e => setEx(i, 'sets', e.target.value)} placeholder="4" style={{ ...inp, textAlign: 'center' }} />
-                <input type="number" min="0" value={ex.reps} onChange={e => setEx(i, 'reps', e.target.value)} placeholder="12" style={{ ...inp, textAlign: 'center' }} />
-                <input type="number" min="0" step="0.5" value={ex.weight_kg} onChange={e => setEx(i, 'weight_kg', e.target.value)} placeholder="60" style={{ ...inp, textAlign: 'center' }} />
-                <input type="number" min="0" value={ex.rest_seconds} onChange={e => setEx(i, 'rest_seconds', e.target.value)} placeholder="90" style={{ ...inp, textAlign: 'center' }} />
-                <button type="button" onClick={() => removeEx(i)} style={{
-                  background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '14px', padding: '0',
-                  opacity: exercises.length === 1 ? 0.3 : 1,
-                }} disabled={exercises.length === 1}>×</button>
-              </div>
-            ))}
+            {isMobile ? (
+              exercises.map((ex, i) => (
+                <div key={i} style={{ background: 'var(--inner-bg)', borderRadius: '10px', padding: '12px', marginBottom: '8px', position: 'relative' }}>
+                  <input value={ex.exercise_name} onChange={e => setEx(i, 'exercise_name', e.target.value)} placeholder="Ejercicio (ej. Sentadilla)"
+                    style={{ ...inp, marginBottom: '8px', paddingRight: exercises.length > 1 ? '28px' : undefined }} />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                    {[
+                      { field: 'sets', label: 'Series', placeholder: '4', type: 'number', step: '1' },
+                      { field: 'reps', label: 'Reps', placeholder: '12', type: 'number', step: '1' },
+                      { field: 'weight_kg', label: 'Carga (lbs)', placeholder: '60', type: 'number', step: '0.5' },
+                      { field: 'rest_seconds', label: 'Descanso (min)', placeholder: '90', type: 'number', step: '1' },
+                    ].map(({ field, label, placeholder, type, step }) => (
+                      <div key={field}>
+                        <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
+                        <input type={type} min="0" step={step} value={ex[field]}
+                          onChange={e => setEx(i, field, e.target.value)} placeholder={placeholder}
+                          style={{ ...inp, textAlign: 'center' }} />
+                      </div>
+                    ))}
+                  </div>
+                  {exercises.length > 1 && (
+                    <button type="button" onClick={() => removeEx(i)} style={{
+                      position: 'absolute', top: '10px', right: '10px',
+                      background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '16px', padding: '0', lineHeight: 1,
+                    }}>×</button>
+                  )}
+                </div>
+              ))
+            ) : (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 60px 60px 80px 80px 28px', gap: '6px', marginBottom: '6px' }}>
+                  {['Ejercicio', 'Series', 'Reps', 'Carga (lbs)', 'Descanso (min)', ''].map(h => (
+                    <div key={h} style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: h === '' ? 'center' : 'left' }}>{h}</div>
+                  ))}
+                </div>
+                {exercises.map((ex, i) => (
+                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 60px 60px 80px 80px 28px', gap: '6px', marginBottom: '6px' }}>
+                    <input value={ex.exercise_name} onChange={e => setEx(i, 'exercise_name', e.target.value)} placeholder="Sentadilla" style={inp} />
+                    <input type="number" min="0" value={ex.sets} onChange={e => setEx(i, 'sets', e.target.value)} placeholder="4" style={{ ...inp, textAlign: 'center' }} />
+                    <input type="number" min="0" value={ex.reps} onChange={e => setEx(i, 'reps', e.target.value)} placeholder="12" style={{ ...inp, textAlign: 'center' }} />
+                    <input type="number" min="0" step="0.5" value={ex.weight_kg} onChange={e => setEx(i, 'weight_kg', e.target.value)} placeholder="60" style={{ ...inp, textAlign: 'center' }} />
+                    <input type="number" min="0" value={ex.rest_seconds} onChange={e => setEx(i, 'rest_seconds', e.target.value)} placeholder="90" style={{ ...inp, textAlign: 'center' }} />
+                    <button type="button" onClick={() => removeEx(i)} style={{
+                      background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '14px', padding: '0',
+                      opacity: exercises.length === 1 ? 0.3 : 1,
+                    }} disabled={exercises.length === 1}>×</button>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
 
           {/* Notes */}
@@ -249,7 +281,8 @@ export default function GymSection({ user }) {
                       <p style={{ fontSize: '12px', color: 'var(--text-2)', marginBottom: '14px', fontStyle: 'italic' }}>"{session.notes}"</p>
                     )}
                     {exList.length > 0 ? (
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                      <table style={{ width: '100%', minWidth: '380px', borderCollapse: 'collapse', fontSize: '12px' }}>
                         <thead>
                           <tr>
                             {['Ejercicio', 'Series', 'Reps', 'Carga (lbs)', 'Descanso (min)'].map(h => (
@@ -273,6 +306,7 @@ export default function GymSection({ user }) {
                           ))}
                         </tbody>
                       </table>
+                      </div>
                     ) : (
                       <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Sin ejercicios registrados</p>
                     )}

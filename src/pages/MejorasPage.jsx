@@ -303,7 +303,7 @@ export default function MejorasPage({ user }) {
       {/* Modal */}
       {showForm && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <div style={{ background: 'var(--card-bg)', borderRadius: '20px', padding: '28px', width: '500px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid var(--border-card)' }}>
+          <div style={{ background: 'var(--card-bg)', borderRadius: '20px', padding: isMobile ? '20px 16px' : '28px', width: '500px', maxWidth: 'calc(100vw - 24px)', maxHeight: '90vh', overflowY: 'auto', border: '1px solid var(--border-card)' }}>
             <h3 style={{ marginBottom: '20px', fontWeight: '700', color: 'var(--text-1)' }}>{editing ? 'Editar medición' : 'Nueva medición'}</h3>
             <form onSubmit={save}>
               <div style={{ marginBottom: '16px' }}>

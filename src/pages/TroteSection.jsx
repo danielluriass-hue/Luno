@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useIsMobile } from '../lib/useIsMobile'
 
 const ACTIVITIES = [
   { key: 'caminar',       label: 'Caminar',      icon: '🚶' },
@@ -25,6 +26,7 @@ const emptyForm = {
 }
 
 function CardioModal({ onClose, onSave, initial }) {
+  const isMobile = useIsMobile()
   const [form, setForm] = useState(initial || emptyForm)
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
 
@@ -41,7 +43,7 @@ function CardioModal({ onClose, onSave, initial }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-      <div style={{ background: 'var(--card-bg)', borderRadius: '20px', padding: '28px', width: '480px', maxHeight: '92vh', overflowY: 'auto', border: '1px solid var(--border-card)' }}>
+      <div style={{ background: 'var(--card-bg)', borderRadius: '20px', padding: isMobile ? '20px 16px' : '28px', width: '480px', maxWidth: 'calc(100vw - 24px)', maxHeight: '92vh', overflowY: 'auto', border: '1px solid var(--border-card)' }}>
         <h3 style={{ marginBottom: '20px', fontWeight: '700', color: 'var(--text-1)', fontSize: '16px' }}>
           {initial ? 'Editar sesión' : 'Nueva sesión'}
         </h3>
@@ -57,19 +59,21 @@ function CardioModal({ onClose, onSave, initial }) {
           {/* Actividad */}
           <div style={{ marginBottom: '16px' }}>
             <label style={{ fontSize: '11px', color: 'var(--text-2)', display: 'block', marginBottom: '8px' }}>¿Qué hiciste? *</label>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {ACTIVITIES.map(a => {
                 const active = form.activity_type === a.key
                 return (
                   <button key={a.key} type="button" onClick={() => set('activity_type', a.key)} style={{
-                    flex: 1, padding: '12px 8px', borderRadius: '12px', cursor: 'pointer',
+                    flex: isMobile ? '1 1 calc(33% - 8px)' : '1',
+                    minWidth: isMobile ? '80px' : undefined,
+                    padding: isMobile ? '10px 4px' : '12px 8px', borderRadius: '12px', cursor: 'pointer',
                     border: `2px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
                     background: active ? 'var(--accent-soft)' : 'var(--inner-bg)',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
                     transition: 'all 0.12s',
                   }}>
-                    <span style={{ fontSize: '24px' }}>{a.icon}</span>
-                    <span style={{ fontSize: '12px', fontWeight: active ? '700' : '500', color: active ? 'var(--accent)' : 'var(--text-2)' }}>{a.label}</span>
+                    <span style={{ fontSize: isMobile ? '20px' : '24px' }}>{a.icon}</span>
+                    <span style={{ fontSize: '11px', fontWeight: active ? '700' : '500', color: active ? 'var(--accent)' : 'var(--text-2)', textAlign: 'center' }}>{a.label}</span>
                   </button>
                 )
               })}
@@ -233,7 +237,7 @@ export default function TroteSection({ user }) {
                   }}>{fat.icon} {fat.label}</span>
                 )}
               </div>
-              <div style={{ display: 'flex', gap: '14px', fontSize: '12px', color: 'var(--text-muted)' }}>
+              <div style={{ display: 'flex', gap: '10px', fontSize: '12px', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
                 <span>{new Date(s.date + 'T12:00').toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
                 {s.duration_minutes && <span>⏱ {s.duration_minutes} min</span>}
                 {s.distance_km && <span>📍 {s.distance_km} km</span>}
