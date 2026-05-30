@@ -109,8 +109,9 @@ export default function HoyPage({ user }) {
 
       {period === 'CALENDARIO' && <CalendarioView user={user} />}
 
+      {period !== 'CALENDARIO' && <>
       {/* Stats */}
-      {period !== 'CALENDARIO' && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '16px' }}>
         {[
           { label: period === 'HOY' ? 'Eventos hoy' : period === 'SEMANA' ? 'Eventos semana' : 'Eventos mes', value: events.length, color: 'var(--accent)' },
           { label: period === 'HOY' ? 'Tareas pendientes' : 'Tareas completadas', value: period === 'HOY' ? tasks.length : completedTasks.length, color: '#ff9500' },
@@ -188,7 +189,8 @@ export default function HoyPage({ user }) {
             </div>
           ))
         }
-      </div>}
+      </div>
+      </>}
     </div>
   )
 }
