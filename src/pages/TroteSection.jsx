@@ -126,11 +126,11 @@ function CardioModal({ onClose, onSave, initial }) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
             <div>
               <label style={{ fontSize: '11px', color: 'var(--text-2)', display: 'block', marginBottom: '5px' }}>Duración <span style={{ color: 'var(--text-muted)' }}>(min)</span></label>
-              <input type="number" min="0" value={form.duration_minutes} onChange={e => set('duration_minutes', e.target.value)} placeholder="30" style={inp} />
+              <input type="number" min="0" value={form.duration_minutes} onChange={e => set('duration_minutes', e.target.value)} style={inp} />
             </div>
             <div>
               <label style={{ fontSize: '11px', color: 'var(--text-2)', display: 'block', marginBottom: '5px' }}>Distancia <span style={{ color: 'var(--text-muted)' }}>(km)</span></label>
-              <input type="number" min="0" step="0.01" value={form.distance_km} onChange={e => set('distance_km', e.target.value)} placeholder="3.5" style={inp} />
+              <input type="number" min="0" step="0.01" value={form.distance_km} onChange={e => set('distance_km', e.target.value)} style={inp} />
             </div>
           </div>
 
