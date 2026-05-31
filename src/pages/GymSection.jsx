@@ -4,12 +4,25 @@ import { useIsMobile } from '../lib/useIsMobile'
 
 const ROUTINES = ['Pecho', 'Tríceps', 'Hombro', 'Espalda', 'Abdomen', 'Glúteo', 'Femoral', 'Cuádriceps', 'Cardio']
 
+const EXERCISE_LIST = {
+  'Pecho':      ['Press plano', 'Press inclinado', 'Aperturas', 'Fondos'],
+  'Tríceps':    ['Tríceps en polea alta', 'Fondos', 'Press francés', 'Extensiones trasnuca'],
+  'Hombro':     ['Laterales', 'Press militar', 'Elevaciones frontales', 'Elevaciones posteriores', 'Face pull', 'Aperturas invertidas'],
+  'Espalda':    ['Jalón al pecho agarre prono', 'Jalón al pecho agarre supino', 'Jalón al pecho agarre neutro', 'Remo agarre prono', 'Remo agarre supino', 'Remo agarre neutro', 'Dominadas'],
+  'Abdomen':    ['Crunch en máquina', 'Crunch acostado', 'Crunch lateral', 'Elevaciones de pierna'],
+  'Glúteo':     ['Hip thrust', 'Peso muerto', 'Patada en polea/máquina', 'Abductores', 'Búlgaras'],
+  'Femoral':    ['Curl femoral sentado', 'Curl femoral acostado', 'Curl femoral de pie', 'Extensión de cadera', 'Prensa'],
+  'Cuádriceps': ['Sentadilla', 'Sentadilla hack', 'Prensa', 'Extensión de cuádriceps', 'Desplantes', 'Búlgaras', 'Aductores'],
+  'Cardio':     [],
+}
+
+const ALL_PREDEFINED = new Set(Object.values(EXERCISE_LIST).flat())
+
 const emptySeries = (prev) => ({
   reps: '',
   weight_kg: prev?.weight_kg || '',
   rest_seconds: prev?.rest_seconds || '',
 })
-const emptyEx = () => ({ exercise_name: '', series: [emptySeries()] })
 
 function mapExToState(exList) {
   return exList.map(ex => ({
@@ -27,13 +40,21 @@ function SessionModal({ onClose, onSave, initial }) {
   const [selected, setSelected] = useState(() => initial?.routine_name ? initial.routine_name.split(' · ') : [])
   const [notes, setNotes] = useState(initial?.notes || '')
   const [exercises, setExercises] = useState(() =>
-    initial?.exercises?.length ? mapExToState(initial.exercises) : [emptyEx()]
+    initial?.exercises?.length ? mapExToState(initial.exercises) : []
   )
 
   const toggleRoutine = (r) => setSelected(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r])
 
+  const toggleExercise = (name) => {
+    setExercises(prev => {
+      const exists = prev.find(ex => ex.exercise_name === name)
+      if (exists) return prev.filter(ex => ex.exercise_name !== name)
+      return [...prev, { exercise_name: name, series: [emptySeries()] }]
+    })
+  }
+
+  const addCustomEx = () => setExercises(prev => [...prev, { exercise_name: '', series: [emptySeries()] }])
   const setExName = (i, val) => setExercises(prev => prev.map((ex, idx) => idx === i ? { ...ex, exercise_name: val } : ex))
-  const addEx = () => setExercises(prev => [...prev, emptyEx()])
   const removeEx = (i) => setExercises(prev => prev.filter((_, idx) => idx !== i))
 
   const addSeries = (exIdx) => setExercises(prev => prev.map((ex, i) => {
@@ -54,6 +75,19 @@ function SessionModal({ onClose, onSave, initial }) {
   }
 
   const inp = { padding: '8px 10px', borderRadius: '8px', background: 'var(--card-bg)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: '12px', width: '100%' }
+
+  const selectedExNames = new Set(exercises.map(ex => ex.exercise_name))
+
+  // Ejercicios agrupados por músculo, sin duplicados entre grupos
+  const shown = new Set()
+  const exercisesByGroup = selected
+    .filter(r => EXERCISE_LIST[r]?.length > 0)
+    .map(r => {
+      const exs = (EXERCISE_LIST[r] || []).filter(e => !shown.has(e))
+      exs.forEach(e => shown.add(e))
+      return { group: r, exercises: exs }
+    })
+    .filter(g => g.exercises.length > 0)
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
@@ -88,77 +122,116 @@ function SessionModal({ onClose, onSave, initial }) {
                 )
               })}
             </div>
-            {selected.length > 0 && (
-              <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
-                Seleccionado: <span style={{ color: 'var(--accent)', fontWeight: '600' }}>{selected.join(' · ')}</span>
-              </div>
-            )}
           </div>
 
-          {/* Ejercicios */}
-          <div style={{ marginBottom: '14px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-              <label style={{ fontSize: '11px', color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ejercicios</label>
-              <button type="button" onClick={addEx} style={{
-                fontSize: '11px', color: 'var(--accent)', background: 'var(--accent-soft)',
-                border: 'none', borderRadius: '8px', padding: '4px 10px', cursor: 'pointer', fontWeight: '600',
-              }}>+ Ejercicio</button>
-            </div>
-
-            {exercises.map((ex, i) => (
-              <div key={i} style={{ background: 'var(--inner-bg)', borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
-                {/* Nombre del ejercicio */}
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', alignItems: 'center' }}>
-                  <input
-                    value={ex.exercise_name}
-                    onChange={e => setExName(i, e.target.value)}
-                    placeholder={`Ejercicio ${i + 1} (ej. Sentadilla)`}
-                    style={{ ...inp, flex: 1, background: 'var(--card-bg)' }}
-                  />
-                  {exercises.length > 1 && (
-                    <button type="button" onClick={() => removeEx(i)} style={{
-                      background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer',
-                      fontSize: '18px', padding: '0', flexShrink: 0, lineHeight: 1,
-                    }}>×</button>
-                  )}
-                </div>
-
-                {/* Header columnas series */}
-                <div style={{ display: 'grid', gridTemplateColumns: '26px 1fr 1fr 1fr 18px', gap: '4px', marginBottom: '4px' }}>
-                  {['', 'REPS', 'CARGA (lbs)', 'DESC (min)', ''].map((h, idx) => (
-                    <div key={idx} style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center' }}>{h}</div>
-                  ))}
-                </div>
-
-                {/* Filas de series */}
-                {ex.series.map((s, si) => (
-                  <div key={si} style={{ display: 'grid', gridTemplateColumns: '26px 1fr 1fr 1fr 18px', gap: '4px', marginBottom: '4px', alignItems: 'center' }}>
-                    <div style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: '700', textAlign: 'center' }}>S{si + 1}</div>
-                    <input type="number" min="0" value={s.reps}
-                      onChange={e => setSeriesField(i, si, 'reps', e.target.value)}
-                      style={{ ...inp, textAlign: 'center', padding: '7px 4px' }} />
-                    <input type="number" min="0" step="0.5" value={s.weight_kg}
-                      onChange={e => setSeriesField(i, si, 'weight_kg', e.target.value)}
-                      style={{ ...inp, textAlign: 'center', padding: '7px 4px' }} />
-                    <input type="number" min="0" step="0.5" value={s.rest_seconds}
-                      onChange={e => setSeriesField(i, si, 'rest_seconds', e.target.value)}
-                      style={{ ...inp, textAlign: 'center', padding: '7px 4px' }} />
-                    <button type="button" onClick={() => removeSeries(i, si)} style={{
-                      background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer',
-                      fontSize: '13px', padding: '0', opacity: ex.series.length === 1 ? 0.2 : 0.7,
-                    }} disabled={ex.series.length === 1}>×</button>
+          {/* Selector de ejercicios por grupo */}
+          {exercisesByGroup.length > 0 && (
+            <div style={{ marginBottom: '16px', background: 'var(--inner-bg)', borderRadius: '12px', padding: '14px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
+                Selecciona ejercicios
+              </div>
+              {exercisesByGroup.map(({ group, exercises: exList }) => (
+                <div key={group} style={{ marginBottom: '12px' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>
+                    {group}
                   </div>
-                ))}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {exList.map(name => {
+                      const active = selectedExNames.has(name)
+                      return (
+                        <button key={name} type="button" onClick={() => toggleExercise(name)} style={{
+                          padding: '5px 12px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer',
+                          border: `1.5px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                          background: active ? 'var(--accent-soft)' : 'var(--card-bg)',
+                          color: active ? 'var(--accent)' : 'var(--text-muted)',
+                          fontWeight: active ? '700' : '400', transition: 'all 0.12s',
+                        }}>{active ? '✓ ' : ''}{name}</button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
-                {/* Botón agregar serie */}
-                <button type="button" onClick={() => addSeries(i)} style={{
-                  marginTop: '8px', fontSize: '11px', color: 'var(--accent)', background: 'transparent',
-                  border: '1px dashed var(--accent)', borderRadius: '6px', padding: '5px', cursor: 'pointer',
-                  width: '100%', fontWeight: '600',
-                }}>+ Serie</button>
+          {/* Cards de ejercicios con series */}
+          {exercises.length > 0 && (
+            <div style={{ marginBottom: '14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <label style={{ fontSize: '11px', color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                  {exercises.length} ejercicio{exercises.length !== 1 ? 's' : ''}
+                </label>
+                <button type="button" onClick={addCustomEx} style={{
+                  fontSize: '11px', color: 'var(--text-muted)', background: 'transparent',
+                  border: '1px dashed var(--border)', borderRadius: '8px', padding: '4px 10px', cursor: 'pointer',
+                }}>+ Personalizado</button>
               </div>
-            ))}
-          </div>
+
+              {exercises.map((ex, i) => {
+                const isPredefined = ALL_PREDEFINED.has(ex.exercise_name)
+                return (
+                  <div key={i} style={{ background: 'var(--inner-bg)', borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
+                    {/* Nombre del ejercicio */}
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', alignItems: 'center' }}>
+                      {isPredefined ? (
+                        <div style={{ flex: 1, fontSize: '13px', fontWeight: '700', color: 'var(--text-1)', padding: '7px 10px', background: 'var(--card-bg)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                          {ex.exercise_name}
+                        </div>
+                      ) : (
+                        <input value={ex.exercise_name} onChange={e => setExName(i, e.target.value)}
+                          placeholder="Nombre del ejercicio"
+                          style={{ ...inp, flex: 1, background: 'var(--card-bg)' }} />
+                      )}
+                      <button type="button" onClick={() => removeEx(i)} style={{
+                        background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer',
+                        fontSize: '18px', padding: '0', flexShrink: 0, lineHeight: 1,
+                      }}>×</button>
+                    </div>
+
+                    {/* Header columnas */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '26px 1fr 1fr 1fr 18px', gap: '4px', marginBottom: '4px' }}>
+                      {['', 'REPS', 'CARGA (lbs)', 'DESC (min)', ''].map((h, idx) => (
+                        <div key={idx} style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center' }}>{h}</div>
+                      ))}
+                    </div>
+
+                    {/* Filas de series */}
+                    {ex.series.map((s, si) => (
+                      <div key={si} style={{ display: 'grid', gridTemplateColumns: '26px 1fr 1fr 1fr 18px', gap: '4px', marginBottom: '4px', alignItems: 'center' }}>
+                        <div style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: '700', textAlign: 'center' }}>S{si + 1}</div>
+                        <input type="number" min="0" value={s.reps}
+                          onChange={e => setSeriesField(i, si, 'reps', e.target.value)}
+                          style={{ ...inp, textAlign: 'center', padding: '7px 4px' }} />
+                        <input type="number" min="0" step="0.5" value={s.weight_kg}
+                          onChange={e => setSeriesField(i, si, 'weight_kg', e.target.value)}
+                          style={{ ...inp, textAlign: 'center', padding: '7px 4px' }} />
+                        <input type="number" min="0" step="0.5" value={s.rest_seconds}
+                          onChange={e => setSeriesField(i, si, 'rest_seconds', e.target.value)}
+                          style={{ ...inp, textAlign: 'center', padding: '7px 4px' }} />
+                        <button type="button" onClick={() => removeSeries(i, si)} style={{
+                          background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer',
+                          fontSize: '13px', padding: '0', opacity: ex.series.length === 1 ? 0.2 : 0.7,
+                        }} disabled={ex.series.length === 1}>×</button>
+                      </div>
+                    ))}
+
+                    <button type="button" onClick={() => addSeries(i)} style={{
+                      marginTop: '8px', fontSize: '11px', color: 'var(--accent)', background: 'transparent',
+                      border: '1px dashed var(--accent)', borderRadius: '6px', padding: '5px', cursor: 'pointer',
+                      width: '100%', fontWeight: '600',
+                    }}>+ Serie</button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Hint cuando hay grupos pero no ejercicios seleccionados */}
+          {exercises.length === 0 && exercisesByGroup.length > 0 && (
+            <div style={{ marginBottom: '14px', textAlign: 'center', padding: '14px', color: 'var(--text-muted)', fontSize: '13px', background: 'var(--inner-bg)', borderRadius: '10px' }}>
+              Selecciona ejercicios arriba para comenzar
+            </div>
+          )}
 
           {/* Notas */}
           <div style={{ marginBottom: '20px' }}>
@@ -201,9 +274,7 @@ export default function GymSection({ user }) {
       user_id: user.id,
       exercise_name: e.exercise_name.trim(),
       sets: e.series.length,
-      reps: null,
-      weight_kg: null,
-      rest_seconds: null,
+      reps: null, weight_kg: null, rest_seconds: null,
       series_data: e.series.map(s => ({
         reps: s.reps !== '' ? parseInt(s.reps) : null,
         weight_kg: s.weight_kg !== '' ? parseFloat(s.weight_kg) : null,
@@ -278,7 +349,6 @@ export default function GymSection({ user }) {
             const totalSeries = exList.reduce((t, e) => t + (e.series_data?.length || e.sets || 0), 0)
             return (
               <div key={session.id} style={{ ...card, marginBottom: '8px', overflow: 'hidden' }}>
-                {/* Header */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', cursor: 'pointer' }}
                   onClick={() => setExpanded(isOpen ? null : session.id)}>
                   <div style={{
@@ -304,7 +374,6 @@ export default function GymSection({ user }) {
                   </div>
                 </div>
 
-                {/* Ejercicios expandidos */}
                 {isOpen && (
                   <div style={{ borderTop: '1px solid var(--border)', padding: '16px 20px' }}>
                     {session.notes && (
@@ -331,7 +400,7 @@ export default function GymSection({ user }) {
                                   alignItems: 'center', flexWrap: 'wrap',
                                 }}>
                                   <span style={{ color: 'var(--accent)', fontSize: '10px', fontWeight: '700', width: '18px', flexShrink: 0 }}>S{si + 1}</span>
-                                  {s.reps != null && <span style={{ color: 'var(--text-1)' }}><strong>{s.reps}</strong> reps</span>}
+                                  {s.reps != null && <span><strong>{s.reps}</strong> reps</span>}
                                   {s.weight_kg != null && <span style={{ color: 'var(--accent)', fontWeight: '600' }}>{s.weight_kg} lbs</span>}
                                   {s.rest_seconds != null && <span style={{ color: 'var(--text-muted)' }}>{s.rest_seconds} min desc.</span>}
                                 </div>
