@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import GymSection from './GymSection'
 import TroteSection from './TroteSection'
 import { useIsMobile } from '../lib/useIsMobile'
+import { localDateStr } from '../lib/dateUtils'
 
 const FIELDS = [
   { key: 'weight',       label: 'Peso',           unit: 'lbs', step: '0.1', goodDown: true,  color: '#7b79f7' },
@@ -15,7 +16,7 @@ const FIELDS = [
   { key: 'leg_cm',       label: 'Muslo',          unit: 'cm',  step: '0.5', goodDown: false, color: '#a78bfa' },
 ]
 
-const emptyForm = { date: new Date().toISOString().split('T')[0], ...Object.fromEntries(FIELDS.map(f => [f.key, ''])) }
+const emptyForm = () => ({ date: localDateStr(), ...Object.fromEntries(FIELDS.map(f => [f.key, ''])) })
 
 function LineChart({ data, field, color, unit }) {
   if (!data || data.length < 2) return (
@@ -75,7 +76,7 @@ export default function MejorasPage({ user }) {
   const isMobile = useIsMobile()
   const [tab, setTab] = useState('mediciones')
   const [entries, setEntries] = useState([])
-  const [form, setForm] = useState(emptyForm)
+  const [form, setForm] = useState(() => emptyForm())
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState(null)
   const [chartField, setChartField] = useState('weight')
@@ -100,7 +101,7 @@ export default function MejorasPage({ user }) {
       const { data } = await supabase.from('body_measurements').insert(payload).select().single()
       if (data) setEntries(prev => [...prev, data].sort((a,b) => a.date.localeCompare(b.date)))
     }
-    setForm(emptyForm); setShowForm(false); setEditing(null)
+    setForm(emptyForm()); setShowForm(false); setEditing(null)
   }
 
   const del = async (id) => {
@@ -148,7 +149,7 @@ export default function MejorasPage({ user }) {
           <div>
             <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Mediciones corporales semanales</p>
           </div>
-          <button onClick={() => { setForm(emptyForm); setEditing(null); setShowForm(true) }}
+          <button onClick={() => { setForm(emptyForm()); setEditing(null); setShowForm(true) }}
             style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '12px', padding: '10px 18px', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>
             + Nueva medición
           </button>

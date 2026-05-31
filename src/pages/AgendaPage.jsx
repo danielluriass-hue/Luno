@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { localDateStr } from '../lib/dateUtils'
 
 const COLORS = ['#818cf8', '#10b981', '#f87171', '#fbbf24', '#f472b6', '#38bdf8']
 
@@ -8,7 +9,7 @@ const emptyForm = { title: '', description: '', date: '', start_time: '', end_ti
 export default function AgendaPage({ user }) {
   const [events, setEvents] = useState([])
   const [month, setMonth] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() } })
-  const [selected, setSelected] = useState(() => new Date().toISOString().split('T')[0])
+  const [selected, setSelected] = useState(() => localDateStr())
   const [form, setForm] = useState(emptyForm)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState(null)
@@ -40,7 +41,7 @@ export default function AgendaPage({ user }) {
   const { y, m } = month
   const totalDays = daysInMonth(y, m)
   const startDay = firstDay(y, m)
-  const today = new Date().toISOString().split('T')[0]
+  const today = localDateStr()
 
   const dayEvents = events.filter(ev => ev.date === selected).sort((a, b) => (a.start_time || '') > (b.start_time || '') ? 1 : -1)
 

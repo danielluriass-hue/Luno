@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useIsMobile } from '../lib/useIsMobile'
+import { localDateStr } from '../lib/dateUtils'
 
 function ElipticaIcon() {
   return (
@@ -61,7 +62,7 @@ const FATIGUE = [
 ]
 
 const emptyForm = {
-  date: new Date().toISOString().split('T')[0],
+  date: localDateStr(),
   activity_type: '',
   duration_minutes: '',
   distance_km: '',
