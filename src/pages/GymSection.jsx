@@ -3,20 +3,49 @@ import { supabase } from '../lib/supabase'
 import { useIsMobile } from '../lib/useIsMobile'
 
 const ROUTINES = ['Pecho', 'Tríceps', 'Hombro', 'Espalda', 'Abdomen', 'Glúteo', 'Femoral', 'Cuádriceps', 'Cardio']
-const emptyEx = () => ({ exercise_name: '', sets: '', reps: '', weight_kg: '', rest_seconds: '' })
+
+const emptySeries = (prev) => ({
+  reps: '',
+  weight_kg: prev?.weight_kg || '',
+  rest_seconds: prev?.rest_seconds || '',
+})
+const emptyEx = () => ({ exercise_name: '', series: [emptySeries()] })
+
+function mapExToState(exList) {
+  return exList.map(ex => ({
+    id: ex.id,
+    exercise_name: ex.exercise_name || '',
+    series: ex.series_data?.length
+      ? ex.series_data.map(s => ({ reps: s.reps ?? '', weight_kg: s.weight_kg ?? '', rest_seconds: s.rest_seconds ?? '' }))
+      : Array.from({ length: ex.sets || 1 }, () => ({ reps: ex.reps ?? '', weight_kg: ex.weight_kg ?? '', rest_seconds: ex.rest_seconds ?? '' }))
+  }))
+}
 
 function SessionModal({ onClose, onSave, initial }) {
   const isMobile = useIsMobile()
   const [date, setDate] = useState(initial?.date || new Date().toISOString().split('T')[0])
   const [selected, setSelected] = useState(() => initial?.routine_name ? initial.routine_name.split(' · ') : [])
   const [notes, setNotes] = useState(initial?.notes || '')
-  const [exercises, setExercises] = useState(initial?.exercises?.length ? initial.exercises : [emptyEx()])
+  const [exercises, setExercises] = useState(() =>
+    initial?.exercises?.length ? mapExToState(initial.exercises) : [emptyEx()]
+  )
 
   const toggleRoutine = (r) => setSelected(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r])
 
-  const setEx = (i, field, val) => setExercises(prev => prev.map((e, idx) => idx === i ? { ...e, [field]: val } : e))
+  const setExName = (i, val) => setExercises(prev => prev.map((ex, idx) => idx === i ? { ...ex, exercise_name: val } : ex))
   const addEx = () => setExercises(prev => [...prev, emptyEx()])
   const removeEx = (i) => setExercises(prev => prev.filter((_, idx) => idx !== i))
+
+  const addSeries = (exIdx) => setExercises(prev => prev.map((ex, i) => {
+    if (i !== exIdx) return ex
+    return { ...ex, series: [...ex.series, emptySeries(ex.series[ex.series.length - 1])] }
+  }))
+  const removeSeries = (exIdx, si) => setExercises(prev => prev.map((ex, i) =>
+    i !== exIdx ? ex : { ...ex, series: ex.series.filter((_, idx) => idx !== si) }
+  ))
+  const setSeriesField = (exIdx, si, field, val) => setExercises(prev => prev.map((ex, i) =>
+    i !== exIdx ? ex : { ...ex, series: ex.series.map((s, idx) => idx !== si ? s : { ...s, [field]: val }) }
+  ))
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -24,22 +53,23 @@ function SessionModal({ onClose, onSave, initial }) {
     onSave({ date, routine_name: selected.join(' · '), notes, exercises })
   }
 
-  const inp = { padding: '8px 10px', borderRadius: '8px', background: 'var(--inner-bg)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: '12px', width: '100%' }
+  const inp = { padding: '8px 10px', borderRadius: '8px', background: 'var(--card-bg)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: '12px', width: '100%' }
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-      <div style={{ background: 'var(--card-bg)', borderRadius: '20px', padding: isMobile ? '20px 16px' : '28px', width: '620px', maxWidth: 'calc(100vw - 24px)', maxHeight: '92vh', overflowY: 'auto', border: '1px solid var(--border-card)' }}>
+      <div style={{ background: 'var(--card-bg)', borderRadius: '20px', padding: isMobile ? '20px 16px' : '28px', width: '560px', maxWidth: 'calc(100vw - 24px)', maxHeight: '92vh', overflowY: 'auto', border: '1px solid var(--border-card)' }}>
         <h3 style={{ marginBottom: '20px', fontWeight: '700', color: 'var(--text-1)', fontSize: '16px' }}>
           {initial ? 'Editar sesión' : 'Nueva sesión'}
         </h3>
         <form onSubmit={handleSubmit}>
-          {/* Date */}
+
+          {/* Fecha */}
           <div style={{ marginBottom: '14px' }}>
             <label style={{ fontSize: '11px', color: 'var(--text-2)', display: 'block', marginBottom: '5px' }}>Fecha *</label>
             <input type="date" required value={date} onChange={e => setDate(e.target.value)} style={{ ...inp, width: '50%' }} />
           </div>
 
-          {/* Routine multi-select */}
+          {/* Grupos musculares */}
           <div style={{ marginBottom: '16px' }}>
             <label style={{ fontSize: '11px', color: 'var(--text-2)', display: 'block', marginBottom: '8px' }}>
               Grupos musculares * <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>(selección múltiple)</span>
@@ -65,50 +95,76 @@ function SessionModal({ onClose, onSave, initial }) {
             )}
           </div>
 
-          {/* Exercises */}
+          {/* Ejercicios */}
           <div style={{ marginBottom: '14px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
               <label style={{ fontSize: '11px', color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ejercicios</label>
               <button type="button" onClick={addEx} style={{
                 fontSize: '11px', color: 'var(--accent)', background: 'var(--accent-soft)',
                 border: 'none', borderRadius: '8px', padding: '4px 10px', cursor: 'pointer', fontWeight: '600',
-              }}>+ Agregar</button>
+              }}>+ Ejercicio</button>
             </div>
 
             {exercises.map((ex, i) => (
-              <div key={i} style={{ background: 'var(--inner-bg)', borderRadius: '10px', padding: '12px', marginBottom: '8px', position: 'relative' }}>
-                <input value={ex.exercise_name} onChange={e => setEx(i, 'exercise_name', e.target.value)} placeholder="Ejercicio (ej. Sentadilla)"
-                  style={{ ...inp, marginBottom: '8px', paddingRight: exercises.length > 1 ? '28px' : undefined }} />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                  {[
-                    { field: 'sets',         label: 'Series',          placeholder: '4',  step: '1'   },
-                    { field: 'reps',         label: 'Reps',            placeholder: '12', step: '1'   },
-                    { field: 'weight_kg',    label: 'Carga (lbs)',     placeholder: '60', step: '0.5' },
-                    { field: 'rest_seconds', label: 'Descanso (min)',  placeholder: '90', step: '1'   },
-                  ].map(({ field, label, placeholder, step }) => (
-                    <div key={field}>
-                      <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
-                      <input type="number" min="0" step={step} value={ex[field]}
-                        onChange={e => setEx(i, field, e.target.value)} placeholder={placeholder}
-                        style={{ ...inp, textAlign: 'center' }} />
-                    </div>
+              <div key={i} style={{ background: 'var(--inner-bg)', borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
+                {/* Nombre del ejercicio */}
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', alignItems: 'center' }}>
+                  <input
+                    value={ex.exercise_name}
+                    onChange={e => setExName(i, e.target.value)}
+                    placeholder={`Ejercicio ${i + 1} (ej. Sentadilla)`}
+                    style={{ ...inp, flex: 1, background: 'var(--card-bg)' }}
+                  />
+                  {exercises.length > 1 && (
+                    <button type="button" onClick={() => removeEx(i)} style={{
+                      background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer',
+                      fontSize: '18px', padding: '0', flexShrink: 0, lineHeight: 1,
+                    }}>×</button>
+                  )}
+                </div>
+
+                {/* Header columnas series */}
+                <div style={{ display: 'grid', gridTemplateColumns: '26px 1fr 1fr 1fr 18px', gap: '4px', marginBottom: '4px' }}>
+                  {['', 'REPS', 'CARGA (lbs)', 'DESC (min)', ''].map((h, idx) => (
+                    <div key={idx} style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center' }}>{h}</div>
                   ))}
                 </div>
-                {exercises.length > 1 && (
-                  <button type="button" onClick={() => removeEx(i)} style={{
-                    position: 'absolute', top: '10px', right: '10px',
-                    background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '18px', padding: '0', lineHeight: 1,
-                  }}>×</button>
-                )}
+
+                {/* Filas de series */}
+                {ex.series.map((s, si) => (
+                  <div key={si} style={{ display: 'grid', gridTemplateColumns: '26px 1fr 1fr 1fr 18px', gap: '4px', marginBottom: '4px', alignItems: 'center' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: '700', textAlign: 'center' }}>S{si + 1}</div>
+                    <input type="number" min="0" value={s.reps}
+                      onChange={e => setSeriesField(i, si, 'reps', e.target.value)}
+                      placeholder="12" style={{ ...inp, textAlign: 'center', padding: '7px 4px' }} />
+                    <input type="number" min="0" step="0.5" value={s.weight_kg}
+                      onChange={e => setSeriesField(i, si, 'weight_kg', e.target.value)}
+                      placeholder="50" style={{ ...inp, textAlign: 'center', padding: '7px 4px' }} />
+                    <input type="number" min="0" step="0.5" value={s.rest_seconds}
+                      onChange={e => setSeriesField(i, si, 'rest_seconds', e.target.value)}
+                      placeholder="2" style={{ ...inp, textAlign: 'center', padding: '7px 4px' }} />
+                    <button type="button" onClick={() => removeSeries(i, si)} style={{
+                      background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer',
+                      fontSize: '13px', padding: '0', opacity: ex.series.length === 1 ? 0.2 : 0.7,
+                    }} disabled={ex.series.length === 1}>×</button>
+                  </div>
+                ))}
+
+                {/* Botón agregar serie */}
+                <button type="button" onClick={() => addSeries(i)} style={{
+                  marginTop: '8px', fontSize: '11px', color: 'var(--accent)', background: 'transparent',
+                  border: '1px dashed var(--accent)', borderRadius: '6px', padding: '5px', cursor: 'pointer',
+                  width: '100%', fontWeight: '600',
+                }}>+ Serie</button>
               </div>
             ))}
           </div>
 
-          {/* Notes */}
+          {/* Notas */}
           <div style={{ marginBottom: '20px' }}>
             <label style={{ fontSize: '11px', color: 'var(--text-2)', display: 'block', marginBottom: '5px' }}>Notas</label>
             <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Cómo fue la sesión..."
-              style={{ ...inp, resize: 'none', fontFamily: 'inherit' }} />
+              style={{ ...inp, resize: 'none', fontFamily: 'inherit', background: 'var(--inner-bg)' }} />
           </div>
 
           <div style={{ display: 'flex', gap: '10px' }}>
@@ -139,21 +195,28 @@ export default function GymSection({ user }) {
       .then(({ data }) => setSessions(data || []))
   }, [user.id])
 
+  const buildExRows = (exercises, sessionId) =>
+    exercises.filter(e => e.exercise_name.trim()).map((e, i) => ({
+      session_id: sessionId,
+      user_id: user.id,
+      exercise_name: e.exercise_name.trim(),
+      sets: e.series.length,
+      reps: null,
+      weight_kg: null,
+      rest_seconds: null,
+      series_data: e.series.map(s => ({
+        reps: s.reps !== '' ? parseInt(s.reps) : null,
+        weight_kg: s.weight_kg !== '' ? parseFloat(s.weight_kg) : null,
+        rest_seconds: s.rest_seconds !== '' ? parseFloat(s.rest_seconds) : null,
+      })),
+      sort_order: i,
+    }))
+
   const handleSave = async ({ date, routine_name, notes, exercises }) => {
     if (editing) {
-      // Update session
       await supabase.from('gym_sessions').update({ date, routine_name, notes }).eq('id', editing.id)
-      // Delete old exercises and re-insert
       await supabase.from('gym_exercises').delete().eq('session_id', editing.id)
-      const exRows = exercises.filter(e => e.exercise_name.trim()).map((e, i) => ({
-        session_id: editing.id, user_id: user.id,
-        exercise_name: e.exercise_name.trim(),
-        sets: e.sets ? parseInt(e.sets) : null,
-        reps: e.reps ? parseInt(e.reps) : null,
-        weight_kg: e.weight_kg ? parseFloat(e.weight_kg) : null,
-        rest_seconds: e.rest_seconds ? parseInt(e.rest_seconds) : null,
-        sort_order: i,
-      }))
+      const exRows = buildExRows(exercises, editing.id)
       const { data: exData } = exRows.length ? await supabase.from('gym_exercises').insert(exRows).select() : { data: [] }
       setSessions(prev => prev.map(s => s.id === editing.id
         ? { ...s, date, routine_name, notes, gym_exercises: exData || [] }
@@ -163,15 +226,7 @@ export default function GymSection({ user }) {
       const { data: session } = await supabase.from('gym_sessions')
         .insert({ user_id: user.id, date, routine_name, notes }).select().single()
       if (!session) return
-      const exRows = exercises.filter(e => e.exercise_name.trim()).map((e, i) => ({
-        session_id: session.id, user_id: user.id,
-        exercise_name: e.exercise_name.trim(),
-        sets: e.sets ? parseInt(e.sets) : null,
-        reps: e.reps ? parseInt(e.reps) : null,
-        weight_kg: e.weight_kg ? parseFloat(e.weight_kg) : null,
-        rest_seconds: e.rest_seconds ? parseInt(e.rest_seconds) : null,
-        sort_order: i,
-      }))
+      const exRows = buildExRows(exercises, session.id)
       const { data: exData } = exRows.length ? await supabase.from('gym_exercises').insert(exRows).select() : { data: [] }
       setSessions(prev => [{ ...session, gym_exercises: exData || [] }, ...prev])
       setExpanded(session.id)
@@ -187,11 +242,9 @@ export default function GymSection({ user }) {
 
   const card = { background: 'var(--card-bg)', borderRadius: '16px', border: '1px solid var(--border-card)' }
 
-  // Group by date
   const grouped = sessions.reduce((acc, s) => {
-    const d = s.date
-    if (!acc[d]) acc[d] = []
-    acc[d].push(s)
+    if (!acc[s.date]) acc[s.date] = []
+    acc[s.date].push(s)
     return acc
   }, {})
   const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a))
@@ -222,6 +275,7 @@ export default function GymSection({ user }) {
           {grouped[date].map(session => {
             const isOpen = expanded === session.id
             const exList = (session.gym_exercises || []).sort((a, b) => a.sort_order - b.sort_order)
+            const totalSeries = exList.reduce((t, e) => t + (e.series_data?.length || e.sets || 0), 0)
             return (
               <div key={session.id} style={{ ...card, marginBottom: '8px', overflow: 'hidden' }}>
                 {/* Header */}
@@ -229,60 +283,62 @@ export default function GymSection({ user }) {
                   onClick={() => setExpanded(isOpen ? null : session.id)}>
                   <div style={{
                     width: '38px', height: '38px', borderRadius: '12px', flexShrink: 0,
-                    background: 'var(--accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '18px',
+                    background: 'var(--accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px',
                   }}>🏋️</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-1)' }}>{session.routine_name}</div>
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
                       {exList.length} ejercicio{exList.length !== 1 ? 's' : ''}
-                      {exList.length > 0 && ` · ${exList.reduce((t, e) => t + (e.sets || 0), 0)} series totales`}
+                      {totalSeries > 0 && ` · ${totalSeries} series`}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    <button onClick={(e) => { e.stopPropagation(); setEditing({ ...session, exercises: exList }); setShowModal(true) }}
+                    <button onClick={e => { e.stopPropagation(); setEditing({ ...session, exercises: exList }); setShowModal(true) }}
                       style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '13px', padding: '4px 6px' }}>✏️</button>
-                    <button onClick={(e) => { e.stopPropagation(); handleDelete(session.id) }}
+                    <button onClick={e => { e.stopPropagation(); handleDelete(session.id) }}
                       style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '13px', padding: '4px 6px' }}>🗑️</button>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2"
-                      style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: '0.15s' }}>
+                      style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: '0.15s', flexShrink: 0 }}>
                       <polyline points="6 9 12 15 18 9"/>
                     </svg>
                   </div>
                 </div>
 
-                {/* Exercises */}
+                {/* Ejercicios expandidos */}
                 {isOpen && (
                   <div style={{ borderTop: '1px solid var(--border)', padding: '16px 20px' }}>
                     {session.notes && (
                       <p style={{ fontSize: '12px', color: 'var(--text-2)', marginBottom: '14px', fontStyle: 'italic' }}>"{session.notes}"</p>
                     )}
                     {exList.length > 0 ? (
-                      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                      <table style={{ width: '100%', minWidth: '380px', borderCollapse: 'collapse', fontSize: '12px' }}>
-                        <thead>
-                          <tr>
-                            {['Ejercicio', 'Series', 'Reps', 'Carga (lbs)', 'Descanso (min)'].map(h => (
-                              <th key={h} style={{ textAlign: h === 'Ejercicio' ? 'left' : 'center', padding: '5px 8px', color: 'var(--text-muted)', fontWeight: '500', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {exList.map((ex, i) => (
-                            <tr key={ex.id || i}>
-                              <td style={{ padding: '9px 8px', color: 'var(--text-1)', fontWeight: '500', borderBottom: '1px solid var(--border)' }}>{ex.exercise_name}</td>
-                              <td style={{ padding: '9px 8px', textAlign: 'center', color: 'var(--text-2)', borderBottom: '1px solid var(--border)' }}>{ex.sets ?? '—'}</td>
-                              <td style={{ padding: '9px 8px', textAlign: 'center', color: 'var(--text-2)', borderBottom: '1px solid var(--border)' }}>{ex.reps ?? '—'}</td>
-                              <td style={{ padding: '9px 8px', textAlign: 'center', color: 'var(--accent)', fontWeight: '600', borderBottom: '1px solid var(--border)' }}>
-                                {ex.weight_kg != null ? `${ex.weight_kg} lbs` : '—'}
-                              </td>
-                              <td style={{ padding: '9px 8px', textAlign: 'center', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}>
-                                {ex.rest_seconds != null ? `${ex.rest_seconds} min` : '—'}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                      <div>
+                        {exList.map((ex, exIdx) => {
+                          const seriesData = ex.series_data?.length
+                            ? ex.series_data
+                            : Array.from({ length: ex.sets || 1 }, () => ({ reps: ex.reps, weight_kg: ex.weight_kg, rest_seconds: ex.rest_seconds }))
+                          return (
+                            <div key={ex.id || exIdx} style={{ marginBottom: exIdx < exList.length - 1 ? '14px' : 0 }}>
+                              <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-1)', marginBottom: '6px' }}>
+                                {ex.exercise_name}
+                                <span style={{ fontSize: '10px', fontWeight: '400', color: 'var(--text-muted)', marginLeft: '6px' }}>
+                                  {seriesData.length} {seriesData.length === 1 ? 'serie' : 'series'}
+                                </span>
+                              </div>
+                              {seriesData.map((s, si) => (
+                                <div key={si} style={{
+                                  display: 'flex', gap: '12px', fontSize: '12px', padding: '5px 8px',
+                                  borderRadius: '6px', background: si % 2 === 0 ? 'var(--inner-bg)' : 'transparent',
+                                  alignItems: 'center', flexWrap: 'wrap',
+                                }}>
+                                  <span style={{ color: 'var(--accent)', fontSize: '10px', fontWeight: '700', width: '18px', flexShrink: 0 }}>S{si + 1}</span>
+                                  {s.reps != null && <span style={{ color: 'var(--text-1)' }}><strong>{s.reps}</strong> reps</span>}
+                                  {s.weight_kg != null && <span style={{ color: 'var(--accent)', fontWeight: '600' }}>{s.weight_kg} lbs</span>}
+                                  {s.rest_seconds != null && <span style={{ color: 'var(--text-muted)' }}>{s.rest_seconds} min desc.</span>}
+                                </div>
+                              ))}
+                            </div>
+                          )
+                        })}
                       </div>
                     ) : (
                       <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Sin ejercicios registrados</p>
