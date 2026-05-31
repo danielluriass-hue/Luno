@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useIsMobile } from '../lib/useIsMobile'
+import { localDateStr } from '../lib/dateUtils'
 
 const ROUTINES = ['Pecho', 'Tríceps', 'Hombro', 'Espalda', 'Abdomen', 'Glúteo', 'Femoral', 'Cuádriceps', 'Cardio']
 
@@ -36,7 +37,7 @@ function mapExToState(exList) {
 
 function SessionModal({ onClose, onSave, initial }) {
   const isMobile = useIsMobile()
-  const [date, setDate] = useState(initial?.date || new Date().toISOString().split('T')[0])
+  const [date, setDate] = useState(initial?.date || localDateStr())
   const [selected, setSelected] = useState(() => initial?.routine_name ? initial.routine_name.split(' · ') : [])
   const [notes, setNotes] = useState(initial?.notes || '')
   const [exercises, setExercises] = useState(() =>

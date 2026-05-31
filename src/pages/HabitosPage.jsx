@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useIsMobile } from '../lib/useIsMobile'
+import { localDateStr } from '../lib/dateUtils'
 
-const today = () => new Date().toISOString().split('T')[0]
+const today = () => localDateStr()
 const ICONS = ['💧','🏃','📚','🧘','🥗','😴','💊','🏋️','✍️','🎯','🧹','🎵']
 const COLORS = ['#10b981','#818cf8','#f87171','#fbbf24','#f472b6','#38bdf8']
 const emptyForm = { name: '', icon: '⭐', color: '#10b981', frequency: 'diario', description: '' }
@@ -23,16 +24,15 @@ export default function HabitosPage({ user }) {
 
   const getWeekStart = () => {
     const d = new Date()
-    const day = d.getDay()
-    const diff = d.getDate() - day
-    return new Date(d.setDate(diff)).toISOString().split('T')[0]
+    d.setDate(d.getDate() - d.getDay())
+    return localDateStr(d)
   }
 
   const getLast7 = () => {
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date()
       d.setDate(d.getDate() - (6 - i))
-      return d.toISOString().split('T')[0]
+      return localDateStr(d)
     })
   }
 
@@ -73,7 +73,7 @@ export default function HabitosPage({ user }) {
     let streak = 0
     const d = new Date()
     while (true) {
-      const dateStr = d.toISOString().split('T')[0]
+      const dateStr = localDateStr(d)
       if (logs.some(l => l.habit_id === habit.id && l.date === dateStr)) { streak++; d.setDate(d.getDate() - 1) }
       else break
     }

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { localDateStr } from '../lib/dateUtils'
 
-const today = () => new Date().toISOString().split('T')[0]
+const today = () => localDateStr()
 const TYPES = [{ key: 'manana', label: '🌅 Mañana' }, { key: 'noche', label: '🌙 Noche' }, { key: 'personalizada', label: '⚙️ Personalizada' }]
 
 export default function RutinasPage({ user }) {

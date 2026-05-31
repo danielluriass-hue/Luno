@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useIsMobile } from '../lib/useIsMobile'
+import { localDateStr } from '../lib/dateUtils'
 
 const WEEK_DAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
 
@@ -9,8 +10,8 @@ function getMonthRange(date) {
   const first = new Date(y, m, 1)
   const last = new Date(y, m + 1, 0)
   return {
-    from: first.toISOString().split('T')[0],
-    to: last.toISOString().split('T')[0],
+    from: localDateStr(first),
+    to: localDateStr(last),
     daysInMonth: last.getDate(),
     firstDayOfWeek: (first.getDay() + 6) % 7, // lunes = 0
   }
@@ -26,7 +27,7 @@ export default function CalendarioView({ user }) {
   const [selectedDay, setSelectedDay] = useState(null)
 
   const { from, to, daysInMonth, firstDayOfWeek } = getMonthRange(month)
-  const todayStr = new Date().toISOString().split('T')[0]
+  const todayStr = localDateStr()
 
   useEffect(() => {
     const uid = user.id

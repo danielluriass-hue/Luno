@@ -2,24 +2,25 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import CalendarioView from './CalendarioView'
 
-const todayStr = () => new Date().toISOString().split('T')[0]
+import { localDateStr } from '../lib/dateUtils'
+const todayStr = () => localDateStr()
 const dayName = () => new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
 
 const getPeriodRange = (period) => {
   const now = new Date()
-  const today = now.toISOString().split('T')[0]
+  const today = localDateStr(now)
   if (period === 'HOY') return { from: today, to: today }
   if (period === 'SEMANA') {
     const start = new Date(now)
     start.setDate(now.getDate() - now.getDay())
     const end = new Date(start)
     end.setDate(start.getDate() + 6)
-    return { from: start.toISOString().split('T')[0], to: end.toISOString().split('T')[0] }
+    return { from: localDateStr(start), to: localDateStr(end) }
   }
   // MES
   const start = new Date(now.getFullYear(), now.getMonth(), 1)
   const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-  return { from: start.toISOString().split('T')[0], to: end.toISOString().split('T')[0] }
+  return { from: localDateStr(start), to: localDateStr(end) }
 }
 
 export default function HoyPage({ user }) {
