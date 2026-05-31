@@ -2,12 +2,39 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useIsMobile } from '../lib/useIsMobile'
 
+function ElipticaIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+      <ellipse cx="12" cy="16" rx="7" ry="4" stroke="currentColor" strokeWidth="2"/>
+      <line x1="6" y1="12" x2="5" y2="5" stroke="currentColor" strokeWidth="2"/>
+      <line x1="18" y1="12" x2="19" y2="5" stroke="currentColor" strokeWidth="2"/>
+      <line x1="5" y1="5" x2="19" y2="5" stroke="currentColor" strokeWidth="2"/>
+    </svg>
+  )
+}
+
+function GradasIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="2,20 2,14 8,14 8,9 14,9 14,4 20,4" stroke="currentColor" strokeWidth="2.2"/>
+    </svg>
+  )
+}
+
+function ActivityIcon({ actKey, size = 22 }) {
+  if (actKey === 'eliptica') return <ElipticaIcon />
+  if (actKey === 'gradas_gym') return <GradasIcon />
+  const emojis = { caminar: '🚶', trotar: '🏃', correr: '⚡', bicicleta_gym: '🚴' }
+  return <span style={{ fontSize: size + 'px', lineHeight: 1 }}>{emojis[actKey] || '🏃'}</span>
+}
+
 const ACTIVITIES = [
-  { key: 'caminar',       label: 'Caminar',      icon: '🚶' },
-  { key: 'trotar',        label: 'Trotar',        icon: '🏃' },
-  { key: 'correr',        label: 'Correr',        icon: '⚡' },
-  { key: 'bicicleta_gym', label: 'Bicicleta Gym', icon: '🚴' },
-  { key: 'eliptica',      label: 'Elíptica',      icon: '🔄' },
+  { key: 'caminar',       label: 'Caminar'       },
+  { key: 'trotar',        label: 'Trotar'        },
+  { key: 'correr',        label: 'Correr'        },
+  { key: 'bicicleta_gym', label: 'Bicicleta Gym' },
+  { key: 'eliptica',      label: 'Elíptica'      },
+  { key: 'gradas_gym',    label: 'Gradas Gym'    },
 ]
 
 const FATIGUE = [
@@ -49,14 +76,12 @@ function CardioModal({ onClose, onSave, initial }) {
         </h3>
         <form onSubmit={handleSubmit}>
 
-          {/* Fecha */}
           <div style={{ marginBottom: '16px' }}>
             <label style={{ fontSize: '11px', color: 'var(--text-2)', display: 'block', marginBottom: '5px' }}>Fecha *</label>
             <input type="date" required value={form.date} onChange={e => set('date', e.target.value)}
               style={{ ...inp, width: '60%' }} />
           </div>
 
-          {/* Actividad */}
           <div style={{ marginBottom: '16px' }}>
             <label style={{ fontSize: '11px', color: 'var(--text-2)', display: 'block', marginBottom: '8px' }}>¿Qué hiciste? *</label>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -71,16 +96,16 @@ function CardioModal({ onClose, onSave, initial }) {
                     background: active ? 'var(--accent-soft)' : 'var(--inner-bg)',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
                     transition: 'all 0.12s',
+                    color: active ? 'var(--accent)' : 'var(--text-muted)',
                   }}>
-                    <span style={{ fontSize: isMobile ? '20px' : '24px' }}>{a.icon}</span>
-                    <span style={{ fontSize: '11px', fontWeight: active ? '700' : '500', color: active ? 'var(--accent)' : 'var(--text-2)', textAlign: 'center' }}>{a.label}</span>
+                    <ActivityIcon actKey={a.key} size={isMobile ? 20 : 22} />
+                    <span style={{ fontSize: '11px', fontWeight: active ? '700' : '500', textAlign: 'center' }}>{a.label}</span>
                   </button>
                 )
               })}
             </div>
           </div>
 
-          {/* Duración + Distancia */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
             <div>
               <label style={{ fontSize: '11px', color: 'var(--text-2)', display: 'block', marginBottom: '5px' }}>Duración <span style={{ color: 'var(--text-muted)' }}>(min)</span></label>
@@ -92,7 +117,6 @@ function CardioModal({ onClose, onSave, initial }) {
             </div>
           </div>
 
-          {/* Cansancio */}
           <div style={{ marginBottom: '16px' }}>
             <label style={{ fontSize: '11px', color: 'var(--text-2)', display: 'block', marginBottom: '8px' }}>¿Cómo terminaste?</label>
             <div style={{ display: 'flex', gap: '8px' }}>
@@ -114,7 +138,6 @@ function CardioModal({ onClose, onSave, initial }) {
             </div>
           </div>
 
-          {/* Notas */}
           <div style={{ marginBottom: '20px' }}>
             <label style={{ fontSize: '11px', color: 'var(--text-2)', display: 'block', marginBottom: '5px' }}>Notas</label>
             <textarea value={form.notes} onChange={e => set('notes', e.target.value)} rows={2}
@@ -175,7 +198,6 @@ export default function TroteSection({ user }) {
   const totalMin = sessions.reduce((t, s) => t + (s.duration_minutes || 0), 0)
   const actInfo = (key) => ACTIVITIES.find(a => a.key === key)
   const fatInfo = (key) => FATIGUE.find(f => f.key === key)
-
   const card = { background: 'var(--card-bg)', borderRadius: '16px', border: '1px solid var(--border-card)' }
 
   return (
@@ -188,7 +210,6 @@ export default function TroteSection({ user }) {
         </button>
       </div>
 
-      {/* Stats rápidas */}
       {sessions.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '16px' }}>
           {[
@@ -204,7 +225,6 @@ export default function TroteSection({ user }) {
         </div>
       )}
 
-      {/* Lista de sesiones */}
       {sessions.length === 0 && (
         <div style={{ ...card, textAlign: 'center', padding: '48px' }}>
           <p style={{ fontSize: '36px', marginBottom: '10px' }}>🏃</p>
@@ -218,15 +238,14 @@ export default function TroteSection({ user }) {
         const fat = fatInfo(s.fatigue_level)
         return (
           <div key={s.id} style={{ ...card, padding: '16px 20px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-            {/* Ícono actividad */}
             <div style={{
               width: '46px', height: '46px', borderRadius: '14px', flexShrink: 0,
-              background: 'var(--accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px',
+              background: 'var(--accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'var(--accent)',
             }}>
-              {act?.icon || '🏃'}
+              <ActivityIcon actKey={s.activity_type} size={22} />
             </div>
 
-            {/* Info */}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                 <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-1)' }}>{act?.label || s.activity_type}</span>
@@ -248,7 +267,6 @@ export default function TroteSection({ user }) {
               {s.notes && <div style={{ fontSize: '11px', color: 'var(--text-2)', marginTop: '4px', fontStyle: 'italic' }}>"{s.notes}"</div>}
             </div>
 
-            {/* Acciones */}
             <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
               <button onClick={() => { setEditing(s); setShowModal(true) }}
                 style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '14px', padding: '4px 6px' }}>✏️</button>
