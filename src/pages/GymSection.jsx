@@ -136,13 +136,13 @@ function SessionModal({ onClose, onSave, initial }) {
                     <div style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: '700', textAlign: 'center' }}>S{si + 1}</div>
                     <input type="number" min="0" value={s.reps}
                       onChange={e => setSeriesField(i, si, 'reps', e.target.value)}
-                      placeholder="12" style={{ ...inp, textAlign: 'center', padding: '7px 4px' }} />
+                      style={{ ...inp, textAlign: 'center', padding: '7px 4px' }} />
                     <input type="number" min="0" step="0.5" value={s.weight_kg}
                       onChange={e => setSeriesField(i, si, 'weight_kg', e.target.value)}
-                      placeholder="50" style={{ ...inp, textAlign: 'center', padding: '7px 4px' }} />
+                      style={{ ...inp, textAlign: 'center', padding: '7px 4px' }} />
                     <input type="number" min="0" step="0.5" value={s.rest_seconds}
                       onChange={e => setSeriesField(i, si, 'rest_seconds', e.target.value)}
-                      placeholder="2" style={{ ...inp, textAlign: 'center', padding: '7px 4px' }} />
+                      style={{ ...inp, textAlign: 'center', padding: '7px 4px' }} />
                     <button type="button" onClick={() => removeSeries(i, si)} style={{
                       background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer',
                       fontSize: '13px', padding: '0', opacity: ex.series.length === 1 ? 0.2 : 0.7,
