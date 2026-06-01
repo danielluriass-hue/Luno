@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-const emptyForm = { title: '', description: '', period: 'mensual', progress: 0, due_date: '' }
+const emptyForm = { title: '', description: '', period: 'mensual', progress: 0, start_date: '', due_date: '' }
 const PERIODS = [{ key: 'semanal', label: 'Semanal' }, { key: 'mensual', label: 'Mensual' }, { key: 'anual', label: 'Anual' }]
 
 export default function MetasPage({ user }) {
@@ -100,13 +100,14 @@ export default function MetasPage({ user }) {
                   {g.period}
                 </span>
                 {g.completed && <span style={{ fontSize: '11px', color: '#10b981', background: 'rgba(16,185,129,0.1)', padding: '2px 8px', borderRadius: '6px', fontWeight: '700' }}>✓ Completada</span>}
-                {g.due_date && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>📅 {g.due_date}</span>}
+                {g.start_date && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Inicio: {g.start_date}</span>}
+                {g.due_date && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Límite: {g.due_date}</span>}
               </div>
               <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-1)', marginBottom: '2px' }}>{g.title}</div>
               {g.description && <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{g.description}</div>}
             </div>
             <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-              <button onClick={() => { setForm({ title: g.title, description: g.description || '', period: g.period, progress: g.progress, due_date: g.due_date || '' }); setEditing(g.id); setShowForm(true) }}
+              <button onClick={() => { setForm({ title: g.title, description: g.description || '', period: g.period, progress: g.progress, start_date: g.start_date || '', due_date: g.due_date || '' }); setEditing(g.id); setShowForm(true) }}
                 style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '13px' }}>✏️</button>
               <button onClick={() => del(g.id)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '13px' }}>🗑️</button>
             </div>
@@ -138,7 +139,7 @@ export default function MetasPage({ user }) {
           <div style={{ background: 'var(--card-bg)', borderRadius: '20px', padding: '28px', width: '420px', border: '1px solid var(--border-card)' }}>
             <h3 style={{ marginBottom: '20px', fontWeight: '700' }}>{editing ? 'Editar meta' : 'Nueva meta'}</h3>
             <form onSubmit={save}>
-              {[['Título *', 'title', 'text', true], ['Descripción', 'description', 'text', false], ['Fecha límite', 'due_date', 'date', false]].map(([lbl, key, type, req]) => (
+              {[['Título *', 'title', 'text', true], ['Descripción', 'description', 'text', false], ['Fecha de inicio', 'start_date', 'date', false], ['Fecha límite', 'due_date', 'date', false]].map(([lbl, key, type, req]) => (
                 <div key={key} style={{ marginBottom: '14px' }}>
                   <label style={{ fontSize: '12px', color: 'var(--text-2)', display: 'block', marginBottom: '5px' }}>{lbl}</label>
                   <input type={type} required={req} value={form[key] || ''} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}

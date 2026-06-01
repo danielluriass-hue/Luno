@@ -11,10 +11,12 @@ import MetasPage from './pages/MetasPage'
 import RutinasPage from './pages/RutinasPage'
 import MejorasPage from './pages/MejorasPage'
 import ConfigPage from './pages/ConfigPage'
+import ContabilidadPage from './pages/ContabilidadPage'
 
 const PAGE_LABELS = {
   HOY: 'Hoy', AGENDA: 'Agenda', TAREAS: 'Tareas', HABITOS: 'Hábitos',
-  NOTAS: 'Notas', METAS: 'Metas', RUTINAS: 'Rutinas', MEJORAS: 'Mejoras', CONFIG: 'Configuración',
+  NOTAS: 'Notas', METAS: 'Metas', RUTINAS: 'Rutinas', MEJORAS: 'Mejoras',
+  CONTABILIDADES: 'Contabilidades', CONFIG: 'Configuración',
 }
 
 const BOTTOM_NAV = [
@@ -75,8 +77,9 @@ export default function App() {
     NOTAS:   <NotasPage user={user} />,
     METAS:   <MetasPage user={user} />,
     RUTINAS: <RutinasPage user={user} />,
-    MEJORAS: <MejorasPage user={user} />,
-    CONFIG:  <ConfigPage user={user} />,
+    MEJORAS:        <MejorasPage user={user} />,
+    CONTABILIDADES: <ContabilidadPage />,
+    CONFIG:         <ConfigPage user={user} />,
   }
 
   return (
