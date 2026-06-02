@@ -12,22 +12,26 @@ const icons = {
   MEJORAS: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>,
 }
 
-const NAV = [
-  { key: 'HOY',           label: 'Hoy'           },
-  { key: 'AGENDA',        label: 'Agenda'         },
-  { key: 'TAREAS',        label: 'Tareas'         },
-  { key: 'HABITOS',       label: 'Hábitos'        },
-  { key: 'NOTAS',         label: 'Notas'          },
-  { key: 'METAS',         label: 'Metas'          },
-  { key: 'RUTINAS',       label: 'Rutinas'        },
-  { key: 'MEJORAS',       label: 'Mejoras'        },
-  { key: 'CONTABILIDADES',label: 'Contabilidades' },
+const NAV_BASE = [
+  { key: 'HOY',     label: 'Hoy'     },
+  { key: 'AGENDA',  label: 'Agenda'  },
+  { key: 'TAREAS',  label: 'Tareas'  },
+  { key: 'HABITOS', label: 'Hábitos' },
+  { key: 'NOTAS',   label: 'Notas'   },
+  { key: 'METAS',   label: 'Metas'   },
+  { key: 'RUTINAS', label: 'Rutinas' },
+  { key: 'MEJORAS', label: 'Mejoras' },
 ]
+
+const CONTA_ALLOWED = 'daniell.uriass@gmail.com'
 
 export default function Sidebar({ page, setPage, user, darkMode, toggleDark, isMobile, onClose }) {
   const initials = (user?.user_metadata?.full_name || user?.email || 'U')
     .split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
   const name = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuario'
+  const NAV = user?.email === CONTA_ALLOWED
+    ? [...NAV_BASE, { key: 'CONTABILIDADES', label: 'Contabilidades' }]
+    : NAV_BASE
 
   return (
     <div style={{

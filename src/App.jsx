@@ -78,7 +78,7 @@ export default function App() {
     METAS:   <MetasPage user={user} />,
     RUTINAS: <RutinasPage user={user} />,
     MEJORAS:        <MejorasPage user={user} />,
-    CONTABILIDADES: <ContabilidadPage />,
+    ...(user.email === 'daniell.uriass@gmail.com' ? { CONTABILIDADES: <ContabilidadPage /> } : {}),
     CONFIG:         <ConfigPage user={user} />,
   }
 
