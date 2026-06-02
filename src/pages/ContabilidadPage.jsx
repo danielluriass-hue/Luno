@@ -185,7 +185,7 @@ function parseRetenciones(wb) {
 
 // ─── UploadZone ─────────────────────────────────────────────────────────────
 
-function UploadZone({ label, fileName, onFile, onDownload }) {
+function UploadZone({ label, fileName, onFile, onDownload, accept = '.xls,.xlsx', icon }) {
   const onDrop = useCallback(e => {
     e.preventDefault()
     const f = e.dataTransfer.files[0]
@@ -207,7 +207,7 @@ function UploadZone({ label, fileName, onFile, onDownload }) {
           transition: 'all 0.15s',
         }}
       >
-        <input type="file" accept=".xls,.xlsx" onChange={e => e.target.files[0] && onFile(e.target.files[0])} style={{ display: 'none' }} />
+        <input type="file" accept={accept} onChange={e => e.target.files[0] && onFile(e.target.files[0])} style={{ display: 'none' }} />
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
           stroke={fileName ? 'var(--accent)' : 'var(--text-muted)'}
           strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -1059,7 +1059,7 @@ const EMPTY_MONTH = () => ({
   ventas: { rows: [], meta: {} },
   compras: { rows: [], meta: {} },
   retenciones: [],
-  files: { ventas: '', compras: '', retenciones: '' },
+  files: { ventas: '', compras: '', retenciones: '', formulario: '' },
 })
 
 const LS_KEY   = (y, m) => `conta_${y}_${m}`
@@ -1252,11 +1252,21 @@ export default function ContabilidadPage() {
   }
 
   const handleFile = (tipo) => async (file) => {
-    const buf    = await file.arrayBuffer()
-    const bufCopy= buf.slice(0)               // copia antes de que XLSX lo procese
-    const wb     = XLSX.read(buf, { type: 'array' })
-    // Guarda el archivo original en IndexedDB para descarga futura
+    const buf     = await file.arrayBuffer()
+    const bufCopy = buf.slice(0)
     idbSave(idbKey(sel.year, sel.month, tipo), { name: file.name, buffer: bufCopy }).catch(() => {})
+
+    // El formulario IVA solo se guarda, no se parsea
+    if (tipo === 'formulario') {
+      setData(prev => {
+        const next = { ...prev, files: { ...prev.files, formulario: file.name } }
+        saveMonth(sel.year, sel.month, next)
+        return next
+      })
+      return
+    }
+
+    const wb = XLSX.read(buf, { type: 'array' })
     setData(prev => {
       const next = {
         ...prev,
@@ -1306,9 +1316,11 @@ export default function ContabilidadPage() {
           <div style={{ background: 'var(--card-bg)', borderRadius: '14px', border: '1px solid var(--border-card)', padding: '14px', marginBottom: '18px' }}>
             <p style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '10px' }}>Archivos SAT</p>
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-              <UploadZone label="Ventas"      fileName={files.ventas}      onFile={handleFile('ventas')}      onDownload={handleDownload('ventas')} />
-              <UploadZone label="Compras"     fileName={files.compras}     onFile={handleFile('compras')}     onDownload={handleDownload('compras')} />
-              <UploadZone label="Retenciones" fileName={files.retenciones} onFile={handleFile('retenciones')} onDownload={handleDownload('retenciones')} />
+              <UploadZone label="Ventas"        fileName={files.ventas}      onFile={handleFile('ventas')}      onDownload={handleDownload('ventas')} />
+              <UploadZone label="Compras"       fileName={files.compras}     onFile={handleFile('compras')}     onDownload={handleDownload('compras')} />
+              <UploadZone label="Retenciones"   fileName={files.retenciones} onFile={handleFile('retenciones')} onDownload={handleDownload('retenciones')} />
+              <UploadZone label="Formulario IVA" fileName={files.formulario}  onFile={handleFile('formulario')}  onDownload={handleDownload('formulario')}
+                accept=".pdf,.xls,.xlsx,.png,.jpg,.doc,.docx" />
             </div>
           </div>
 
