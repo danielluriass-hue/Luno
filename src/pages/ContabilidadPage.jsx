@@ -32,14 +32,12 @@ function parseVentas(wb) {
   const COL = colMap(rows[0])
   const NCR_TIPOS = ['NCRE', 'NAB', 'NCR']
   const data = rows.slice(1).map((r, i) => {
-    const anulado  = String(r[COL['Marca de anulado']] || '').toLowerCase() === 'si'
-    const tipoDTE  = r[COL['Tipo de DTE (nombre)']] || ''
-    const esNCR    = NCR_TIPOS.includes(tipoDTE)
-    const total    = parseFloat(r[COL['Gran Total (Moneda Original)']]) || 0
-    const iva      = parseFloat(r[COL['IVA (monto de este impuesto)']]) || 0
-    const neto     = total - iva
-    // NCR tiene signo negativo: reduce el IVA débito fiscal
-    const sign     = esNCR ? -1 : 1
+    const anulado = String(r[COL['Marca de anulado']] || '').toLowerCase() === 'si'
+    const tipoDTE = r[COL['Tipo de DTE (nombre)']] || ''
+    const esNCR   = NCR_TIPOS.includes(tipoDTE)
+    const total   = parseFloat(r[COL['Gran Total (Moneda Original)']]) || 0
+    const iva     = parseFloat(r[COL['IVA (monto de este impuesto)']]) || 0
+    const neto    = total - iva
     return {
       no: i + 1,
       fecha:    fmtFecha(r[COL['Fecha de emisión']]),
@@ -50,12 +48,12 @@ function parseVentas(wb) {
       nit:      r[COL['ID del receptor']] || '',
       cliente:  r[COL['Nombre completo del receptor']] || '',
       estado:   anulado ? 'Anulado' : 'Vigente',
-      servicios: sign * neto,
+      servicios: neto,
       bienes:   0,
       exportacion: 0,
-      iva:      sign * iva,
+      iva,
       ventasExentas: 0,
-      total:    sign * total,
+      total,
     }
   })
   const meta = {
@@ -167,7 +165,7 @@ function UploadZone({ label, fileName, onFile }) {
   )
 }
 
-// ─── Resumen Fiscal ──────────────────────────────────────────────────────────
+// ─── Resumen Fiscal (Formulario IVA) ─────────────────────────────────────────
 
 function ResumenFiscal({ ventas, compras, retenciones }) {
   if (!ventas.length && !compras.length) {
@@ -183,96 +181,159 @@ function ResumenFiscal({ ventas, compras, retenciones }) {
     )
   }
 
-  const factVig   = ventas.filter(v => v.estado === 'Vigente' && !v.esNCR)
-  const ncrVig    = ventas.filter(v => v.estado === 'Vigente' && v.esNCR)
-  const anuladas  = ventas.filter(v => v.estado === 'Anulado')
+  // Ventas Brutas = TODOS los DTEs (vigentes + anulados, incluyendo NCRE)
+  const ventasBrutas  = ventas.reduce((s, v) => s + v.total, 0)
+  const totalAnuladas = ventas.filter(v => v.estado === 'Anulado').reduce((s, v) => s + v.total, 0)
+  const totalNCR      = 0  // notas de crédito externas (no SAT) — siempre se muestra la línea
+  const totalDeducciones = totalAnuladas + totalNCR
+  const ventasNetas   = ventasBrutas - totalDeducciones
 
-  const totalFact = factVig.reduce((s, v) => s + v.total, 0)
-  const totalNCR  = ncrVig.reduce((s, v) => s + Math.abs(v.total), 0)   // valor positivo para mostrar
-  const totalAnul = anuladas.filter(v => !v.esNCR).reduce((s, v) => s + v.total, 0)
+  // IVA débito = suma del IVA de todos los vigentes (FACT + NCRE incluidos)
+  const ivaDebito  = ventas.filter(v => v.estado === 'Vigente').reduce((s, v) => s + v.iva, 0)
+  const ivaRet     = retenciones.reduce((s, r) => s + r.totalRetencion, 0)
+  const ivaAPagar  = ivaDebito - ivaRet
 
-  const netoFact  = totalFact - totalNCR - totalAnul
-  // IVA: facturas cobradas menos lo que devuelve el NCR
-  const ivaFact   = factVig.reduce((s, v) => s + v.iva, 0)
-  const ivaNCR    = ncrVig.reduce((s, v) => s + Math.abs(v.iva), 0)
-  const ivaTotal  = ivaFact - ivaNCR
-  const factSinIVA= netoFact - ivaTotal
-  const ivaRet    = retenciones.reduce((s, r) => s + r.totalRetencion, 0)
-  const ivaAPagar = ivaTotal - ivaRet
+  const cVig          = compras.filter(c => c.estado === 'Vigente')
+  const combRows      = cVig.filter(c => c.combustibles > 0)
+  const compRows      = cVig.filter(c => c.compras > 0)
+  const svcRows       = cVig.filter(c => c.servicios > 0)
 
-  const cVig  = compras.filter(c => c.estado === 'Vigente')
-  const ivaComb = cVig.filter(c => c.combustibles > 0).reduce((s, c) => s + c.iva, 0)
-  const ivaComp = cVig.filter(c => c.compras > 0).reduce((s, c) => s + c.iva, 0)
-  const ivaSvc  = cVig.filter(c => c.servicios > 0).reduce((s, c) => s + c.iva, 0)
-  const totalGastos = ivaComb + ivaComp + ivaSvc
-  const totalAPagar = ivaAPagar - totalGastos
+  const totalFacComb  = combRows.reduce((s, c) => s + c.total, 0)
+  const totalFacComp  = compRows.reduce((s, c) => s + c.total, 0)
+  const totalFacSvc   = svcRows.reduce((s, c) => s + c.total, 0)
+  const totalFacGastos= totalFacComb + totalFacComp + totalFacSvc
 
-  const FilaSimple = ({ label, valor, bold, indent, color }) => (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: `6px ${indent ? '28px' : '16px'}` }}>
-      <span style={{ fontSize: '13px', color: color || (bold ? 'var(--text-1)' : 'var(--text-2)'), fontWeight: bold ? '600' : '400' }}>{label}</span>
-      <span style={{ fontSize: '13px', fontWeight: bold ? '700' : '400', color: color || 'var(--text-1)', fontFamily: 'monospace' }}>{Qn(valor)}</span>
-    </div>
-  )
+  const ivaComb       = combRows.reduce((s, c) => s + c.iva, 0)
+  const ivaComp       = compRows.reduce((s, c) => s + c.iva, 0)
+  const ivaSvc        = svcRows.reduce((s, c) => s + c.iva, 0)
+  const ivaGastos     = ivaComb + ivaComp + ivaSvc
 
-  const FilaDestacada = ({ label, valor, colorVal }) => (
-    <div style={{ margin: '4px 8px', padding: '10px 14px', background: 'rgba(255, 193, 7, 0.12)', borderRadius: '10px', border: '1.5px solid rgba(255,193,7,0.4)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-1)' }}>{label}</span>
-      <span style={{ fontSize: '15px', fontWeight: '700', color: colorVal || 'var(--text-1)', fontFamily: 'monospace' }}>{Qn(valor)}</span>
-    </div>
-  )
+  const totalAPagar   = ivaAPagar - ivaGastos
 
-  const Divider = () => <div style={{ height: '1px', background: 'var(--border)', margin: '6px 0' }} />
+  // Detectar mes del período desde ventas
+  const mesLabel = (() => {
+    const row = ventas.find(v => v.fecha)
+    if (!row) return ''
+    const parts = row.fecha.split('/')
+    if (parts.length < 3) return ''
+    const d = new Date(+parts[2], +parts[1] - 1, +parts[0])
+    return d.toLocaleDateString('es-GT', { month: 'long', year: 'numeric' })
+  })()
+
+  const C  = 'var(--text-1)'
+  const CM = 'var(--text-muted)'
+  const CR = 'var(--red)'
+
+  const s = {
+    card:   { background: 'var(--card-bg)', borderRadius: '16px', border: '1px solid var(--border-card)', overflow: 'hidden', maxWidth: '600px' },
+    title:  { textAlign: 'center', padding: '16px', borderBottom: '1px solid var(--border)', background: 'var(--inner-bg)' },
+    body:   { padding: '20px 28px' },
+    row:    { display: 'grid', alignItems: 'center', marginBottom: '4px' },
+    sep:    { height: '1px', background: 'var(--border)', margin: '10px 0' },
+    yellow: { background: 'rgba(255,193,7,0.15)', border: '1.5px solid rgba(255,193,7,0.45)', borderRadius: '8px', padding: '9px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '6px 0' },
+    box:    { border: '1.5px solid var(--border-card)', borderRadius: '6px', padding: '7px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '4px 0' },
+  }
+
+  const Lbl  = ({ t, bold, indent, color }) => <span style={{ fontSize: '13px', fontWeight: bold ? '700' : '400', color: color || (bold ? C : CM), paddingLeft: indent ? '16px' : 0 }}>{t}</span>
+  const Val  = ({ v, bold, color }) => <span style={{ fontSize: '13px', fontWeight: bold ? '700' : '400', color: color || C, fontFamily: 'monospace', textAlign: 'right' }}>{v === 0 ? 'Q  –' : Qn(v)}</span>
+  const Div  = () => <div style={s.sep} />
 
   return (
-    <div style={{ maxWidth: '560px' }}>
-      <div style={{ background: 'var(--card-bg)', borderRadius: '16px', border: '1px solid var(--border-card)', overflow: 'hidden' }}>
-        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', background: 'var(--inner-bg)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-          </svg>
-          <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Cálculo de IVA</span>
+    <div style={s.card}>
+      {/* Título */}
+      <div style={s.title}>
+        <div style={{ fontSize: '15px', fontWeight: '800', color: C, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Formulario IVA</div>
+        {mesLabel && <div style={{ fontSize: '12px', color: CM, marginTop: '3px', fontStyle: 'italic' }}>Operación del mes: {mesLabel}</div>}
+      </div>
+
+      <div style={s.body}>
+
+        {/* ── Ventas ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '0 12px', alignItems: 'center', marginBottom: '2px' }}>
+          <Lbl t="Ventas Brutas" bold />
+          <span />
+          <Val v={ventasBrutas} bold />
         </div>
 
-        <div style={{ padding: '8px 0' }}>
-          <FilaSimple label="TOTAL FACTURADO" valor={totalFact} bold />
+        {/* Facturas Anuladas */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto auto', gap: '0 8px', alignItems: 'center', marginBottom: '2px' }}>
+          <Lbl t="(-)" color={CR} />
+          <Lbl t="Facturas Anuladas" indent />
+          <Val v={totalAnuladas} color={CR} />
+          <span />
+        </div>
 
-          {totalNCR > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 16px 6px 28px', alignItems: 'center' }}>
-              <span style={{ fontSize: '13px', color: 'var(--text-2)' }}>(-) Notas de Crédito</span>
-              <span style={{ fontSize: '13px', color: 'var(--red)', fontFamily: 'monospace' }}>{Qn(totalNCR)}</span>
-            </div>
-          )}
+        {/* Notas de Crédito — siempre visible */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto auto', gap: '0 8px', alignItems: 'center', marginBottom: '4px' }}>
+          <Lbl t="(-)" color={CR} />
+          <Lbl t="Notas de Crédito" indent />
+          <Val v={totalNCR} color={totalNCR > 0 ? CR : CM} />
+          <Val v={totalDeducciones} bold />
+        </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 16px 6px 28px', alignItems: 'center' }}>
-            <span style={{ fontSize: '13px', color: 'var(--text-2)' }}>(-) FACT ANULADAS</span>
-            <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
-              <span style={{ fontSize: '13px', color: 'var(--red)', fontFamily: 'monospace' }}>{Qn(totalAnul)}</span>
-              <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-1)', fontFamily: 'monospace' }}>{Qn(netoFact)}</span>
-            </div>
+        {/* Ventas Netas */}
+        <div style={s.box}>
+          <Lbl t="Ventas Netas" bold />
+          <Val v={ventasNetas} bold />
+        </div>
+
+        {/* IVA Débito */}
+        <div style={s.yellow}>
+          <span style={{ fontSize: '14px', fontWeight: '800', color: C }}>IVA DÉBITO</span>
+          <span style={{ fontSize: '15px', fontWeight: '800', color: C, fontFamily: 'monospace' }}>{Qn(ivaDebito)}</span>
+        </div>
+
+        <Div />
+
+        {/* Retenciones */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: '0 8px', alignItems: 'center', marginBottom: '2px' }}>
+          <Lbl t="(-)" color={CR} />
+          <Lbl t="RETENCIONES IVA" indent />
+          <Val v={ivaRet} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', padding: '2px 0' }}>
+          <Lbl t="IVA A PAGAR" bold />
+          <Val v={ivaAPagar} bold />
+        </div>
+
+        <Div />
+
+        {/* Gastos — tabla con dos columnas */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto auto', gap: '0 8px', alignItems: 'center', marginBottom: '3px' }}>
+          <span />
+          <span />
+          <span style={{ fontSize: '10px', fontWeight: '700', color: CM, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Fac</span>
+          <span style={{ fontSize: '10px', fontWeight: '700', color: CM, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>IVA</span>
+        </div>
+
+        {[
+          { label: 'Combustibles', fac: totalFacComb, iva: ivaComb },
+          { label: 'Compras',      fac: totalFacComp, iva: ivaComp },
+          { label: 'Servicios',    fac: totalFacSvc,  iva: ivaSvc  },
+        ].map(({ label, fac, iva }) => (
+          <div key={label} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto auto', gap: '0 8px', alignItems: 'center', marginBottom: '2px' }}>
+            <Lbl t="(-)" color={CR} />
+            <Lbl t={label} indent />
+            <Val v={fac} color={CM} />
+            <Val v={iva} />
           </div>
+        ))}
 
-          <FilaSimple label="FACT S/IVA" valor={factSinIVA} indent />
-          {ivaNCR > 0 && <FilaSimple label="(-) IVA NCR" valor={ivaNCR} indent color="var(--red)" />}
-          <FilaDestacada label="IVA A TOTAL" valor={ivaTotal} />
-
-          <Divider />
-
-          <FilaSimple label="(-) IVA RETENIDO" valor={ivaRet} indent color="var(--text-2)" />
-          <FilaSimple label="IVA A PAGAR" valor={ivaAPagar} bold />
-
-          <Divider />
-
-          <FilaSimple label="(-) Combustibles" valor={ivaComb} indent />
-          <FilaSimple label="(-) Compras" valor={ivaComp} indent />
-          <FilaSimple label="(-) Servicios" valor={ivaSvc} indent />
-          <FilaSimple label="TOTAL GASTOS" valor={totalGastos} bold />
-
-          <FilaDestacada
-            label="TOTAL A PAGAR"
-            valor={totalAPagar}
-            colorVal={totalAPagar > 0 ? 'var(--red)' : 'var(--green)'}
-          />
+        <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto auto', gap: '0 8px', alignItems: 'center', marginTop: '4px', paddingTop: '6px', borderTop: '1px solid var(--border)' }}>
+          <span />
+          <Lbl t="TOTAL GASTOS" bold />
+          <Val v={totalFacGastos} bold color={CM} />
+          <Val v={ivaGastos} bold />
         </div>
+
+        <Div />
+
+        {/* Total a pagar */}
+        <div style={{ ...s.yellow, marginTop: '8px' }}>
+          <span style={{ fontSize: '14px', fontWeight: '800', color: C }}>TOTAL A PAGAR</span>
+          <span style={{ fontSize: '15px', fontWeight: '800', color: totalAPagar > 0 ? CR : 'var(--green)', fontFamily: 'monospace' }}>{Qn(totalAPagar)}</span>
+        </div>
+
       </div>
     </div>
   )
