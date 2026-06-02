@@ -589,6 +589,10 @@ function printLibro(tipo, htmlContent, mesLabel) {
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:Arial,sans-serif;font-size:8pt;color:#000;padding:12mm}
+  .toolbar{position:fixed;top:10px;right:10px;display:flex;gap:8px;z-index:999}
+  .toolbar button{padding:7px 14px;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer}
+  .btn-print{background:#1a56db;color:#fff}
+  .btn-close{background:#e5e7eb;color:#333}
   h1{text-align:center;font-size:11pt;font-weight:bold;margin-bottom:6px;text-transform:uppercase}
   .meta{margin-bottom:10px;font-size:8.5pt}
   .meta p{margin-bottom:2px}
@@ -599,10 +603,14 @@ function printLibro(tipo, htmlContent, mesLabel) {
   tr.anulado td{color:#999}
   tfoot td{font-weight:bold;background:#f0f0f0;border:1px solid #666}
   .leyenda{margin-top:8px;font-size:7pt;color:#555}
-  @media print{@page{size:landscape;margin:10mm}}
-</style></head><body>${htmlContent}</body></html>`)
+  @media print{.toolbar{display:none}@page{size:landscape;margin:10mm}}
+</style></head><body>
+<div class="toolbar">
+  <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+  <button class="btn-close" onclick="window.close()">✕ Cerrar</button>
+</div>
+${htmlContent}</body></html>`)
   w.document.close()
-  setTimeout(() => { w.focus(); w.print() }, 400)
 }
 
 // ─── Exportar botones ────────────────────────────────────────────────────────
@@ -779,6 +787,40 @@ function LibroCompras({ rows, meta, mesLabel }) {
           <MetaLibro titulo="Libro de Compras y Servicios Adquiridos" meta={meta} filas={rows} />
           <ExportButtons onXLSX={() => exportComprasXLSX(rows, meta, mesLabel)} onPrint={handlePrint} />
         </div>
+        {/* Resumen arriba — siempre visible */}
+        <div style={{ background:'var(--card-bg)', borderRadius:'12px', border:'1px solid var(--border-card)', overflow:'hidden', marginBottom:'16px' }}>
+          <div style={{ padding:'10px 14px', background:'var(--inner-bg)', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', gap:'6px' }}>
+            <span style={{ fontSize:'10px', fontWeight:'700', color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.05em' }}>Resumen</span>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0' }}>
+            {[
+              { label:'Combustible', base: totComb, iva: ivaComb },
+              { label:'Compras',     base: totComp, iva: ivaComp },
+              { label:'Servicios',   base: 0,        iva: 0       },
+              { label:'Importaciones',base: 0,       iva: 0       },
+            ].map(({ label, base, iva }, idx) => (
+              <div key={label} style={{ display:'grid', gridTemplateColumns:'120px 1fr 40px 1fr', alignItems:'center', padding:'6px 14px', borderBottom:'1px solid var(--border)', gap:'4px', gridColumn: idx % 2 === 0 ? '1' : '2' }}>
+                <span style={{ fontSize:'12px', fontWeight:'600', color:'var(--text-1)' }}>{label}:</span>
+                <span style={{ textAlign:'right', fontFamily:'monospace', fontSize:'12px', color:'var(--text-2)' }}>{base === 0 ? '–' : Qn(base)}</span>
+                <span style={{ fontSize:'10px', color:'var(--text-muted)', textAlign:'center' }}>IVA</span>
+                <span style={{ textAlign:'right', fontFamily:'monospace', fontSize:'12px', fontWeight:'600', color:'var(--text-1)' }}>{iva === 0 ? '–' : Qn(iva)}</span>
+              </div>
+            ))}
+            <div style={{ display:'grid', gridTemplateColumns:'120px 1fr', padding:'6px 14px', borderBottom:'1px solid var(--border)', gap:'4px' }}>
+              <span style={{ fontSize:'12px', color:'var(--text-2)' }}>IDP:</span>
+              <span style={{ textAlign:'right', fontFamily:'monospace', fontSize:'12px', fontWeight:'600', color:'var(--text-1)' }}>{totIdp === 0 ? '–' : Qn(totIdp)}</span>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'120px 1fr', padding:'6px 14px', borderBottom:'1px solid var(--border)', gap:'4px' }}>
+              <span style={{ fontSize:'12px', color:'var(--text-2)' }}>Tasa Municipal:</span>
+              <span style={{ textAlign:'right', fontFamily:'monospace', fontSize:'12px', color:'var(--text-1)' }}>{totTM === 0 ? '–' : Qn(totTM)}</span>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'120px 1fr', padding:'8px 14px', background:'var(--inner-bg)', gridColumn:'1 / -1', gap:'4px' }}>
+              <span style={{ fontSize:'13px', fontWeight:'700', color:'var(--text-1)' }}>Total Documental:</span>
+              <span style={{ textAlign:'right', fontFamily:'monospace', fontSize:'13px', fontWeight:'700', color:'var(--accent)' }}>{Qn(totTotal)}</span>
+            </div>
+          </div>
+        </div>
+
         <ScrollTable>
           <table style={{ borderCollapse:'collapse', width:'100%', minWidth:'980px', background:'var(--card-bg)' }}>
             <thead>
@@ -834,41 +876,6 @@ function LibroCompras({ rows, meta, mesLabel }) {
         <LeyendaCompras />
       </div>
 
-      {/* Resumen de compras */}
-      <div style={{ background: 'var(--card-bg)', borderRadius: '14px', border: '1px solid var(--border-card)', overflow: 'hidden', maxWidth: '480px' }}>
-        <div style={{ padding: '12px 16px', background: 'var(--inner-bg)', borderBottom: '1px solid var(--border)' }}>
-          <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Resumen</span>
-        </div>
-        <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-          <tbody>
-            {[
-              { label: 'Combustible', base: totComb, iva: ivaComb },
-              { label: 'Compras', base: totComp, iva: ivaComp },
-              { label: 'Servicios', base: 0, iva: 0 },
-              { label: 'Importaciones', base: 0, iva: 0 },
-            ].map(({ label, base, iva }) => (
-              <tr key={label} style={{ borderBottom: '1px solid var(--border)' }}>
-                <td style={{ padding: '8px 16px', fontSize: '12px', fontWeight: '600', color: 'var(--text-1)', width: '40%' }}>{label}:</td>
-                <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'monospace', fontSize: '12px', color: 'var(--text-2)' }}>{Qn(base)}</td>
-                <td style={{ padding: '8px 6px', fontSize: '11px', color: 'var(--text-muted)' }}>IVA:</td>
-                <td style={{ padding: '8px 16px 8px 4px', textAlign: 'right', fontFamily: 'monospace', fontSize: '12px', color: 'var(--text-1)', fontWeight: '600' }}>{Qn(iva)}</td>
-              </tr>
-            ))}
-            <tr style={{ borderBottom: '1px solid var(--border)' }}>
-              <td style={{ padding: '8px 16px', fontSize: '12px', color: 'var(--text-2)' }}>IDP:</td>
-              <td colSpan={3} style={{ padding: '8px 16px', textAlign: 'right', fontFamily: 'monospace', fontSize: '12px', color: 'var(--text-1)', fontWeight: '600' }}>{Qn(totIdp)}</td>
-            </tr>
-            <tr style={{ borderBottom: '1px solid var(--border)' }}>
-              <td style={{ padding: '8px 16px', fontSize: '12px', color: 'var(--text-2)' }}>Tasa Municipal:</td>
-              <td colSpan={3} style={{ padding: '8px 16px', textAlign: 'right', fontFamily: 'monospace', fontSize: '12px', color: 'var(--text-1)' }}>{Qn(totTM)}</td>
-            </tr>
-            <tr style={{ background: 'var(--inner-bg)' }}>
-              <td style={{ padding: '10px 16px', fontSize: '13px', fontWeight: '700', color: 'var(--text-1)' }}>Total Documental:</td>
-              <td colSpan={3} style={{ padding: '10px 16px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', fontWeight: '700', color: 'var(--accent)' }}>{Qn(totTotal)}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
     </div>
   )
 }
