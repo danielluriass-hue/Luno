@@ -30,26 +30,32 @@ function parseVentas(wb) {
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
   if (rows.length < 2) return { rows: [], meta: {} }
   const COL = colMap(rows[0])
+  const NCR_TIPOS = ['NCRE', 'NAB', 'NCR']
   const data = rows.slice(1).map((r, i) => {
-    const anulado = String(r[COL['Marca de anulado']] || '').toLowerCase() === 'si'
-    const total   = parseFloat(r[COL['Gran Total (Moneda Original)']]) || 0
-    const iva     = parseFloat(r[COL['IVA (monto de este impuesto)']]) || 0
-    const neto    = total - iva
+    const anulado  = String(r[COL['Marca de anulado']] || '').toLowerCase() === 'si'
+    const tipoDTE  = r[COL['Tipo de DTE (nombre)']] || ''
+    const esNCR    = NCR_TIPOS.includes(tipoDTE)
+    const total    = parseFloat(r[COL['Gran Total (Moneda Original)']]) || 0
+    const iva      = parseFloat(r[COL['IVA (monto de este impuesto)']]) || 0
+    const neto     = total - iva
+    // NCR tiene signo negativo: reduce el IVA débito fiscal
+    const sign     = esNCR ? -1 : 1
     return {
       no: i + 1,
       fecha:    fmtFecha(r[COL['Fecha de emisión']]),
-      tipoDTE:  r[COL['Tipo de DTE (nombre)']] || '',
+      tipoDTE,
+      esNCR,
       serie:    r[COL['Serie']] || '',
       numero:   r[COL['Número del DTE']] || '',
       nit:      r[COL['ID del receptor']] || '',
       cliente:  r[COL['Nombre completo del receptor']] || '',
       estado:   anulado ? 'Anulado' : 'Vigente',
-      servicios: neto,
+      servicios: sign * neto,
       bienes:   0,
       exportacion: 0,
-      iva,
+      iva:      sign * iva,
       ventasExentas: 0,
-      total,
+      total:    sign * total,
     }
   })
   const meta = {
@@ -177,12 +183,19 @@ function ResumenFiscal({ ventas, compras, retenciones }) {
     )
   }
 
-  const vigentes  = ventas.filter(v => v.estado === 'Vigente')
+  const factVig   = ventas.filter(v => v.estado === 'Vigente' && !v.esNCR)
+  const ncrVig    = ventas.filter(v => v.estado === 'Vigente' && v.esNCR)
   const anuladas  = ventas.filter(v => v.estado === 'Anulado')
-  const totalFact = ventas.reduce((s, v) => s + v.total, 0)
-  const totalAnul = anuladas.reduce((s, v) => s + v.total, 0)
-  const netoFact  = totalFact - totalAnul
-  const ivaTotal  = vigentes.reduce((s, v) => s + v.iva, 0)
+
+  const totalFact = factVig.reduce((s, v) => s + v.total, 0)
+  const totalNCR  = ncrVig.reduce((s, v) => s + Math.abs(v.total), 0)   // valor positivo para mostrar
+  const totalAnul = anuladas.filter(v => !v.esNCR).reduce((s, v) => s + v.total, 0)
+
+  const netoFact  = totalFact - totalNCR - totalAnul
+  // IVA: facturas cobradas menos lo que devuelve el NCR
+  const ivaFact   = factVig.reduce((s, v) => s + v.iva, 0)
+  const ivaNCR    = ncrVig.reduce((s, v) => s + Math.abs(v.iva), 0)
+  const ivaTotal  = ivaFact - ivaNCR
   const factSinIVA= netoFact - ivaTotal
   const ivaRet    = retenciones.reduce((s, r) => s + r.totalRetencion, 0)
   const ivaAPagar = ivaTotal - ivaRet
@@ -223,6 +236,13 @@ function ResumenFiscal({ ventas, compras, retenciones }) {
         <div style={{ padding: '8px 0' }}>
           <FilaSimple label="TOTAL FACTURADO" valor={totalFact} bold />
 
+          {totalNCR > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 16px 6px 28px', alignItems: 'center' }}>
+              <span style={{ fontSize: '13px', color: 'var(--text-2)' }}>(-) Notas de Crédito</span>
+              <span style={{ fontSize: '13px', color: 'var(--red)', fontFamily: 'monospace' }}>{Qn(totalNCR)}</span>
+            </div>
+          )}
+
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 16px 6px 28px', alignItems: 'center' }}>
             <span style={{ fontSize: '13px', color: 'var(--text-2)' }}>(-) FACT ANULADAS</span>
             <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
@@ -232,6 +252,7 @@ function ResumenFiscal({ ventas, compras, retenciones }) {
           </div>
 
           <FilaSimple label="FACT S/IVA" valor={factSinIVA} indent />
+          {ivaNCR > 0 && <FilaSimple label="(-) IVA NCR" valor={ivaNCR} indent color="var(--red)" />}
           <FilaDestacada label="IVA A TOTAL" valor={ivaTotal} />
 
           <Divider />
@@ -269,9 +290,13 @@ const TH = ({ children, right, mono, w }) => (
   }}>{children}</th>
 )
 
-const TD = ({ children, right, mono, muted, red, green, bold, small }) => (
+const TD = ({ children, right, mono, muted, red, green, bold, small, wrap }) => (
   <td style={{
-    padding: '7px 10px', fontSize: small ? '10px' : '12px', whiteSpace: 'nowrap',
+    padding: '7px 10px', fontSize: small ? '10px' : '12px',
+    whiteSpace: wrap ? 'normal' : 'nowrap',
+    maxWidth: wrap ? '180px' : undefined,
+    overflow: wrap ? 'hidden' : undefined,
+    textOverflow: wrap ? 'ellipsis' : undefined,
     textAlign: right ? 'right' : 'left',
     fontFamily: mono ? 'monospace' : 'inherit',
     color: red ? 'var(--red)' : green ? 'var(--green)' : muted ? 'var(--text-muted)' : 'var(--text-1)',
@@ -287,6 +312,7 @@ function LibroVentas({ rows, meta }) {
     return <EmptyState label="Carga el archivo de Ventas SAT" />
   }
   const vigentes = rows.filter(r => r.estado === 'Vigente')
+  // NCR ya tiene signo negativo en el parse, la suma neta es correcta
   const totServ  = vigentes.reduce((s, r) => s + r.servicios, 0)
   const totIVA   = vigentes.reduce((s, r) => s + r.iva, 0)
   const totTotal = vigentes.reduce((s, r) => s + r.total, 0)
@@ -295,36 +321,36 @@ function LibroVentas({ rows, meta }) {
     <div>
       <MetaLibro titulo="Libro de Ventas y Servicios Prestados" meta={meta} filas={rows} />
       <div style={{ overflowX: 'auto', borderRadius: '12px', border: '1px solid var(--border-card)', background: 'var(--card-bg)' }}>
-        <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: '900px' }}>
+        <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: '860px' }}>
           <thead>
             <tr>
-              <TH w="40px">No.</TH>
-              <TH w="90px">Fecha</TH>
-              <TH w="70px">Tip. Doc.</TH>
-              <TH w="90px">Serie</TH>
-              <TH w="110px">Número</TH>
-              <TH w="90px">NIT</TH>
-              <TH w="200px">Nombre del Cliente</TH>
-              <TH w="70px">Estado</TH>
-              <TH right w="110px">P. Neto Servicios</TH>
-              <TH right w="110px">IVA Débito Fiscal</TH>
-              <TH right w="120px">Monto IVA Incluido</TH>
+              <TH w="36px">No.</TH>
+              <TH w="84px">Fecha</TH>
+              <TH w="60px">Tipo</TH>
+              <TH w="80px">Serie</TH>
+              <TH w="100px">Número</TH>
+              <TH w="80px">NIT</TH>
+              <TH w="160px">Cliente</TH>
+              <TH w="64px">Estado</TH>
+              <TH right w="105px">P. Neto Serv.</TH>
+              <TH right w="105px">IVA Débito</TH>
+              <TH right w="110px">Total c/IVA</TH>
             </tr>
           </thead>
           <tbody>
             {rows.map((r, i) => (
-              <tr key={i} style={{ background: r.estado === 'Anulado' ? 'rgba(255,59,48,0.04)' : i % 2 === 0 ? 'transparent' : 'var(--inner-bg)' }}>
+              <tr key={i} style={{ background: r.esNCR ? 'rgba(255,149,0,0.04)' : r.estado === 'Anulado' ? 'rgba(255,59,48,0.04)' : i % 2 === 0 ? 'transparent' : 'var(--inner-bg)' }}>
                 <TD muted small>{r.no}</TD>
                 <TD>{r.fecha}</TD>
                 <TD><TipoBadge tipo={r.tipoDTE} /></TD>
                 <TD mono small muted>{r.serie}</TD>
                 <TD mono small>{r.numero}</TD>
                 <TD mono small>{r.nit}</TD>
-                <TD>{r.cliente}</TD>
+                <TD wrap>{r.cliente}</TD>
                 <TD><EstadoBadge estado={r.estado} /></TD>
-                <TD right mono>{r.estado === 'Anulado' ? '–' : Q(r.servicios)}</TD>
-                <TD right mono>{r.estado === 'Anulado' ? '–' : Q(r.iva)}</TD>
-                <TD right mono bold>{Q(r.total)}</TD>
+                <TD right mono red={r.esNCR}>{r.estado === 'Anulado' ? '–' : Q(Math.abs(r.servicios))}</TD>
+                <TD right mono red={r.esNCR}>{r.estado === 'Anulado' ? '–' : (r.esNCR ? `(${Q(Math.abs(r.iva))})` : Q(r.iva))}</TD>
+                <TD right mono bold red={r.esNCR}>{r.esNCR ? `(${Q(Math.abs(r.total))})` : Q(r.total)}</TD>
               </tr>
             ))}
           </tbody>
@@ -368,20 +394,20 @@ function LibroCompras({ rows, meta }) {
           <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: '1100px' }}>
             <thead>
               <tr>
-                <TH w="40px">No.</TH>
-                <TH w="90px">Fecha</TH>
-                <TH w="70px">Tipo Doc.</TH>
-                <TH w="90px">Serie</TH>
-                <TH w="110px">Número</TH>
-                <TH w="90px">NIT</TH>
-                <TH w="220px">Proveedor</TH>
-                <TH right w="100px">Combustibles</TH>
-                <TH right w="110px">Compras</TH>
-                <TH right w="90px">Servicios</TH>
-                <TH right w="80px">IDP</TH>
-                <TH right w="90px">Tasa Mun.</TH>
-                <TH right w="90px">IVA</TH>
-                <TH right w="100px">Total</TH>
+                <TH w="36px">No.</TH>
+                <TH w="84px">Fecha</TH>
+                <TH w="58px">Tipo</TH>
+                <TH w="78px">Serie</TH>
+                <TH w="98px">Número</TH>
+                <TH w="78px">NIT</TH>
+                <TH w="175px">Proveedor</TH>
+                <TH right w="90px">Combustibles</TH>
+                <TH right w="90px">Compras</TH>
+                <TH right w="72px">Servicios</TH>
+                <TH right w="72px">IDP</TH>
+                <TH right w="78px">Tasa Mun.</TH>
+                <TH right w="80px">IVA</TH>
+                <TH right w="90px">Total</TH>
               </tr>
             </thead>
             <tbody>
@@ -393,7 +419,7 @@ function LibroCompras({ rows, meta }) {
                   <TD mono small muted>{r.serie}</TD>
                   <TD mono small>{r.numero}</TD>
                   <TD mono small>{r.nit}</TD>
-                  <TD>{r.proveedor}</TD>
+                  <TD wrap>{r.proveedor}</TD>
                   <TD right mono>{r.estado === 'Anulado' ? '–' : Q(r.combustibles)}</TD>
                   <TD right mono>{r.estado === 'Anulado' ? '–' : Q(r.compras)}</TD>
                   <TD right mono>{r.estado === 'Anulado' ? '–' : Q(r.servicios)}</TD>
