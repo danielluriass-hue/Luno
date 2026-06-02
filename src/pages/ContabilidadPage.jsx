@@ -301,137 +301,153 @@ function ResumenFiscal({ ventas, compras, retenciones }) {
     return d.toLocaleDateString('es-GT', { month: 'long', year: 'numeric' })
   })()
 
-  const C  = 'var(--text-1)'
-  const CM = 'var(--text-muted)'
-  const CR = 'var(--red)'
+  const nVentasBrutas = ventas.length
+  const nAnuladas     = ventas.filter(v => v.estado === 'Anulado').length
+  const nNCR          = ncrVig.length
+  const nComb         = combRows.length
+  const nComp         = compRows.length
+  const nSvc          = svcRows.length
+  const nRet          = retenciones.length
 
-  const s = {
-    card:   { background: 'var(--card-bg)', borderRadius: '16px', border: '1px solid var(--border-card)', overflow: 'hidden', maxWidth: '600px' },
-    title:  { textAlign: 'center', padding: '16px', borderBottom: '1px solid var(--border)', background: 'var(--inner-bg)' },
-    body:   { padding: '20px 28px' },
-    row:    { display: 'grid', alignItems: 'center', marginBottom: '4px' },
-    sep:    { height: '1px', background: 'var(--border)', margin: '10px 0' },
-    yellow: { background: 'rgba(255,193,7,0.15)', border: '1.5px solid rgba(255,193,7,0.45)', borderRadius: '8px', padding: '9px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '6px 0' },
-    box:    { border: '1.5px solid var(--border-card)', borderRadius: '6px', padding: '7px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '4px 0' },
-  }
+  const C   = 'var(--text-1)'
+  const CM  = 'var(--text-muted)'
+  const CR  = 'var(--red)'
+  const ACC = 'var(--accent)'
+  const AS  = 'var(--accent-soft)'
 
-  const Lbl  = ({ t, bold, indent, color }) => <span style={{ fontSize: '13px', fontWeight: bold ? '700' : '400', color: color || (bold ? C : CM), paddingLeft: indent ? '16px' : 0 }}>{t}</span>
-  const Val  = ({ v, bold, color }) => <span style={{ fontSize: '13px', fontWeight: bold ? '700' : '400', color: color || C, fontFamily: 'monospace', textAlign: 'right' }}>{v === 0 ? 'Q  –' : Qn(v)}</span>
-  const Div  = () => <div style={s.sep} />
+  // Estilos de celda reutilizables
+  const cell  = (extra={}) => ({ padding: '7px 12px', fontSize: '13px', borderTop: '1px solid var(--border)', ...extra })
+  const mono  = (extra={}) => ({ ...cell(extra), fontFamily: 'monospace', textAlign: 'right' })
+  const cnt   = (extra={}) => ({ ...cell(extra), textAlign: 'center', fontSize: '11px', color: CM, width: '38px' })
+  const ivaC  = (extra={}) => ({ ...mono(extra), background: AS, borderLeft: '1px solid var(--border)', color: C, fontWeight: '600', width: '120px' })
+  const hdr   = (extra={}) => ({ padding: '6px 12px', fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', background: 'var(--inner-bg)', borderBottom: '1px solid var(--border)', ...extra })
 
   return (
-    <div style={s.card}>
+    <div style={{ background: 'var(--card-bg)', borderRadius: '16px', border: '1px solid var(--border-card)', overflow: 'hidden', maxWidth: '580px' }}>
+
       {/* Título */}
-      <div style={s.title}>
-        <div style={{ fontSize: '15px', fontWeight: '800', color: C, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Formulario IVA</div>
-        {mesLabel && <div style={{ fontSize: '12px', color: CM, marginTop: '3px', fontStyle: 'italic' }}>Operación del mes: {mesLabel}</div>}
+      <div style={{ textAlign: 'center', padding: '14px 16px', borderBottom: '2px solid var(--border)', background: 'var(--inner-bg)' }}>
+        <div style={{ fontSize: '14px', fontWeight: '800', color: C, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Formulario IVA</div>
+        {mesLabel && <div style={{ fontSize: '11px', color: CM, marginTop: '3px', fontStyle: 'italic' }}>Operación del mes: {mesLabel}</div>}
       </div>
 
-      <div style={s.body}>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <colgroup>
+          <col />{/* label */}
+          <col style={{ width: '38px' }} />{/* # */}
+          <col style={{ width: '130px' }} />{/* monto / total fac */}
+          <col style={{ width: '120px' }} />{/* IVA */}
+        </colgroup>
+
+        {/* ── Encabezado sección ventas ── */}
+        <thead>
+          <tr>
+            <th style={hdr({ textAlign: 'left' })} />
+            <th style={hdr({ textAlign: 'center', color: CM })}>#</th>
+            <th style={hdr({ textAlign: 'right', color: CM })}>Monto</th>
+            <th style={{ ...hdr({ textAlign: 'right', color: ACC }), background: AS }}>IVA</th>
+          </tr>
+        </thead>
 
         {/* ── Ventas ── */}
-        {/* Tabla de deducciones: 3 columnas fijas para alineación perfecta */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '6px' }}>
-          <colgroup>
-            <col style={{ width: '24px' }} />
-            <col />
-            <col style={{ width: '130px' }} />
-          </colgroup>
-          <tbody>
-            <tr>
-              <td />
-              <td style={{ padding: '4px 0', fontSize: '13px', fontWeight: '700', color: C }}>Ventas Brutas</td>
-              <td style={{ padding: '4px 0', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: '700', color: C }}>{Qn(ventasBrutas)}</td>
-            </tr>
-            <tr>
-              <td style={{ fontSize: '13px', fontWeight: '700', color: CR, paddingRight: '4px' }}>(-)</td>
-              <td style={{ padding: '3px 0', fontSize: '13px', color: CM, paddingLeft: '8px' }}>Facturas Anuladas</td>
-              <td style={{ padding: '3px 0', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: CR }}>{Qn(totalAnuladas)}</td>
-            </tr>
-            <tr>
-              <td style={{ fontSize: '13px', fontWeight: '700', color: CR, paddingRight: '4px' }}>(-)</td>
-              <td style={{ padding: '3px 0 6px', fontSize: '13px', color: totalNCR > 0 ? CR : CM, paddingLeft: '8px' }}>Notas de Crédito</td>
-              <td style={{ padding: '3px 0 6px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: totalNCR > 0 ? CR : CM, borderBottom: '1px solid var(--border)' }}>
-                {totalNCR === 0 ? '–' : Qn(totalNCR)}
+        <tbody>
+          <tr>
+            <td style={cell({ fontWeight: '700', color: C })}><strong>Ventas Brutas</strong></td>
+            <td style={cnt()}>{nVentasBrutas}</td>
+            <td style={mono({ fontWeight: '700' })}>{Qn(ventasBrutas)}</td>
+            <td style={ivaC()} />
+          </tr>
+          <tr>
+            <td style={cell({ color: CM })}>
+              <span style={{ color: CR, fontWeight: '700', marginRight: '6px' }}>(-)</span>Facturas Anuladas
+            </td>
+            <td style={cnt({ color: CR })}>{nAnuladas}</td>
+            <td style={mono({ color: CR })}>{Qn(totalAnuladas)}</td>
+            <td style={ivaC()} />
+          </tr>
+          <tr>
+            <td style={cell({ color: totalNCR > 0 ? CR : CM })}>
+              <span style={{ color: CR, fontWeight: '700', marginRight: '6px' }}>(-)</span>Notas de Crédito
+            </td>
+            <td style={cnt({ color: totalNCR > 0 ? CR : CM })}>{nNCR || '–'}</td>
+            <td style={mono({ color: totalNCR > 0 ? CR : CM })}>{totalNCR === 0 ? '–' : Qn(totalNCR)}</td>
+            <td style={ivaC()} />
+          </tr>
+          <tr style={{ background: 'var(--inner-bg)' }}>
+            <td style={cell({ fontWeight: '700', color: C, borderTop: '2px solid var(--border)' })}>Ventas Netas</td>
+            <td style={cnt({ borderTop: '2px solid var(--border)' })} />
+            <td style={mono({ fontWeight: '700', borderTop: '2px solid var(--border)' })}>{Qn(ventasNetas)}</td>
+            <td style={ivaC({ borderTop: '2px solid var(--border)' })} />
+          </tr>
+          {/* IVA DÉBITO — destacado */}
+          <tr style={{ background: 'rgba(255,193,7,0.12)' }}>
+            <td style={{ ...cell({ fontWeight: '800', fontSize: '14px', color: C, borderTop: '2px solid var(--border)' }), borderBottom: '1px solid rgba(255,193,7,0.3)' }}>
+              IVA DÉBITO
+            </td>
+            <td style={{ ...cnt({ borderTop: '2px solid var(--border)' }), borderBottom: '1px solid rgba(255,193,7,0.3)' }} />
+            <td style={{ ...mono({ borderTop: '2px solid var(--border)' }), borderBottom: '1px solid rgba(255,193,7,0.3)' }} />
+            <td style={{ ...ivaC({ fontWeight: '800', fontSize: '14px', borderTop: '2px solid var(--border)' }), borderBottom: '1px solid rgba(255,193,7,0.3)', background: 'rgba(255,193,7,0.2)' }}>
+              {Qn(ivaDebito)}
+            </td>
+          </tr>
+        </tbody>
+
+        {/* ── Sub-encabezado gastos ── */}
+        <thead>
+          <tr>
+            <th style={hdr({ textAlign: 'left', borderTop: '2px solid var(--border)' })} />
+            <th style={hdr({ textAlign: 'center', color: CM, borderTop: '2px solid var(--border)' })}>#</th>
+            <th style={hdr({ textAlign: 'right', color: CM, borderTop: '2px solid var(--border)' })}>Total Fac</th>
+            <th style={{ ...hdr({ textAlign: 'right', color: ACC, borderTop: '2px solid var(--border)' }), background: AS }}>IVA</th>
+          </tr>
+        </thead>
+
+        {/* ── Gastos ── */}
+        <tbody>
+          {[
+            { label: 'Combustibles', n: nComb, fac: totalFacComb, iva: ivaComb },
+            { label: 'Compras',      n: nComp, fac: totalFacComp, iva: ivaComp },
+            { label: 'Servicios',    n: nSvc,  fac: totalFacSvc,  iva: ivaSvc  },
+          ].map(({ label, n, fac, iva }, i) => (
+            <tr key={label} style={{ background: i % 2 !== 0 ? 'var(--inner-bg)' : 'transparent' }}>
+              <td style={cell({ color: CM })}>
+                <span style={{ color: CR, fontWeight: '700', marginRight: '6px' }}>(-)</span>{label}
               </td>
+              <td style={cnt()}>{n || '–'}</td>
+              <td style={mono()}>{fac === 0 ? '–' : Qn(fac)}</td>
+              <td style={ivaC()}>{iva === 0 ? '–' : Qn(iva)}</td>
             </tr>
-          </tbody>
-        </table>
+          ))}
+          <tr style={{ background: 'var(--inner-bg)' }}>
+            <td style={cell({ fontWeight: '700', color: C, borderTop: '2px solid var(--border)' })}>TOTAL GASTOS</td>
+            <td style={cnt({ borderTop: '2px solid var(--border)' })} />
+            <td style={mono({ fontWeight: '700', borderTop: '2px solid var(--border)' })}>{Qn(totalFacGastos)}</td>
+            <td style={ivaC({ fontWeight: '700', color: ACC, borderTop: '2px solid var(--border)' })}>{Qn(ivaGastos)}</td>
+          </tr>
 
-        {/* Ventas Netas */}
-        <div style={s.box}>
-          <Lbl t="Ventas Netas" bold />
-          <Val v={ventasNetas} bold />
-        </div>
+          {/* ── Retenciones ── */}
+          <tr>
+            <td style={cell({ color: CM, borderTop: '2px solid var(--border)' })}>
+              <span style={{ color: CR, fontWeight: '700', marginRight: '6px' }}>(-)</span>Retenciones IVA
+            </td>
+            <td style={cnt({ borderTop: '2px solid var(--border)' })}>{nRet || '–'}</td>
+            <td style={mono({ borderTop: '2px solid var(--border)' })} />
+            <td style={ivaC({ borderTop: '2px solid var(--border)' })}>{Qn(ivaRet)}</td>
+          </tr>
 
-        {/* IVA Débito */}
-        <div style={s.yellow}>
-          <span style={{ fontSize: '14px', fontWeight: '800', color: C }}>IVA DÉBITO</span>
-          <span style={{ fontSize: '15px', fontWeight: '800', color: C, fontFamily: 'monospace' }}>{Qn(ivaDebito)}</span>
-        </div>
-
-        <Div />
-
-        {/* Gastos deducibles */}
-        <div style={{ borderRadius: '10px', border: '1px solid var(--border-card)', overflow: 'hidden', marginBottom: '10px' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: 'var(--inner-bg)' }}>
-                <th style={{ padding: '7px 12px', fontSize: '10px', fontWeight: '700', color: CM, textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'left', width: '40%' }} />
-                <th style={{ padding: '7px 12px', fontSize: '10px', fontWeight: '700', color: CM, textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right', borderLeft: '1px solid var(--border)' }}>Total Fac</th>
-                <th style={{ padding: '7px 12px', fontSize: '10px', fontWeight: '700', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right', borderLeft: '1px solid var(--border)', background: 'var(--accent-soft)' }}>IVA</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                { label: 'Combustibles', fac: totalFacComb, iva: ivaComb },
-                { label: 'Compras',      fac: totalFacComp, iva: ivaComp },
-                { label: 'Servicios',    fac: totalFacSvc,  iva: ivaSvc  },
-              ].map(({ label, fac, iva }, i) => (
-                <tr key={label} style={{ borderTop: '1px solid var(--border)', background: i % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.015)' }}>
-                  <td style={{ padding: '7px 12px', fontSize: '13px', color: CM }}>
-                    <span style={{ color: CR, fontWeight: '700', marginRight: '6px' }}>(-)</span>
-                    {label}
-                  </td>
-                  <td style={{ padding: '7px 12px', fontSize: '13px', fontFamily: 'monospace', textAlign: 'right', color: C, borderLeft: '1px solid var(--border)' }}>
-                    {fac === 0 ? '–' : Qn(fac)}
-                  </td>
-                  <td style={{ padding: '7px 12px', fontSize: '13px', fontFamily: 'monospace', textAlign: 'right', fontWeight: '600', color: C, borderLeft: '1px solid var(--border)', background: 'var(--accent-soft)' }}>
-                    {iva === 0 ? '–' : Qn(iva)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr style={{ borderTop: '2px solid var(--border)', background: 'var(--inner-bg)' }}>
-                <td style={{ padding: '8px 12px', fontSize: '13px', fontWeight: '700', color: C }}>TOTAL GASTOS</td>
-                <td style={{ padding: '8px 12px', fontSize: '13px', fontFamily: 'monospace', textAlign: 'right', fontWeight: '700', color: C, borderLeft: '1px solid var(--border)' }}>
-                  {Qn(totalFacGastos)}
-                </td>
-                <td style={{ padding: '8px 12px', fontSize: '13px', fontFamily: 'monospace', textAlign: 'right', fontWeight: '700', color: 'var(--accent)', borderLeft: '1px solid var(--border)', background: 'var(--accent-soft)' }}>
-                  {Qn(ivaGastos)}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-
-        <Div />
-
-        {/* Retenciones — después de gastos */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: '0 8px', alignItems: 'center', marginBottom: '6px' }}>
-          <Lbl t="(-)" color={CR} />
-          <Lbl t="RETENCIONES IVA" indent />
-          <Val v={ivaRet} />
-        </div>
-
-        {/* Total a pagar */}
-        <div style={{ ...s.yellow, marginTop: '4px' }}>
-          <span style={{ fontSize: '14px', fontWeight: '800', color: C }}>TOTAL A PAGAR</span>
-          <span style={{ fontSize: '15px', fontWeight: '800', color: totalAPagar > 0 ? CR : 'var(--green)', fontFamily: 'monospace' }}>{Qn(totalAPagar)}</span>
-        </div>
-
-      </div>
+          {/* ── TOTAL A PAGAR ── */}
+          <tr style={{ background: 'rgba(255,193,7,0.12)' }}>
+            <td style={{ ...cell({ fontWeight: '800', fontSize: '14px', color: C, borderTop: '2px solid var(--border)' }), borderBottom: '1px solid rgba(255,193,7,0.3)' }}>
+              TOTAL A PAGAR
+            </td>
+            <td style={{ ...cnt({ borderTop: '2px solid var(--border)' }), borderBottom: '1px solid rgba(255,193,7,0.3)' }} />
+            <td style={{ ...mono({ borderTop: '2px solid var(--border)' }), borderBottom: '1px solid rgba(255,193,7,0.3)' }} />
+            <td style={{ ...ivaC({ fontWeight: '800', fontSize: '14px', borderTop: '2px solid var(--border)' }), borderBottom: '1px solid rgba(255,193,7,0.3)', background: 'rgba(255,193,7,0.2)', color: totalAPagar > 0 ? CR : 'var(--green)' }}>
+              {Qn(totalAPagar)}
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   )
 }
