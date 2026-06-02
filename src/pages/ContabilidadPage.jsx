@@ -372,20 +372,7 @@ function ResumenFiscal({ ventas, compras, retenciones }) {
 
         <Div />
 
-        {/* Retenciones */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: '0 8px', alignItems: 'center', marginBottom: '2px' }}>
-          <Lbl t="(-)" color={CR} />
-          <Lbl t="RETENCIONES IVA" indent />
-          <Val v={ivaRet} />
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', padding: '2px 0' }}>
-          <Lbl t="IVA A PAGAR" bold />
-          <Val v={ivaAPagar} bold />
-        </div>
-
-        <Div />
-
-        {/* Gastos — tabla con columnas bien definidas */}
+        {/* Gastos deducibles */}
         <div style={{ borderRadius: '10px', border: '1px solid var(--border-card)', overflow: 'hidden', marginBottom: '10px' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
@@ -431,8 +418,15 @@ function ResumenFiscal({ ventas, compras, retenciones }) {
 
         <Div />
 
+        {/* Retenciones — después de gastos */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: '0 8px', alignItems: 'center', marginBottom: '6px' }}>
+          <Lbl t="(-)" color={CR} />
+          <Lbl t="RETENCIONES IVA" indent />
+          <Val v={ivaRet} />
+        </div>
+
         {/* Total a pagar */}
-        <div style={{ ...s.yellow, marginTop: '8px' }}>
+        <div style={{ ...s.yellow, marginTop: '4px' }}>
           <span style={{ fontSize: '14px', fontWeight: '800', color: C }}>TOTAL A PAGAR</span>
           <span style={{ fontSize: '15px', fontWeight: '800', color: totalAPagar > 0 ? CR : 'var(--green)', fontFamily: 'monospace' }}>{Qn(totalAPagar)}</span>
         </div>
@@ -1174,9 +1168,15 @@ export default function ContabilidadPage() {
     return { year: curY, month: curM }
   })()
 
+  const VALID_SUBS = ['RESUMEN', 'VENTAS', 'COMPRAS', 'RETENCIONES']
+  const initSub = (() => {
+    const s = localStorage.getItem('conta_sub')
+    return VALID_SUBS.includes(s) ? s : 'RESUMEN'
+  })()
+
   const [expanded, setExpanded] = useState({ [initSel.year]: true })
   const [sel, setSel]           = useState(initSel)
-  const [sub, setSub]           = useState('RESUMEN')
+  const [sub, setSub]           = useState(initSub)
   const [data, setData]         = useState(() => loadMonth(initSel.year, initSel.month))
 
   // Al iniciar, intenta re-parsear desde IndexedDB si localStorage está vacío
@@ -1299,7 +1299,7 @@ export default function ContabilidadPage() {
           {/* Sub-tabs */}
           <div style={{ display: 'flex', gap: '4px', marginBottom: '18px', background: 'var(--inner-bg)', padding: '4px', borderRadius: '12px', width: 'fit-content' }}>
             {SUBTABS.map(t => (
-              <button key={t.key} onClick={() => setSub(t.key)} style={{
+              <button key={t.key} onClick={() => { setSub(t.key); localStorage.setItem('conta_sub', t.key) }} style={{
                 padding: '7px 14px', borderRadius: '9px', border: 'none', fontSize: '13px',
                 fontWeight: sub === t.key ? '600' : '400',
                 background: sub === t.key ? 'var(--card-bg)' : 'transparent',
