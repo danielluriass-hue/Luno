@@ -668,7 +668,10 @@ const LeyendaCompras = () => (
   </div>
 )
 
-// ─── Página principal ────────────────────────────────────────────────────────
+// ─── Constantes y helpers de persistencia ────────────────────────────────────
+
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+               'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
 const SUBTABS = [
   { key: 'RESUMEN',     label: 'Resumen Fiscal' },
@@ -677,66 +680,233 @@ const SUBTABS = [
   { key: 'RETENCIONES', label: 'Retenciones' },
 ]
 
-export default function ContabilidadPage() {
-  const [sub, setSub]   = useState('RESUMEN')
-  const [ventas,      setVentas]      = useState({ rows: [], meta: {} })
-  const [compras,     setCompras]     = useState({ rows: [], meta: {} })
-  const [retenciones, setRetenciones] = useState([])
-  const [files,       setFiles]       = useState({ ventas: '', compras: '', retenciones: '' })
+const EMPTY_MONTH = () => ({
+  ventas: { rows: [], meta: {} },
+  compras: { rows: [], meta: {} },
+  retenciones: [],
+  files: { ventas: '', compras: '', retenciones: '' },
+})
 
-  const handleFile = (tipo) => async (file) => {
-    setFiles(f => ({ ...f, [tipo]: file.name }))
-    const buf  = await file.arrayBuffer()
-    const wb   = XLSX.read(buf, { type: 'array' })
-    if (tipo === 'ventas')      setVentas(parseVentas(wb))
-    if (tipo === 'compras')     setCompras(parseCompras(wb))
-    if (tipo === 'retenciones') setRetenciones(parseRetenciones(wb))
-  }
+const LS_KEY   = (y, m) => `conta_${y}_${m}`
+const LS_YEARS = 'conta_years'
 
-  const hayDatos = ventas.rows.length || compras.rows.length || retenciones.length
+function loadMonth(year, month) {
+  try {
+    const raw = localStorage.getItem(LS_KEY(year, month))
+    return raw ? JSON.parse(raw) : EMPTY_MONTH()
+  } catch { return EMPTY_MONTH() }
+}
 
+function saveMonth(year, month, data) {
+  try { localStorage.setItem(LS_KEY(year, month), JSON.stringify(data)) }
+  catch { /* localStorage lleno */ }
+}
+
+function monthHasData(year, month) {
+  try {
+    const raw = localStorage.getItem(LS_KEY(year, month))
+    if (!raw) return false
+    const d = JSON.parse(raw)
+    return !!(d.ventas?.rows?.length || d.compras?.rows?.length || d.retenciones?.length)
+  } catch { return false }
+}
+
+// ─── Panel de navegación año / mes ───────────────────────────────────────────
+
+function NavPanel({ years, expanded, sel, onSelect, onToggleYear, onAddYear }) {
   return (
-    <div style={{ maxWidth: '1200px' }}>
-      {/* Título */}
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '22px', fontWeight: '700', color: 'var(--text-1)', letterSpacing: '-0.02em' }}>Contabilidades</h1>
-        <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '2px' }}>Carga los archivos descargados de la SAT para generar los libros</p>
+    <div style={{
+      width: '174px', minWidth: '174px', flexShrink: 0,
+      background: 'var(--card-bg)', borderRadius: '14px',
+      border: '1px solid var(--border-card)',
+      display: 'flex', flexDirection: 'column',
+      overflow: 'hidden', alignSelf: 'flex-start',
+    }}>
+      <div style={{ padding: '12px 14px 8px', borderBottom: '1px solid var(--border)' }}>
+        <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Períodos</span>
       </div>
 
-      {/* Upload zone */}
-      <div style={{ background: 'var(--card-bg)', borderRadius: '16px', border: '1px solid var(--border-card)', padding: '16px', marginBottom: '24px' }}>
-        <p style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '12px' }}>Archivos SAT</p>
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-          <UploadZone label="Ventas"      fileName={files.ventas}      onFile={handleFile('ventas')} />
-          <UploadZone label="Compras"     fileName={files.compras}     onFile={handleFile('compras')} />
-          <UploadZone label="Retenciones" fileName={files.retenciones} onFile={handleFile('retenciones')} />
-        </div>
-      </div>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
+        {[...years].sort((a, b) => b - a).map(year => (
+          <div key={year}>
+            {/* Año */}
+            <button onClick={() => onToggleYear(year)} style={{
+              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '7px 14px', border: 'none', background: 'transparent',
+              color: 'var(--text-1)', fontSize: '13px', fontWeight: '700', cursor: 'pointer',
+            }}>
+              <span>{year}</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                strokeLinecap="round" strokeLinejoin="round"
+                style={{ transform: expanded[year] ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </button>
 
-      {/* Sub-tabs */}
-      <div style={{ display: 'flex', gap: '4px', marginBottom: '20px', background: 'var(--inner-bg)', padding: '4px', borderRadius: '12px', width: 'fit-content' }}>
-        {SUBTABS.map(t => (
-          <button key={t.key} onClick={() => setSub(t.key)} style={{
-            padding: '7px 14px', borderRadius: '9px', border: 'none', fontSize: '13px',
-            fontWeight: sub === t.key ? '600' : '400',
-            background: sub === t.key ? 'var(--card-bg)' : 'transparent',
-            color: sub === t.key ? 'var(--text-1)' : 'var(--text-muted)',
-            boxShadow: sub === t.key ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-            transition: 'all 0.15s', cursor: 'pointer',
-          }}>
-            {t.label}
-            {t.key === 'VENTAS' && ventas.rows.length > 0 && <CountBadge n={ventas.rows.length} />}
-            {t.key === 'COMPRAS' && compras.rows.length > 0 && <CountBadge n={compras.rows.length} />}
-            {t.key === 'RETENCIONES' && retenciones.length > 0 && <CountBadge n={retenciones.length} />}
-          </button>
+            {/* Meses */}
+            {expanded[year] && (
+              <div style={{ paddingBottom: '4px' }}>
+                {MESES.map((mes, i) => {
+                  const active  = sel.year === year && sel.month === i
+                  const hasData = monthHasData(year, i)
+                  return (
+                    <button key={i} onClick={() => onSelect(year, i)} style={{
+                      width: '100%', display: 'flex', alignItems: 'center', gap: '8px',
+                      padding: '5px 14px 5px 22px', border: 'none', cursor: 'pointer',
+                      background: active ? 'var(--accent-soft)' : 'transparent',
+                      color: active ? 'var(--accent)' : 'var(--text-muted)',
+                      fontSize: '12.5px', fontWeight: active ? '600' : '400',
+                      transition: 'all 0.1s',
+                    }}>
+                      <span style={{
+                        width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0,
+                        background: hasData ? 'var(--green)' : 'var(--border-card)',
+                        border: hasData ? 'none' : '1.5px solid var(--text-muted)',
+                      }} />
+                      {mes}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         ))}
       </div>
 
-      {/* Contenido */}
-      {sub === 'RESUMEN'     && <ResumenFiscal ventas={ventas.rows} compras={compras.rows} retenciones={retenciones} />}
-      {sub === 'VENTAS'      && <LibroVentas rows={ventas.rows} meta={ventas.meta} />}
-      {sub === 'COMPRAS'     && <LibroCompras rows={compras.rows} meta={compras.meta} />}
-      {sub === 'RETENCIONES' && <LibroRetenciones rows={retenciones} />}
+      {/* Agregar año */}
+      <div style={{ padding: '8px', borderTop: '1px solid var(--border)' }}>
+        <button onClick={onAddYear} style={{
+          width: '100%', padding: '7px', borderRadius: '8px', border: '1.5px dashed var(--border-card)',
+          background: 'transparent', color: 'var(--text-muted)', fontSize: '12px',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
+        }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          Nuevo año
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Página principal ────────────────────────────────────────────────────────
+
+export default function ContabilidadPage() {
+  const now   = new Date()
+  const curY  = now.getFullYear()
+  const curM  = now.getMonth()
+
+  const [years, setYears] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(LS_YEARS)) || [curY] }
+    catch { return [curY] }
+  })
+  const [expanded, setExpanded] = useState({ [curY]: true })
+  const [sel, setSel]           = useState({ year: curY, month: curM })
+  const [sub, setSub]           = useState('RESUMEN')
+  const [data, setData]         = useState(() => loadMonth(curY, curM))
+
+  const selectMonth = (year, month) => {
+    setSel({ year, month })
+    setData(loadMonth(year, month))
+    setSub('RESUMEN')
+  }
+
+  const toggleYear = (year) =>
+    setExpanded(e => ({ ...e, [year]: !e[year] }))
+
+  const addYear = () => {
+    const input = prompt('Ingresa el año a agregar:')
+    const y = parseInt(input)
+    if (!y || isNaN(y) || years.includes(y)) return
+    const next = [...years, y]
+    setYears(next)
+    localStorage.setItem(LS_YEARS, JSON.stringify(next))
+    setExpanded(e => ({ ...e, [y]: true }))
+  }
+
+  const handleFile = (tipo) => async (file) => {
+    const buf = await file.arrayBuffer()
+    const wb  = XLSX.read(buf, { type: 'array' })
+    setData(prev => {
+      const next = {
+        ...prev,
+        files: { ...prev.files, [tipo]: file.name },
+        ...(tipo === 'ventas'      ? { ventas:      parseVentas(wb)      } : {}),
+        ...(tipo === 'compras'     ? { compras:     parseCompras(wb)     } : {}),
+        ...(tipo === 'retenciones' ? { retenciones: parseRetenciones(wb) } : {}),
+      }
+      saveMonth(sel.year, sel.month, next)
+      return next
+    })
+  }
+
+  const { ventas, compras, retenciones, files } = data
+
+  return (
+    <div style={{ maxWidth: '1300px' }}>
+      {/* Título */}
+      <div style={{ marginBottom: '20px' }}>
+        <h1 style={{ fontSize: '22px', fontWeight: '700', color: 'var(--text-1)', letterSpacing: '-0.02em' }}>Contabilidades</h1>
+        <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '2px' }}>Selecciona el período y carga los archivos SAT</p>
+      </div>
+
+      <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+
+        {/* ── Navegación ── */}
+        <NavPanel
+          years={years} expanded={expanded} sel={sel}
+          onSelect={selectMonth} onToggleYear={toggleYear} onAddYear={addYear}
+        />
+
+        {/* ── Contenido ── */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+
+          {/* Cabecera del mes */}
+          <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'baseline', gap: '10px' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-1)', textTransform: 'capitalize' }}>
+              {MESES[sel.month]}
+            </h2>
+            <span style={{ fontSize: '14px', color: 'var(--text-muted)', fontWeight: '500' }}>{sel.year}</span>
+          </div>
+
+          {/* Upload zone */}
+          <div style={{ background: 'var(--card-bg)', borderRadius: '14px', border: '1px solid var(--border-card)', padding: '14px', marginBottom: '18px' }}>
+            <p style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '10px' }}>Archivos SAT</p>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <UploadZone label="Ventas"      fileName={files.ventas}      onFile={handleFile('ventas')} />
+              <UploadZone label="Compras"     fileName={files.compras}     onFile={handleFile('compras')} />
+              <UploadZone label="Retenciones" fileName={files.retenciones} onFile={handleFile('retenciones')} />
+            </div>
+          </div>
+
+          {/* Sub-tabs */}
+          <div style={{ display: 'flex', gap: '4px', marginBottom: '18px', background: 'var(--inner-bg)', padding: '4px', borderRadius: '12px', width: 'fit-content' }}>
+            {SUBTABS.map(t => (
+              <button key={t.key} onClick={() => setSub(t.key)} style={{
+                padding: '7px 14px', borderRadius: '9px', border: 'none', fontSize: '13px',
+                fontWeight: sub === t.key ? '600' : '400',
+                background: sub === t.key ? 'var(--card-bg)' : 'transparent',
+                color: sub === t.key ? 'var(--text-1)' : 'var(--text-muted)',
+                boxShadow: sub === t.key ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                transition: 'all 0.15s', cursor: 'pointer',
+              }}>
+                {t.label}
+                {t.key === 'VENTAS'      && ventas.rows.length      > 0 && <CountBadge n={ventas.rows.length} />}
+                {t.key === 'COMPRAS'     && compras.rows.length     > 0 && <CountBadge n={compras.rows.length} />}
+                {t.key === 'RETENCIONES' && retenciones.length      > 0 && <CountBadge n={retenciones.length} />}
+              </button>
+            ))}
+          </div>
+
+          {/* Contenido */}
+          {sub === 'RESUMEN'     && <ResumenFiscal ventas={ventas.rows} compras={compras.rows} retenciones={retenciones} />}
+          {sub === 'VENTAS'      && <LibroVentas rows={ventas.rows} meta={ventas.meta} />}
+          {sub === 'COMPRAS'     && <LibroCompras rows={compras.rows} meta={compras.meta} />}
+          {sub === 'RETENCIONES' && <LibroRetenciones rows={retenciones} />}
+
+        </div>{/* fin contenido */}
+      </div>{/* fin flex */}
     </div>
   )
 }
