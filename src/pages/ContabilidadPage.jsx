@@ -38,13 +38,22 @@ async function idbLoad(key) {
 const idbKey = (year, month, tipo) => `${year}_${month}_${tipo}`
 
 async function downloadFromIDB(year, month, tipo, fallbackName) {
-  const stored = await idbLoad(idbKey(year, month, tipo))
-  if (!stored) return
-  const blob = new Blob([stored.buffer])
-  const url  = URL.createObjectURL(blob)
-  const a    = document.createElement('a')
-  a.href = url; a.download = stored.name || fallbackName; a.click()
-  URL.revokeObjectURL(url)
+  try {
+    const stored = await idbLoad(idbKey(year, month, tipo))
+    if (!stored?.buffer) { alert('Archivo no encontrado. Vuelve a cargarlo.'); return }
+    const mime = stored.name?.endsWith('.xlsx')
+      ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      : 'application/vnd.ms-excel'
+    const blob = new Blob([stored.buffer], { type: mime })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href = url
+    a.download = stored.name || fallbackName
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 1500)
+  } catch (e) { alert('Error al descargar: ' + e.message) }
 }
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -424,6 +433,15 @@ function ResumenFiscal({ ventas, compras, retenciones }) {
 
 // ─── Tabla genérica con scroll horizontal ───────────────────────────────────
 
+// Wrapper con scroll horizontal garantizado
+const ScrollTable = ({ children, minW }) => (
+  <div style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+    <div style={{ borderRadius: '12px', border: '1px solid var(--border-card)', overflow: 'hidden', minWidth: minW || 'auto' }}>
+      {children}
+    </div>
+  </div>
+)
+
 const TH = ({ children, right, mono, w }) => (
   <th style={{
     padding: '8px 10px', fontSize: '10px', fontWeight: '700', whiteSpace: 'nowrap',
@@ -464,8 +482,8 @@ function LibroVentas({ rows, meta }) {
   return (
     <div>
       <MetaLibro titulo="Libro de Ventas y Servicios Prestados" meta={meta} filas={rows} />
-      <div style={{ overflowX: 'auto', borderRadius: '12px', border: '1px solid var(--border-card)', background: 'var(--card-bg)' }}>
-        <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: '860px' }}>
+      <ScrollTable minW="860px">
+        <table style={{ borderCollapse: 'collapse', width: '100%', background: 'var(--card-bg)' }}>
           <thead>
             <tr>
               <TH w="36px">No.</TH>
@@ -483,7 +501,7 @@ function LibroVentas({ rows, meta }) {
           </thead>
           <tbody>
             {rows.map((r, i) => (
-              <tr key={i} style={{ background: r.esNCR ? 'rgba(255,149,0,0.04)' : r.estado === 'Anulado' ? 'rgba(255,59,48,0.04)' : i % 2 === 0 ? 'transparent' : 'var(--inner-bg)' }}>
+              <tr key={i} style={{ background: r.estado === 'Anulado' ? 'rgba(255,59,48,0.04)' : i % 2 === 0 ? 'transparent' : 'var(--inner-bg)' }}>
                 <TD muted small>{r.no}</TD>
                 <TD>{r.fecha}</TD>
                 <TD><TipoBadge tipo={r.tipoDTE} /></TD>
@@ -492,9 +510,9 @@ function LibroVentas({ rows, meta }) {
                 <TD mono small>{r.nit}</TD>
                 <TD wrap>{r.cliente}</TD>
                 <TD><EstadoBadge estado={r.estado} /></TD>
-                <TD right mono red={r.esNCR}>{r.estado === 'Anulado' ? '–' : Q(Math.abs(r.servicios))}</TD>
-                <TD right mono red={r.esNCR}>{r.estado === 'Anulado' ? '–' : (r.esNCR ? `(${Q(Math.abs(r.iva))})` : Q(r.iva))}</TD>
-                <TD right mono bold red={r.esNCR}>{r.esNCR ? `(${Q(Math.abs(r.total))})` : Q(r.total)}</TD>
+                <TD right mono>{r.estado === 'Anulado' ? '–' : Q(r.servicios)}</TD>
+                <TD right mono>{r.estado === 'Anulado' ? '–' : Q(r.iva)}</TD>
+                <TD right mono bold>{r.estado === 'Anulado' ? '–' : Q(r.total)}</TD>
               </tr>
             ))}
           </tbody>
@@ -507,7 +525,7 @@ function LibroVentas({ rows, meta }) {
             </tr>
           </tfoot>
         </table>
-      </div>
+      </ScrollTable>
       <LeyendaVentas />
     </div>
   )
@@ -534,8 +552,8 @@ function LibroCompras({ rows, meta }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <div>
         <MetaLibro titulo="Libro de Compras y Servicios Adquiridos" meta={meta} filas={rows} />
-        <div style={{ overflowX: 'auto', borderRadius: '12px', border: '1px solid var(--border-card)', background: 'var(--card-bg)' }}>
-          <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: '1100px' }}>
+        <ScrollTable minW="1100px">
+          <table style={{ borderCollapse: 'collapse', width: '100%', background: 'var(--card-bg)' }}>
             <thead>
               <tr>
                 <TH w="36px">No.</TH>
@@ -585,7 +603,7 @@ function LibroCompras({ rows, meta }) {
               </tr>
             </tfoot>
           </table>
-        </div>
+        </ScrollTable>
         <LeyendaCompras />
       </div>
 
@@ -636,8 +654,8 @@ function LibroRetenciones({ rows }) {
   }
   const totalRet = rows.reduce((s, r) => s + r.totalRetencion, 0)
   return (
-    <div style={{ overflowX: 'auto', borderRadius: '12px', border: '1px solid var(--border-card)', background: 'var(--card-bg)' }}>
-      <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: '800px' }}>
+    <ScrollTable minW="800px">
+      <table style={{ borderCollapse: 'collapse', width: '100%', background: 'var(--card-bg)' }}>
         <thead>
           <tr>
             <TH w="40px">No.</TH>
@@ -675,7 +693,7 @@ function LibroRetenciones({ rows }) {
           </tr>
         </tfoot>
       </table>
-    </div>
+    </ScrollTable>
   )
 }
 
@@ -884,17 +902,25 @@ export default function ContabilidadPage() {
     try { return JSON.parse(localStorage.getItem(LS_YEARS)) || [curY] }
     catch { return [curY] }
   })
-  const [expanded, setExpanded] = useState({ [curY]: true })
-  const [sel, setSel]           = useState({ year: curY, month: curM })
+  const initSel = (() => {
+    try {
+      const s = JSON.parse(localStorage.getItem('conta_sel'))
+      if (s?.year && s?.month !== undefined) return s
+    } catch {}
+    return { year: curY, month: curM }
+  })()
+
+  const [expanded, setExpanded] = useState({ [initSel.year]: true })
+  const [sel, setSel]           = useState(initSel)
   const [sub, setSub]           = useState('RESUMEN')
-  const [data, setData]         = useState(() => loadMonth(curY, curM))
+  const [data, setData]         = useState(() => loadMonth(initSel.year, initSel.month))
 
   // Al iniciar, intenta re-parsear desde IndexedDB si localStorage está vacío
   useEffect(() => {
-    const saved = loadMonth(curY, curM)
+    const saved = loadMonth(initSel.year, initSel.month)
     if (saved.ventas?.rows?.length || saved.compras?.rows?.length) return
     const tipos = ['ventas', 'compras', 'retenciones']
-    Promise.all(tipos.map(t => idbLoad(idbKey(curY, curM, t)).catch(() => null)))
+    Promise.all(tipos.map(t => idbLoad(idbKey(initSel.year, initSel.month, t)).catch(() => null)))
       .then(([v, c, r]) => {
         let d = { ...saved }
         if (v) { const wb = XLSX.read(v.buffer, { type: 'array' }); d = { ...d, ventas: parseVentas(wb), files: { ...d.files, ventas: v.name } } }
@@ -905,7 +931,9 @@ export default function ContabilidadPage() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectMonth = (year, month) => {
-    setSel({ year, month })
+    const newSel = { year, month }
+    setSel(newSel)
+    localStorage.setItem('conta_sel', JSON.stringify(newSel))
     setSub('RESUMEN')
     // Carga datos parseados desde localStorage
     const saved = loadMonth(year, month)
@@ -944,10 +972,11 @@ export default function ContabilidadPage() {
   }
 
   const handleFile = (tipo) => async (file) => {
-    const buf = await file.arrayBuffer()
-    const wb  = XLSX.read(buf, { type: 'array' })
+    const buf    = await file.arrayBuffer()
+    const bufCopy= buf.slice(0)               // copia antes de que XLSX lo procese
+    const wb     = XLSX.read(buf, { type: 'array' })
     // Guarda el archivo original en IndexedDB para descarga futura
-    idbSave(idbKey(sel.year, sel.month, tipo), { name: file.name, buffer: buf }).catch(() => {})
+    idbSave(idbKey(sel.year, sel.month, tipo), { name: file.name, buffer: bufCopy }).catch(() => {})
     setData(prev => {
       const next = {
         ...prev,
