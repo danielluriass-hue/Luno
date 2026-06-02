@@ -264,9 +264,10 @@ function ResumenFiscal({ ventas, compras, retenciones }) {
   const compRows      = cVig.filter(c => c.compras > 0)
   const svcRows       = cVig.filter(c => c.servicios > 0)
 
-  const totalFacComb  = combRows.reduce((s, c) => s + c.total, 0)
-  const totalFacComp  = compRows.reduce((s, c) => s + c.total, 0)
-  const totalFacSvc   = svcRows.reduce((s, c) => s + c.total, 0)
+  // "Total Fac" = precio neto SIN IVA (ni IDP para combustibles)
+  const totalFacComb  = combRows.reduce((s, c) => s + c.combustibles, 0)
+  const totalFacComp  = compRows.reduce((s, c) => s + c.compras, 0)
+  const totalFacSvc   = svcRows.reduce((s, c) => s + c.servicios, 0)
   const totalFacGastos= totalFacComb + totalFacComp + totalFacSvc
 
   const ivaComb       = combRows.reduce((s, c) => s + c.iva, 0)
@@ -364,32 +365,48 @@ function ResumenFiscal({ ventas, compras, retenciones }) {
 
         <Div />
 
-        {/* Gastos — tabla con dos columnas */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto auto', gap: '0 8px', alignItems: 'center', marginBottom: '3px' }}>
-          <span />
-          <span />
-          <span style={{ fontSize: '10px', fontWeight: '700', color: CM, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Fac</span>
-          <span style={{ fontSize: '10px', fontWeight: '700', color: CM, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.05em' }}>IVA</span>
-        </div>
-
-        {[
-          { label: 'Combustibles', fac: totalFacComb, iva: ivaComb },
-          { label: 'Compras',      fac: totalFacComp, iva: ivaComp },
-          { label: 'Servicios',    fac: totalFacSvc,  iva: ivaSvc  },
-        ].map(({ label, fac, iva }) => (
-          <div key={label} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto auto', gap: '0 8px', alignItems: 'center', marginBottom: '2px' }}>
-            <Lbl t="(-)" color={CR} />
-            <Lbl t={label} indent />
-            <Val v={fac} color={CM} />
-            <Val v={iva} />
-          </div>
-        ))}
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto auto', gap: '0 8px', alignItems: 'center', marginTop: '4px', paddingTop: '6px', borderTop: '1px solid var(--border)' }}>
-          <span />
-          <Lbl t="TOTAL GASTOS" bold />
-          <Val v={totalFacGastos} bold color={CM} />
-          <Val v={ivaGastos} bold />
+        {/* Gastos — tabla con columnas bien definidas */}
+        <div style={{ borderRadius: '10px', border: '1px solid var(--border-card)', overflow: 'hidden', marginBottom: '10px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: 'var(--inner-bg)' }}>
+                <th style={{ padding: '7px 12px', fontSize: '10px', fontWeight: '700', color: CM, textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'left', width: '40%' }} />
+                <th style={{ padding: '7px 12px', fontSize: '10px', fontWeight: '700', color: CM, textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right', borderLeft: '1px solid var(--border)' }}>Total Fac</th>
+                <th style={{ padding: '7px 12px', fontSize: '10px', fontWeight: '700', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right', borderLeft: '1px solid var(--border)', background: 'var(--accent-soft)' }}>IVA</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                { label: 'Combustibles', fac: totalFacComb, iva: ivaComb },
+                { label: 'Compras',      fac: totalFacComp, iva: ivaComp },
+                { label: 'Servicios',    fac: totalFacSvc,  iva: ivaSvc  },
+              ].map(({ label, fac, iva }, i) => (
+                <tr key={label} style={{ borderTop: '1px solid var(--border)', background: i % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.015)' }}>
+                  <td style={{ padding: '7px 12px', fontSize: '13px', color: CM }}>
+                    <span style={{ color: CR, fontWeight: '700', marginRight: '6px' }}>(-)</span>
+                    {label}
+                  </td>
+                  <td style={{ padding: '7px 12px', fontSize: '13px', fontFamily: 'monospace', textAlign: 'right', color: C, borderLeft: '1px solid var(--border)' }}>
+                    {fac === 0 ? '–' : Qn(fac)}
+                  </td>
+                  <td style={{ padding: '7px 12px', fontSize: '13px', fontFamily: 'monospace', textAlign: 'right', fontWeight: '600', color: C, borderLeft: '1px solid var(--border)', background: 'var(--accent-soft)' }}>
+                    {iva === 0 ? '–' : Qn(iva)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr style={{ borderTop: '2px solid var(--border)', background: 'var(--inner-bg)' }}>
+                <td style={{ padding: '8px 12px', fontSize: '13px', fontWeight: '700', color: C }}>TOTAL GASTOS</td>
+                <td style={{ padding: '8px 12px', fontSize: '13px', fontFamily: 'monospace', textAlign: 'right', fontWeight: '700', color: C, borderLeft: '1px solid var(--border)' }}>
+                  {Qn(totalFacGastos)}
+                </td>
+                <td style={{ padding: '8px 12px', fontSize: '13px', fontFamily: 'monospace', textAlign: 'right', fontWeight: '700', color: 'var(--accent)', borderLeft: '1px solid var(--border)', background: 'var(--accent-soft)' }}>
+                  {Qn(ivaGastos)}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
 
         <Div />
