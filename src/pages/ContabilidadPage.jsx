@@ -1,5 +1,51 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import * as XLSX from 'xlsx'
+
+// ─── IndexedDB: almacena archivos originales para descarga ───────────────────
+
+const IDB_NAME  = 'contabilidad_files'
+const IDB_STORE = 'archivos'
+
+function openIDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(IDB_NAME, 1)
+    req.onupgradeneeded = e => e.target.result.createObjectStore(IDB_STORE)
+    req.onsuccess = e => res(e.target.result)
+    req.onerror   = e => rej(e.target.error)
+  })
+}
+
+async function idbSave(key, value) {
+  const db = await openIDB()
+  return new Promise((res, rej) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite')
+    tx.objectStore(IDB_STORE).put(value, key)
+    tx.oncomplete = res
+    tx.onerror = e => rej(e.target.error)
+  })
+}
+
+async function idbLoad(key) {
+  const db = await openIDB()
+  return new Promise((res, rej) => {
+    const tx  = db.transaction(IDB_STORE, 'readonly')
+    const req = tx.objectStore(IDB_STORE).get(key)
+    req.onsuccess = e => res(e.target.result ?? null)
+    req.onerror   = e => rej(e.target.error)
+  })
+}
+
+const idbKey = (year, month, tipo) => `${year}_${month}_${tipo}`
+
+async function downloadFromIDB(year, month, tipo, fallbackName) {
+  const stored = await idbLoad(idbKey(year, month, tipo))
+  if (!stored) return
+  const blob = new Blob([stored.buffer])
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href = url; a.download = stored.name || fallbackName; a.click()
+  URL.revokeObjectURL(url)
+}
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -130,7 +176,7 @@ function parseRetenciones(wb) {
 
 // ─── UploadZone ─────────────────────────────────────────────────────────────
 
-function UploadZone({ label, fileName, onFile }) {
+function UploadZone({ label, fileName, onFile, onDownload }) {
   const onDrop = useCallback(e => {
     e.preventDefault()
     const f = e.dataTransfer.files[0]
@@ -138,30 +184,50 @@ function UploadZone({ label, fileName, onFile }) {
   }, [onFile])
 
   return (
-    <label
-      onDrop={onDrop}
-      onDragOver={e => e.preventDefault()}
-      style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        justifyContent: 'center', gap: '6px', padding: '14px 10px',
-        borderRadius: '12px', cursor: 'pointer', flex: 1, minWidth: '130px',
-        border: `1.5px dashed ${fileName ? 'var(--accent)' : 'var(--border-card)'}`,
-        background: fileName ? 'var(--accent-soft)' : 'var(--inner-bg)',
-        transition: 'all 0.15s',
-      }}
-    >
-      <input type="file" accept=".xls,.xlsx" onChange={e => e.target.files[0] && onFile(e.target.files[0])} style={{ display: 'none' }} />
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-        stroke={fileName ? 'var(--accent)' : 'var(--text-muted)'}
-        strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-        <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-      </svg>
-      <span style={{ fontSize: '11px', fontWeight: '600', color: fileName ? 'var(--accent)' : 'var(--text-muted)' }}>{label}</span>
-      <span style={{ fontSize: '10px', color: 'var(--text-muted)', textAlign: 'center', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {fileName || 'Arrastra o haz clic'}
-      </span>
-    </label>
+    <div style={{ flex: 1, minWidth: '130px', display: 'flex', flexDirection: 'column', gap: '0' }}>
+      <label
+        onDrop={onDrop}
+        onDragOver={e => e.preventDefault()}
+        style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          justifyContent: 'center', gap: '6px', padding: '14px 10px',
+          borderRadius: fileName ? '12px 12px 0 0' : '12px', cursor: 'pointer',
+          border: `1.5px dashed ${fileName ? 'var(--accent)' : 'var(--border-card)'}`,
+          borderBottom: fileName ? 'none' : undefined,
+          background: fileName ? 'var(--accent-soft)' : 'var(--inner-bg)',
+          transition: 'all 0.15s',
+        }}
+      >
+        <input type="file" accept=".xls,.xlsx" onChange={e => e.target.files[0] && onFile(e.target.files[0])} style={{ display: 'none' }} />
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+          stroke={fileName ? 'var(--accent)' : 'var(--text-muted)'}
+          strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <span style={{ fontSize: '11px', fontWeight: '600', color: fileName ? 'var(--accent)' : 'var(--text-muted)' }}>{label}</span>
+        <span style={{ fontSize: '10px', color: 'var(--text-muted)', textAlign: 'center', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {fileName || 'Arrastra o haz clic'}
+        </span>
+      </label>
+
+      {/* Botón de descarga — solo aparece si hay archivo guardado */}
+      {fileName && onDownload && (
+        <button onClick={onDownload} style={{
+          width: '100%', padding: '5px 8px', border: '1.5px dashed var(--accent)',
+          borderTop: '1px solid var(--accent-soft)', borderRadius: '0 0 12px 12px',
+          background: 'var(--accent-soft)', color: 'var(--accent)',
+          fontSize: '10px', fontWeight: '600', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+        }}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Descargar
+        </button>
+      )}
+    </div>
   )
 }
 
@@ -806,10 +872,45 @@ export default function ContabilidadPage() {
   const [sub, setSub]           = useState('RESUMEN')
   const [data, setData]         = useState(() => loadMonth(curY, curM))
 
+  // Al iniciar, intenta re-parsear desde IndexedDB si localStorage está vacío
+  useEffect(() => {
+    const saved = loadMonth(curY, curM)
+    if (saved.ventas?.rows?.length || saved.compras?.rows?.length) return
+    const tipos = ['ventas', 'compras', 'retenciones']
+    Promise.all(tipos.map(t => idbLoad(idbKey(curY, curM, t)).catch(() => null)))
+      .then(([v, c, r]) => {
+        let d = { ...saved }
+        if (v) { const wb = XLSX.read(v.buffer, { type: 'array' }); d = { ...d, ventas: parseVentas(wb), files: { ...d.files, ventas: v.name } } }
+        if (c) { const wb = XLSX.read(c.buffer, { type: 'array' }); d = { ...d, compras: parseCompras(wb), files: { ...d.files, compras: c.name } } }
+        if (r) { const wb = XLSX.read(r.buffer, { type: 'array' }); d = { ...d, retenciones: parseRetenciones(wb), files: { ...d.files, retenciones: r.name } } }
+        if (v || c || r) setData(d)
+      })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const selectMonth = (year, month) => {
     setSel({ year, month })
-    setData(loadMonth(year, month))
     setSub('RESUMEN')
+    // Carga datos parseados desde localStorage
+    const saved = loadMonth(year, month)
+    // Si faltan datos, intenta re-parsear desde IndexedDB
+    const tipos = ['ventas', 'compras', 'retenciones']
+    Promise.all(tipos.map(t => idbLoad(idbKey(year, month, t)).catch(() => null)))
+      .then(([v, c, r]) => {
+        let d = { ...saved }
+        if (v && !saved.ventas?.rows?.length) {
+          const wb = XLSX.read(v.buffer, { type: 'array' })
+          d = { ...d, ventas: parseVentas(wb), files: { ...d.files, ventas: v.name } }
+        }
+        if (c && !saved.compras?.rows?.length) {
+          const wb = XLSX.read(c.buffer, { type: 'array' })
+          d = { ...d, compras: parseCompras(wb), files: { ...d.files, compras: c.name } }
+        }
+        if (r && !saved.retenciones?.length) {
+          const wb = XLSX.read(r.buffer, { type: 'array' })
+          d = { ...d, retenciones: parseRetenciones(wb), files: { ...d.files, retenciones: r.name } }
+        }
+        setData(d)
+      })
   }
 
   const toggleYear = (year) =>
@@ -828,6 +929,8 @@ export default function ContabilidadPage() {
   const handleFile = (tipo) => async (file) => {
     const buf = await file.arrayBuffer()
     const wb  = XLSX.read(buf, { type: 'array' })
+    // Guarda el archivo original en IndexedDB para descarga futura
+    idbSave(idbKey(sel.year, sel.month, tipo), { name: file.name, buffer: buf }).catch(() => {})
     setData(prev => {
       const next = {
         ...prev,
@@ -840,6 +943,9 @@ export default function ContabilidadPage() {
       return next
     })
   }
+
+  const handleDownload = (tipo) => () =>
+    downloadFromIDB(sel.year, sel.month, tipo, `${tipo}_${MESES[sel.month]}_${sel.year}.xls`)
 
   const { ventas, compras, retenciones, files } = data
 
@@ -874,9 +980,9 @@ export default function ContabilidadPage() {
           <div style={{ background: 'var(--card-bg)', borderRadius: '14px', border: '1px solid var(--border-card)', padding: '14px', marginBottom: '18px' }}>
             <p style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '10px' }}>Archivos SAT</p>
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-              <UploadZone label="Ventas"      fileName={files.ventas}      onFile={handleFile('ventas')} />
-              <UploadZone label="Compras"     fileName={files.compras}     onFile={handleFile('compras')} />
-              <UploadZone label="Retenciones" fileName={files.retenciones} onFile={handleFile('retenciones')} />
+              <UploadZone label="Ventas"      fileName={files.ventas}      onFile={handleFile('ventas')}      onDownload={handleDownload('ventas')} />
+              <UploadZone label="Compras"     fileName={files.compras}     onFile={handleFile('compras')}     onDownload={handleDownload('compras')} />
+              <UploadZone label="Retenciones" fileName={files.retenciones} onFile={handleFile('retenciones')} onDownload={handleDownload('retenciones')} />
             </div>
           </div>
 
