@@ -256,15 +256,20 @@ function ResumenFiscal({ ventas, compras, retenciones }) {
     )
   }
 
-  // Ventas Brutas = TODOS los DTEs (vigentes + anulados, incluyendo NCRE)
+  const NCR_TIPOS = new Set(['NCRE', 'NAB', 'NCR'])
+  const vigentes    = ventas.filter(v => v.estado === 'Vigente')
+  const factVig     = vigentes.filter(v => !NCR_TIPOS.has(v.tipoDTE))
+  const ncrVig      = vigentes.filter(v =>  NCR_TIPOS.has(v.tipoDTE))
+
+  // Ventas Brutas = TODOS los DTEs (vigentes + anulados)
   const ventasBrutas  = ventas.reduce((s, v) => s + v.total, 0)
   const totalAnuladas = ventas.filter(v => v.estado === 'Anulado').reduce((s, v) => s + v.total, 0)
-  const totalNCR      = 0  // notas de crédito externas (no SAT) — siempre se muestra la línea
+  const totalNCR      = ncrVig.reduce((s, v) => s + v.total, 0)   // NCRE vigentes reducen ventas
   const totalDeducciones = totalAnuladas + totalNCR
   const ventasNetas   = ventasBrutas - totalDeducciones
 
-  // IVA débito = suma del IVA de todos los vigentes (FACT + NCRE incluidos)
-  const ivaDebito  = ventas.filter(v => v.estado === 'Vigente').reduce((s, v) => s + v.iva, 0)
+  // IVA débito = solo las FACTURAS vigentes (las NCR reducen el débito)
+  const ivaDebito  = factVig.reduce((s, v) => s + v.iva, 0)
   const ivaRet     = retenciones.reduce((s, r) => s + r.totalRetencion, 0)
   const ivaAPagar  = ivaDebito - ivaRet
 
@@ -325,27 +330,33 @@ function ResumenFiscal({ ventas, compras, retenciones }) {
       <div style={s.body}>
 
         {/* ── Ventas ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '0 12px', alignItems: 'center', marginBottom: '2px' }}>
-          <Lbl t="Ventas Brutas" bold />
-          <span />
-          <Val v={ventasBrutas} bold />
-        </div>
-
-        {/* Facturas Anuladas */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto auto', gap: '0 8px', alignItems: 'center', marginBottom: '2px' }}>
-          <Lbl t="(-)" color={CR} />
-          <Lbl t="Facturas Anuladas" indent />
-          <Val v={totalAnuladas} color={CR} />
-          <span />
-        </div>
-
-        {/* Notas de Crédito — siempre visible */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto auto', gap: '0 8px', alignItems: 'center', marginBottom: '4px' }}>
-          <Lbl t="(-)" color={CR} />
-          <Lbl t="Notas de Crédito" indent />
-          <Val v={totalNCR} color={totalNCR > 0 ? CR : CM} />
-          <Val v={totalDeducciones} bold />
-        </div>
+        {/* Tabla de deducciones: 3 columnas fijas para alineación perfecta */}
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '6px' }}>
+          <colgroup>
+            <col style={{ width: '24px' }} />
+            <col />
+            <col style={{ width: '130px' }} />
+          </colgroup>
+          <tbody>
+            <tr>
+              <td />
+              <td style={{ padding: '4px 0', fontSize: '13px', fontWeight: '700', color: C }}>Ventas Brutas</td>
+              <td style={{ padding: '4px 0', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: '700', color: C }}>{Qn(ventasBrutas)}</td>
+            </tr>
+            <tr>
+              <td style={{ fontSize: '13px', fontWeight: '700', color: CR, paddingRight: '4px' }}>(-)</td>
+              <td style={{ padding: '3px 0', fontSize: '13px', color: CM, paddingLeft: '8px' }}>Facturas Anuladas</td>
+              <td style={{ padding: '3px 0', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: CR }}>{Qn(totalAnuladas)}</td>
+            </tr>
+            <tr>
+              <td style={{ fontSize: '13px', fontWeight: '700', color: CR, paddingRight: '4px' }}>(-)</td>
+              <td style={{ padding: '3px 0 6px', fontSize: '13px', color: totalNCR > 0 ? CR : CM, paddingLeft: '8px' }}>Notas de Crédito</td>
+              <td style={{ padding: '3px 0 6px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: totalNCR > 0 ? CR : CM, borderBottom: '1px solid var(--border)' }}>
+                {totalNCR === 0 ? '–' : Qn(totalNCR)}
+              </td>
+            </tr>
+          </tbody>
+        </table>
 
         {/* Ventas Netas */}
         <div style={s.box}>
@@ -552,24 +563,24 @@ function LibroCompras({ rows, meta }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <div>
         <MetaLibro titulo="Libro de Compras y Servicios Adquiridos" meta={meta} filas={rows} />
-        <ScrollTable minW="1100px">
+        <ScrollTable minW="980px">
           <table style={{ borderCollapse: 'collapse', width: '100%', background: 'var(--card-bg)' }}>
             <thead>
               <tr>
-                <TH w="36px">No.</TH>
-                <TH w="84px">Fecha</TH>
-                <TH w="58px">Tipo</TH>
-                <TH w="78px">Serie</TH>
-                <TH w="98px">Número</TH>
-                <TH w="78px">NIT</TH>
-                <TH w="175px">Proveedor</TH>
-                <TH right w="90px">Combustibles</TH>
-                <TH right w="90px">Compras</TH>
-                <TH right w="72px">Servicios</TH>
-                <TH right w="72px">IDP</TH>
-                <TH right w="78px">Tasa Mun.</TH>
-                <TH right w="80px">IVA</TH>
-                <TH right w="90px">Total</TH>
+                <TH w="32px">No.</TH>
+                <TH w="80px">Fecha</TH>
+                <TH w="52px">Tipo</TH>
+                <TH w="64px">Serie</TH>
+                <TH w="82px">Número</TH>
+                <TH w="62px">NIT</TH>
+                <TH w="138px">Proveedor</TH>
+                <TH right w="82px">Combustibles</TH>
+                <TH right w="82px">Compras</TH>
+                <TH right w="60px">Servicios</TH>
+                <TH right w="58px">IDP</TH>
+                <TH right w="66px">Tasa Mun.</TH>
+                <TH right w="70px">IVA</TH>
+                <TH right w="78px">Total</TH>
               </tr>
             </thead>
             <tbody>
@@ -654,20 +665,20 @@ function LibroRetenciones({ rows }) {
   }
   const totalRet = rows.reduce((s, r) => s + r.totalRetencion, 0)
   return (
-    <ScrollTable minW="800px">
+    <ScrollTable minW="989px">
       <table style={{ borderCollapse: 'collapse', width: '100%', background: 'var(--card-bg)' }}>
         <thead>
           <tr>
-            <TH w="40px">No.</TH>
-            <TH w="100px">NIT Retenedor</TH>
-            <TH w="250px">Nombre Retenedor</TH>
-            <TH w="80px">Estado</TH>
-            <TH w="120px">Constancia</TH>
-            <TH w="100px">Fecha Emisión</TH>
-            <TH right w="110px">Total Factura</TH>
-            <TH right w="100px">Importe Neto</TH>
-            <TH right w="110px">Afecto Retención</TH>
-            <TH right w="110px">Total Retención</TH>
+            <TH w="32px">No.</TH>
+            <TH w="90px">NIT Retenedor</TH>
+            <TH w="200px">Nombre Retenedor</TH>
+            <TH w="72px">Estado</TH>
+            <TH w="110px">Constancia</TH>
+            <TH w="90px">Fecha Emisión</TH>
+            <TH right w="100px">Total Factura</TH>
+            <TH right w="95px">Importe Neto</TH>
+            <TH right w="100px">Afecto Ret.</TH>
+            <TH right w="100px">Total Ret.</TH>
           </tr>
         </thead>
         <tbody>
