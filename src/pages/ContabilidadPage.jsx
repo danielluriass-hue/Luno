@@ -444,32 +444,28 @@ function ResumenFiscal({ ventas, compras, retenciones }) {
 
 // ─── Tabla genérica con scroll horizontal ───────────────────────────────────
 
-// Wrapper con scroll horizontal garantizado
-const ScrollTable = ({ children, minW }) => (
-  <div style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-    <div style={{ borderRadius: '12px', border: '1px solid var(--border-card)', overflow: 'hidden', minWidth: minW || 'auto' }}>
-      {children}
-    </div>
+const ScrollTable = ({ children }) => (
+  <div style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: '12px', border: '1px solid var(--border-card)', overflow: 'auto' }}>
+    {children}
   </div>
 )
 
-const TH = ({ children, right, mono, w }) => (
+const TH = ({ children, right, w }) => (
   <th style={{
-    padding: '8px 10px', fontSize: '10px', fontWeight: '700', whiteSpace: 'nowrap',
-    textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)',
-    textAlign: right ? 'right' : 'center', background: 'var(--inner-bg)',
-    borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 1,
-    minWidth: w || 'auto',
+    padding: '7px 8px', fontSize: '10px', fontWeight: '700', whiteSpace: 'nowrap',
+    textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)',
+    textAlign: right ? 'right' : 'left', background: 'var(--inner-bg)',
+    borderBottom: '1px solid var(--border)', width: w || 'auto',
   }}>{children}</th>
 )
 
-const TD = ({ children, right, mono, muted, red, green, bold, small, wrap }) => (
+const TD = ({ children, right, mono, muted, red, green, bold, small, trunc }) => (
   <td style={{
-    padding: '7px 10px', fontSize: small ? '10px' : '12px',
-    whiteSpace: wrap ? 'normal' : 'nowrap',
-    maxWidth: wrap ? '180px' : undefined,
-    overflow: wrap ? 'hidden' : undefined,
-    textOverflow: wrap ? 'ellipsis' : undefined,
+    padding: '6px 8px', fontSize: small ? '10px' : '12px',
+    whiteSpace: 'nowrap',
+    maxWidth: trunc ? '160px' : undefined,
+    overflow: trunc ? 'hidden' : undefined,
+    textOverflow: trunc ? 'ellipsis' : undefined,
     textAlign: right ? 'right' : 'left',
     fontFamily: mono ? 'monospace' : 'inherit',
     color: red ? 'var(--red)' : green ? 'var(--green)' : muted ? 'var(--text-muted)' : 'var(--text-1)',
@@ -478,36 +474,218 @@ const TD = ({ children, right, mono, muted, red, green, bold, small, wrap }) => 
   }}>{children}</td>
 )
 
+// ─── Funciones de exportación ────────────────────────────────────────────────
+
+function Qx(n) {
+  if (n === undefined || n === null || n === '') return ''
+  return Number(n).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function exportVentasXLSX(rows, meta, mesLabel) {
+  const wb = XLSX.utils.book_new()
+  const vig = rows.filter(r => r.estado === 'Vigente')
+  const totS = vig.reduce((s, r) => s + r.servicios, 0)
+  const totI = vig.reduce((s, r) => s + r.iva, 0)
+  const totT = vig.reduce((s, r) => s + r.total, 0)
+
+  const aoa = [
+    ['LIBRO DE VENTAS Y SERVICIOS PRESTADOS'],
+    [],
+    [`OPERACIÓN DEL MES: ${mesLabel}`, '', '', '', '', '', '', '', '', '', 'Folio:'],
+    [`NOMBRE O RAZÓN SOCIAL: ${meta.nombre}`, '', '', '', '', '', '', '', '', '', 'Resolución:'],
+    ['DIRECCIÓN:', '', '', '', '', '', '', '', '', '', 'Fecha:'],
+    [`NIT: ${meta.nit}`, '', '', '', '', '', '', '', '', '', 'Folio del:'],
+    [],
+    ['No.', 'Fecha', 'Tip. Doc.', 'Serie', 'Número', 'NIT', 'Nombre del Cliente', 'Estado', 'P. Neto Servicios', 'IVA Débito Fiscal', 'Monto c/IVA'],
+    ...rows.map(r => [
+      r.no, r.fecha, r.tipoDTE, r.serie, r.numero, r.nit, r.cliente, r.estado,
+      r.estado === 'Anulado' ? '' : r.servicios,
+      r.estado === 'Anulado' ? '' : r.iva,
+      r.total,
+    ]),
+    [],
+    ['', '', '', '', '', '', '', 'TOTALES', totS, totI, totT],
+    [],
+    ['FACT = Factura', 'NCRE = Nota de crédito', 'NAB = Nota de abono', 'FCAM = Factura cambiaria'],
+  ]
+  const ws = XLSX.utils.aoa_to_sheet(aoa)
+  ws['!cols'] = [{wch:5},{wch:12},{wch:8},{wch:10},{wch:14},{wch:12},{wch:42},{wch:10},{wch:18},{wch:18},{wch:18}]
+  ws['!merges'] = [{ s:{r:0,c:0}, e:{r:0,c:10} }]
+  XLSX.utils.book_append_sheet(wb, ws, 'Ventas')
+  XLSX.writeFile(wb, `LibroVentas_${mesLabel}.xlsx`)
+}
+
+function exportComprasXLSX(rows, meta, mesLabel) {
+  const wb = XLSX.utils.book_new()
+  const vig = rows.filter(r => r.estado === 'Vigente')
+  const totC = vig.reduce((s, r) => s + r.combustibles, 0)
+  const totK = vig.reduce((s, r) => s + r.compras, 0)
+  const totI = vig.reduce((s, r) => s + r.idp, 0)
+  const totTM= vig.reduce((s, r) => s + r.tasaMunicipal, 0)
+  const totIV= vig.reduce((s, r) => s + r.iva, 0)
+  const totT = vig.reduce((s, r) => s + r.total, 0)
+
+  const aoa = [
+    ['LIBRO DE COMPRAS Y SERVICIOS ADQUIRIDOS'],
+    [],
+    [`OPERACIÓN DEL MES: ${mesLabel}`, '', '', '', '', '', '', '', '', '', '', '', '', 'Folio:'],
+    [`NOMBRE O RAZÓN SOCIAL: ${meta.nombre}`, '', '', '', '', '', '', '', '', '', '', '', '', 'Resolución:'],
+    ['DIRECCIÓN:', '', '', '', '', '', '', '', '', '', '', '', '', 'Fecha:'],
+    [`NIT: ${meta.nit}`, '', '', '', '', '', '', '', '', '', '', '', '', 'Folio del:'],
+    [],
+    ['No.', 'Fecha', 'Tipo Doc.', 'Serie', 'Número', 'NIT', 'Proveedor', 'Combustibles', 'Compras', 'Servicios', 'Importaciones', 'Pequeño Contrib.', 'IDP Dto. 38-92', 'Tasa Municipal', 'IVA', 'Total'],
+    ...rows.map(r => [
+      r.no, r.fecha, r.tipoDTE, r.serie, r.numero, r.nit, r.proveedor,
+      r.estado === 'Anulado' ? '' : r.combustibles,
+      r.estado === 'Anulado' ? '' : r.compras,
+      r.estado === 'Anulado' ? '' : r.servicios,
+      '', '',
+      r.idp || '',
+      r.tasaMunicipal || '',
+      r.estado === 'Anulado' ? '' : r.iva,
+      r.total,
+    ]),
+    [],
+    ['', '', '', '', '', '', 'TOTALES', totC, totK, 0, 0, 0, totI, totTM, totIV, totT],
+    [],
+    ['RESUMEN:'],
+    ['Combustible:', totC, 'IVA:', vig.filter(r=>r.combustibles>0).reduce((s,r)=>s+r.iva,0)],
+    ['Compras:', totK, 'IVA:', vig.filter(r=>r.compras>0).reduce((s,r)=>s+r.iva,0)],
+    ['Servicios:', 0, 'IVA:', 0],
+    ['IDP:', totI],
+    ['Tasa Municipal:', totTM],
+    ['Total Documental:', totT],
+    [],
+    ['FACT=Factura','FES=Factura Especial','NCR=Nota de crédito','FPC=Factura Pequeño Contribuyente','FCAM=Factura cambiaria'],
+  ]
+  const ws = XLSX.utils.aoa_to_sheet(aoa)
+  ws['!cols'] = [{wch:5},{wch:12},{wch:8},{wch:10},{wch:14},{wch:12},{wch:38},{wch:14},{wch:14},{wch:12},{wch:12},{wch:12},{wch:14},{wch:14},{wch:12},{wch:14}]
+  ws['!merges'] = [{ s:{r:0,c:0}, e:{r:0,c:15} }]
+  XLSX.utils.book_append_sheet(wb, ws, 'Compras')
+  XLSX.writeFile(wb, `LibroCompras_${mesLabel}.xlsx`)
+}
+
+function exportRetencionesXLSX(rows, mesLabel) {
+  const wb = XLSX.utils.book_new()
+  const totRet = rows.reduce((s, r) => s + r.totalRetencion, 0)
+  const aoa = [
+    ['RETENCIONES IVA'],
+    [`PERÍODO: ${mesLabel}`],
+    [],
+    ['No.', 'NIT Retenedor', 'Nombre Retenedor', 'Estado', 'Constancia', 'Fecha Emisión', 'Total Factura', 'Importe Neto', 'Afecto Retención', 'Total Retención'],
+    ...rows.map(r => [r.no, r.nitRetenedor, r.retenedor, r.estado, r.constancia, r.fecha, r.totalFactura, r.importeNeto, r.afectoRetencion, r.totalRetencion]),
+    [],
+    ['', '', '', '', '', '', '', '', 'TOTAL:', totRet],
+  ]
+  const ws = XLSX.utils.aoa_to_sheet(aoa)
+  ws['!cols'] = [{wch:5},{wch:12},{wch:40},{wch:10},{wch:18},{wch:14},{wch:14},{wch:14},{wch:16},{wch:16}]
+  XLSX.utils.book_append_sheet(wb, ws, 'Retenciones')
+  XLSX.writeFile(wb, `Retenciones_${mesLabel}.xlsx`)
+}
+
+function printLibro(tipo, htmlContent, mesLabel) {
+  const w = window.open('', '_blank')
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${tipo} — ${mesLabel}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Arial,sans-serif;font-size:8pt;color:#000;padding:12mm}
+  h1{text-align:center;font-size:11pt;font-weight:bold;margin-bottom:6px;text-transform:uppercase}
+  .meta{margin-bottom:10px;font-size:8.5pt}
+  .meta p{margin-bottom:2px}
+  table{border-collapse:collapse;width:100%}
+  th{background:#e8e8e8;font-weight:bold;font-size:7.5pt;padding:3px 5px;border:1px solid #666;text-align:center}
+  td{font-size:7.5pt;padding:2px 5px;border:1px solid #ccc}
+  td.r{text-align:right}
+  tr.anulado td{color:#999}
+  tfoot td{font-weight:bold;background:#f0f0f0;border:1px solid #666}
+  .leyenda{margin-top:8px;font-size:7pt;color:#555}
+  @media print{@page{size:landscape;margin:10mm}}
+</style></head><body>${htmlContent}</body></html>`)
+  w.document.close()
+  setTimeout(() => { w.focus(); w.print() }, 400)
+}
+
+// ─── Exportar botones ────────────────────────────────────────────────────────
+
+function ExportButtons({ onXLSX, onPrint }) {
+  const btn = { display:'flex', alignItems:'center', gap:'5px', padding:'5px 10px', borderRadius:'8px', border:'1px solid var(--border-card)', background:'var(--inner-bg)', color:'var(--text-muted)', fontSize:'11px', fontWeight:'600', cursor:'pointer' }
+  return (
+    <div style={{ display:'flex', gap:'8px' }}>
+      <button style={btn} onClick={onXLSX}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Excel
+      </button>
+      <button style={btn} onClick={onPrint}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        PDF / Imprimir
+      </button>
+    </div>
+  )
+}
+
 // ─── Libro de Ventas ─────────────────────────────────────────────────────────
 
-function LibroVentas({ rows, meta }) {
-  if (!rows.length) {
-    return <EmptyState label="Carga el archivo de Ventas SAT" />
-  }
+function LibroVentas({ rows, meta, mesLabel }) {
+  if (!rows.length) return <EmptyState label="Carga el archivo de Ventas SAT" />
+
   const vigentes = rows.filter(r => r.estado === 'Vigente')
-  // NCR ya tiene signo negativo en el parse, la suma neta es correcta
   const totServ  = vigentes.reduce((s, r) => s + r.servicios, 0)
   const totIVA   = vigentes.reduce((s, r) => s + r.iva, 0)
   const totTotal = vigentes.reduce((s, r) => s + r.total, 0)
 
+  const handlePrint = () => {
+    const html = `
+      <h1>Libro de Ventas y Servicios Prestados</h1>
+      <div class="meta">
+        <p><b>OPERACIÓN DEL MES:</b> ${mesLabel}</p>
+        <p><b>NOMBRE O RAZÓN SOCIAL:</b> ${meta.nombre}</p>
+        <p><b>NIT:</b> ${meta.nit}</p>
+      </div>
+      <table>
+        <thead><tr>
+          <th>No.</th><th>Fecha</th><th>Tip. Doc.</th><th>Serie</th><th>Número</th>
+          <th>NIT</th><th>Nombre del Cliente</th><th>Estado</th>
+          <th>P. Neto Servicios</th><th>IVA Débito Fiscal</th><th>Total c/IVA</th>
+        </tr></thead>
+        <tbody>
+          ${rows.map(r => `<tr class="${r.estado==='Anulado'?'anulado':''}">
+            <td>${r.no}</td><td>${r.fecha}</td><td>${r.tipoDTE}</td><td>${r.serie}</td>
+            <td>${r.numero}</td><td>${r.nit}</td><td>${r.cliente}</td><td>${r.estado}</td>
+            <td class="r">${r.estado==='Anulado'?'–':Qx(r.servicios)}</td>
+            <td class="r">${r.estado==='Anulado'?'–':Qx(r.iva)}</td>
+            <td class="r">${Qx(r.total)}</td>
+          </tr>`).join('')}
+        </tbody>
+        <tfoot><tr>
+          <td colspan="8">TOTALES</td>
+          <td class="r">${Qx(totServ)}</td><td class="r">${Qx(totIVA)}</td><td class="r">${Qx(totTotal)}</td>
+        </tr></tfoot>
+      </table>
+      <div class="leyenda">FACT = Factura &nbsp;|&nbsp; NCRE = Nota de crédito &nbsp;|&nbsp; NAB = Nota de abono &nbsp;|&nbsp; FCAM = Factura cambiaria</div>`
+    printLibro('Libro de Ventas', html, mesLabel)
+  }
+
   return (
     <div>
-      <MetaLibro titulo="Libro de Ventas y Servicios Prestados" meta={meta} filas={rows} />
-      <ScrollTable minW="860px">
-        <table style={{ borderCollapse: 'collapse', width: '100%', background: 'var(--card-bg)' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'10px', flexWrap:'wrap', gap:'8px' }}>
+        <MetaLibro titulo="Libro de Ventas y Servicios Prestados" meta={meta} filas={rows} />
+        <ExportButtons onXLSX={() => exportVentasXLSX(rows, meta, mesLabel)} onPrint={handlePrint} />
+      </div>
+      <ScrollTable>
+        <table style={{ borderCollapse:'collapse', width:'100%', minWidth:'820px', background:'var(--card-bg)' }}>
           <thead>
             <tr>
-              <TH w="36px">No.</TH>
-              <TH w="84px">Fecha</TH>
-              <TH w="60px">Tipo</TH>
-              <TH w="80px">Serie</TH>
-              <TH w="100px">Número</TH>
-              <TH w="80px">NIT</TH>
-              <TH w="160px">Cliente</TH>
-              <TH w="64px">Estado</TH>
-              <TH right w="105px">P. Neto Serv.</TH>
-              <TH right w="105px">IVA Débito</TH>
-              <TH right w="110px">Total c/IVA</TH>
+              <TH w="34px">No.</TH>
+              <TH w="82px">Fecha</TH>
+              <TH w="58px">Tipo</TH>
+              <TH w="74px">Serie</TH>
+              <TH w="96px">Número</TH>
+              <TH w="76px">NIT</TH>
+              <TH w="165px">Cliente</TH>
+              <TH w="62px">Estado</TH>
+              <TH right w="100px">P. Neto Serv.</TH>
+              <TH right w="100px">IVA Débito</TH>
+              <TH right w="108px">Total c/IVA</TH>
             </tr>
           </thead>
           <tbody>
@@ -519,7 +697,7 @@ function LibroVentas({ rows, meta }) {
                 <TD mono small muted>{r.serie}</TD>
                 <TD mono small>{r.numero}</TD>
                 <TD mono small>{r.nit}</TD>
-                <TD wrap>{r.cliente}</TD>
+                <TD trunc>{r.cliente}</TD>
                 <TD><EstadoBadge estado={r.estado} /></TD>
                 <TD right mono>{r.estado === 'Anulado' ? '–' : Q(r.servicios)}</TD>
                 <TD right mono>{r.estado === 'Anulado' ? '–' : Q(r.iva)}</TD>
@@ -544,10 +722,9 @@ function LibroVentas({ rows, meta }) {
 
 // ─── Libro de Compras ────────────────────────────────────────────────────────
 
-function LibroCompras({ rows, meta }) {
-  if (!rows.length) {
-    return <EmptyState label="Carga el archivo de Compras SAT" />
-  }
+function LibroCompras({ rows, meta, mesLabel }) {
+  if (!rows.length) return <EmptyState label="Carga el archivo de Compras SAT" />
+
   const vigentes = rows.filter(r => r.estado === 'Vigente')
   const totComb  = vigentes.reduce((s, r) => s + r.combustibles, 0)
   const totComp  = vigentes.reduce((s, r) => s + r.compras, 0)
@@ -555,44 +732,83 @@ function LibroCompras({ rows, meta }) {
   const totTM    = vigentes.reduce((s, r) => s + r.tasaMunicipal, 0)
   const totIVA   = vigentes.reduce((s, r) => s + r.iva, 0)
   const totTotal = vigentes.reduce((s, r) => s + r.total, 0)
-
   const ivaComb  = vigentes.filter(r => r.combustibles > 0).reduce((s, r) => s + r.iva, 0)
   const ivaComp  = vigentes.filter(r => r.compras > 0).reduce((s, r) => s + r.iva, 0)
+
+  const handlePrint = () => {
+    const html = `
+      <h1>Libro de Compras y Servicios Adquiridos</h1>
+      <div class="meta">
+        <p><b>OPERACIÓN DEL MES:</b> ${mesLabel}</p>
+        <p><b>NOMBRE O RAZÓN SOCIAL:</b> ${meta.nombre}</p>
+        <p><b>NIT:</b> ${meta.nit}</p>
+      </div>
+      <table>
+        <thead><tr>
+          <th>No.</th><th>Fecha</th><th>Tipo</th><th>Serie</th><th>Número</th>
+          <th>NIT</th><th>Proveedor</th><th>Combustibles</th><th>Compras</th>
+          <th>Servicios</th><th>IDP</th><th>Tasa Mun.</th><th>IVA</th><th>Total</th>
+        </tr></thead>
+        <tbody>
+          ${rows.map(r=>`<tr class="${r.estado==='Anulado'?'anulado':''}">
+            <td>${r.no}</td><td>${r.fecha}</td><td>${r.tipoDTE}</td><td>${r.serie}</td>
+            <td>${r.numero}</td><td>${r.nit}</td><td>${r.proveedor}</td>
+            <td class="r">${r.estado==='Anulado'?'–':Qx(r.combustibles)}</td>
+            <td class="r">${r.estado==='Anulado'?'–':Qx(r.compras)}</td>
+            <td class="r">${r.estado==='Anulado'?'–':Qx(r.servicios)}</td>
+            <td class="r">${Qx(r.idp)}</td><td class="r">${Qx(r.tasaMunicipal)}</td>
+            <td class="r">${r.estado==='Anulado'?'–':Qx(r.iva)}</td>
+            <td class="r">${Qx(r.total)}</td>
+          </tr>`).join('')}
+        </tbody>
+        <tfoot><tr>
+          <td colspan="7">TOTALES</td>
+          <td class="r">${Qx(totComb)}</td><td class="r">${Qx(totComp)}</td>
+          <td>–</td><td class="r">${Qx(totIdp)}</td><td class="r">${Qx(totTM)}</td>
+          <td class="r">${Qx(totIVA)}</td><td class="r">${Qx(totTotal)}</td>
+        </tr></tfoot>
+      </table>
+      <div class="leyenda">FACT=Factura &nbsp;|&nbsp; FES=Factura Especial &nbsp;|&nbsp; NCR=Nota de crédito &nbsp;|&nbsp; FCAM=Factura cambiaria</div>`
+    printLibro('Libro de Compras', html, mesLabel)
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <div>
-        <MetaLibro titulo="Libro de Compras y Servicios Adquiridos" meta={meta} filas={rows} />
-        <ScrollTable minW="980px">
-          <table style={{ borderCollapse: 'collapse', width: '100%', background: 'var(--card-bg)' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'10px', flexWrap:'wrap', gap:'8px' }}>
+          <MetaLibro titulo="Libro de Compras y Servicios Adquiridos" meta={meta} filas={rows} />
+          <ExportButtons onXLSX={() => exportComprasXLSX(rows, meta, mesLabel)} onPrint={handlePrint} />
+        </div>
+        <ScrollTable>
+          <table style={{ borderCollapse:'collapse', width:'100%', minWidth:'980px', background:'var(--card-bg)' }}>
             <thead>
               <tr>
                 <TH w="32px">No.</TH>
                 <TH w="80px">Fecha</TH>
                 <TH w="52px">Tipo</TH>
-                <TH w="64px">Serie</TH>
+                <TH w="62px">Serie</TH>
                 <TH w="82px">Número</TH>
                 <TH w="62px">NIT</TH>
-                <TH w="138px">Proveedor</TH>
+                <TH w="140px">Proveedor</TH>
                 <TH right w="82px">Combustibles</TH>
-                <TH right w="82px">Compras</TH>
+                <TH right w="78px">Compras</TH>
                 <TH right w="60px">Servicios</TH>
-                <TH right w="58px">IDP</TH>
-                <TH right w="66px">Tasa Mun.</TH>
-                <TH right w="70px">IVA</TH>
-                <TH right w="78px">Total</TH>
+                <TH right w="56px">IDP</TH>
+                <TH right w="64px">Tasa Mun.</TH>
+                <TH right w="68px">IVA</TH>
+                <TH right w="80px">Total</TH>
               </tr>
             </thead>
             <tbody>
               {rows.map((r, i) => (
                 <tr key={i} style={{ background: r.estado === 'Anulado' ? 'rgba(255,59,48,0.04)' : i % 2 === 0 ? 'transparent' : 'var(--inner-bg)' }}>
                   <TD muted small>{r.no}</TD>
-                  <TD>{r.fecha}</TD>
+                  <TD small>{r.fecha}</TD>
                   <TD><TipoBadge tipo={r.tipoDTE} /></TD>
                   <TD mono small muted>{r.serie}</TD>
                   <TD mono small>{r.numero}</TD>
                   <TD mono small>{r.nit}</TD>
-                  <TD wrap>{r.proveedor}</TD>
+                  <TD trunc>{r.proveedor}</TD>
                   <TD right mono>{r.estado === 'Anulado' ? '–' : Q(r.combustibles)}</TD>
                   <TD right mono>{r.estado === 'Anulado' ? '–' : Q(r.compras)}</TD>
                   <TD right mono>{r.estado === 'Anulado' ? '–' : Q(r.servicios)}</TD>
@@ -659,14 +875,43 @@ function LibroCompras({ rows, meta }) {
 
 // ─── Libro de Retenciones ────────────────────────────────────────────────────
 
-function LibroRetenciones({ rows }) {
-  if (!rows.length) {
-    return <EmptyState label="Carga el archivo de Retenciones SAT" />
-  }
+function LibroRetenciones({ rows, mesLabel }) {
+  if (!rows.length) return <EmptyState label="Carga el archivo de Retenciones SAT" />
+
   const totalRet = rows.reduce((s, r) => s + r.totalRetencion, 0)
+
+  const handlePrint = () => {
+    const html = `
+      <h1>Retenciones IVA</h1>
+      <div class="meta"><p><b>PERÍODO:</b> ${mesLabel}</p></div>
+      <table>
+        <thead><tr>
+          <th>No.</th><th>NIT Retenedor</th><th>Nombre Retenedor</th><th>Estado</th>
+          <th>Constancia</th><th>Fecha Emisión</th><th>Total Factura</th>
+          <th>Importe Neto</th><th>Afecto Retención</th><th>Total Retención</th>
+        </tr></thead>
+        <tbody>
+          ${rows.map(r=>`<tr>
+            <td>${r.no}</td><td>${r.nitRetenedor}</td><td>${r.retenedor}</td>
+            <td>${r.estado}</td><td>${r.constancia}</td><td>${r.fecha}</td>
+            <td class="r">${Qx(r.totalFactura)}</td><td class="r">${Qx(r.importeNeto)}</td>
+            <td class="r">${Qx(r.afectoRetencion)}</td><td class="r">${Qx(r.totalRetencion)}</td>
+          </tr>`).join('')}
+        </tbody>
+        <tfoot><tr>
+          <td colspan="9">TOTAL RETENCIONES</td><td class="r">${Qx(totalRet)}</td>
+        </tr></tfoot>
+      </table>`
+    printLibro('Retenciones', html, mesLabel)
+  }
+
   return (
-    <ScrollTable minW="989px">
-      <table style={{ borderCollapse: 'collapse', width: '100%', background: 'var(--card-bg)' }}>
+    <div>
+      <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:'10px' }}>
+        <ExportButtons onXLSX={() => exportRetencionesXLSX(rows, mesLabel)} onPrint={handlePrint} />
+      </div>
+      <ScrollTable>
+      <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: '920px', background: 'var(--card-bg)' }}>
         <thead>
           <tr>
             <TH w="32px">No.</TH>
@@ -686,10 +931,10 @@ function LibroRetenciones({ rows }) {
             <tr key={i} style={{ background: i % 2 === 0 ? 'transparent' : 'var(--inner-bg)' }}>
               <TD muted small>{r.no}</TD>
               <TD mono small>{r.nitRetenedor}</TD>
-              <TD>{r.retenedor}</TD>
+              <TD trunc>{r.retenedor}</TD>
               <TD><EstadoBadge estado={r.estado} /></TD>
               <TD mono small>{r.constancia}</TD>
-              <TD>{r.fecha}</TD>
+              <TD small>{r.fecha}</TD>
               <TD right mono>{Qn(r.totalFactura)}</TD>
               <TD right mono>{Qn(r.importeNeto)}</TD>
               <TD right mono>{Qn(r.afectoRetencion)}</TD>
@@ -704,7 +949,8 @@ function LibroRetenciones({ rows }) {
           </tr>
         </tfoot>
       </table>
-    </ScrollTable>
+      </ScrollTable>
+    </div>
   )
 }
 
@@ -1063,10 +1309,15 @@ export default function ContabilidadPage() {
           </div>
 
           {/* Contenido */}
-          {sub === 'RESUMEN'     && <ResumenFiscal ventas={ventas.rows} compras={compras.rows} retenciones={retenciones} />}
-          {sub === 'VENTAS'      && <LibroVentas rows={ventas.rows} meta={ventas.meta} />}
-          {sub === 'COMPRAS'     && <LibroCompras rows={compras.rows} meta={compras.meta} />}
-          {sub === 'RETENCIONES' && <LibroRetenciones rows={retenciones} />}
+          {(() => {
+            const mesLabel = `${MESES[sel.month]} ${sel.year}`
+            return <>
+              {sub === 'RESUMEN'     && <ResumenFiscal ventas={ventas.rows} compras={compras.rows} retenciones={retenciones} />}
+              {sub === 'VENTAS'      && <LibroVentas rows={ventas.rows} meta={ventas.meta} mesLabel={mesLabel} />}
+              {sub === 'COMPRAS'     && <LibroCompras rows={compras.rows} meta={compras.meta} mesLabel={mesLabel} />}
+            </>
+          })()}
+          {sub === 'RETENCIONES' && <LibroRetenciones rows={retenciones} mesLabel={`${MESES[sel.month]} ${sel.year}`} />}
 
         </div>{/* fin contenido */}
       </div>{/* fin flex */}
