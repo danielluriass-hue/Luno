@@ -1051,15 +1051,9 @@ export default function PresupuestoPage({ user }) {
                 <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em'}}>Gastos Variables</div>
                 <div style={{fontSize:'20px',fontWeight:'800',letterSpacing:'-0.02em',color:'var(--text-1)',marginTop:'4px'}}>{fmtMes(mes)}</div>
               </div>
-              <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
-                <div style={{textAlign:'right'}}>
-                  <div style={{fontSize:'10px',color:'var(--text-muted)',marginBottom:'2px'}}>Total del mes</div>
-                  <div style={{fontSize:'16px',fontWeight:'800',color:'var(--accent)'}}>{q(totalVariables)}</div>
-                </div>
-                <button onClick={()=>openAddVar(today.startsWith(mes)?today:`${mes}-01`)}
-                  style={{background:'var(--accent)',color:'#fff',border:'none',borderRadius:'10px',padding:'8px 14px',fontSize:'12px',fontWeight:'600',cursor:'pointer',whiteSpace:'nowrap'}}>
-                  + Agregar
-                </button>
+              <div style={{textAlign:'right'}}>
+                <div style={{fontSize:'10px',color:'var(--text-muted)',marginBottom:'2px'}}>Total del mes</div>
+                <div style={{fontSize:'16px',fontWeight:'800',color:'var(--accent)'}}>{q(totalVariables)}</div>
               </div>
             </div>
 
@@ -1225,6 +1219,36 @@ export default function PresupuestoPage({ user }) {
                 MES TOTAL <span style={{color:'#ff9500',marginLeft:'6px'}}>{q(totalFijos+totalVariables)}</span>
               </div>
             </div>
+          </div>
+
+          {/* Lista gastos variables del mes */}
+          <div style={card}>
+            <SubHead label="Gastos Variables del mes" total={totalVariables} onAdd={()=>openAddVar(today.startsWith(mes)?today:`${mes}-01`)}/>
+            {varMes.length===0
+              ?<p style={{fontSize:'13px',color:'var(--text-muted)',textAlign:'center',padding:'20px 0'}}>Sin gastos variables registrados</p>
+              :[...varMes].sort((a,b)=>{
+                  const fa=normFecha(a.fecha)||'9999'
+                  const fb=normFecha(b.fecha)||'9999'
+                  return fa.localeCompare(fb)
+                }).map(g=>(
+                <div key={g.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:'13px',fontWeight:'500',color:'var(--text-1)'}}>{g.nombre}</div>
+                    <div style={{display:'flex',gap:'6px',marginTop:'3px',flexWrap:'wrap',alignItems:'center'}}>
+                      {g.fecha&&<span style={{fontSize:'10px',color:'var(--text-muted)'}}>{new Date(g.fecha+'T00:00:00').toLocaleDateString('es-GT',{day:'numeric',month:'short'})}</span>}
+                      <span style={{fontSize:'10px',color:'var(--text-muted)'}}>{g.categoria}</span>
+                      <TarjetaChip g={g}/>
+                    </div>
+                  </div>
+                  <div style={{fontSize:'13px',fontWeight:'600',color:'var(--accent)',whiteSpace:'nowrap'}}>{q(g.monto)}</div>
+                  <div style={{display:'flex',gap:'4px'}}>
+                    <button onClick={()=>{setFVar({nombre:g.nombre,categoria:g.categoria,monto:String(g.monto),fecha:g.fecha||today,medio_pago:g.medio_pago||'Efectivo',tarjeta:g.tarjeta||'',fecha_pago:g.fecha_pago||''});setModalVar(g)}} style={bEdit}><IcoEdit/></button>
+                    <button onClick={()=>askDel(`"${g.nombre}" se eliminará.`,()=>del('budget_gastos_variables',g.id,setGastosVar))} style={bDel}><IcoDel/></button>
+                  </div>
+                </div>
+              ))
+            }
+            {varMes.length>0&&<div style={{display:'flex',justifyContent:'flex-end',paddingTop:'14px'}}><span style={{fontSize:'14px',fontWeight:'700',color:'var(--accent)'}}>Total: {q(totalVariables)}</span></div>}
           </div>
 
           {/* Análisis por categoría */}
