@@ -988,9 +988,11 @@ export default function PresupuestoPage({ user }) {
                     {(fVar.medio_pago==='Tarjeta de Crédito'?TARJETAS_CRED:TARJETAS_DEB).map(t=><option key={t} value={t}>{t}</option>)}
                   </select>
                 </FormField>
-                <FormField label="Fecha de pago de la tarjeta (opcional)">
-                  <input type="date" style={inp} value={fVar.fecha_pago} onChange={e=>setFVar(p=>({...p,fecha_pago:e.target.value}))}/>
-                </FormField>
+                {fVar.medio_pago==='Tarjeta de Crédito'&&(
+                  <FormField label="Fecha de pago de la tarjeta (opcional)">
+                    <input type="date" style={inp} value={fVar.fecha_pago} onChange={e=>setFVar(p=>({...p,fecha_pago:e.target.value}))}/>
+                  </FormField>
+                )}
               </>
             )}
             <ModalBtns onClose={()=>setModalVar(null)}/>
