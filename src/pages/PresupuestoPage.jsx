@@ -15,11 +15,11 @@ const TARJETAS_DEB   = ['Joss BANRURAL','Joss INDUSTRIAL','Joss BAC','Melvin Ind
 const DIAS_MES       = Array.from({length:31},(_,i)=>i+1)
 
 const TABS = [
-  {key:'resumen', label:'Resumen'},
   {key:'ingresos',label:'Ingresos'},
-  {key:'deudas',  label:'Deudas'},
   {key:'gastos',  label:'Gastos'},
   {key:'ahorros', label:'Ahorros'},
+  {key:'deudas',  label:'Deudas'},
+  {key:'resumen', label:'Resumen'},
 ]
 
 const now     = new Date()
@@ -107,7 +107,7 @@ function ModalBtns({ onClose }) {
 export default function PresupuestoPage({ user }) {
   const isMobile = useIsMobile()
 
-  const [tab,        setTab]        = useState(()=>localStorage.getItem('presupuesto_tab')||'resumen')
+  const [tab,        setTab]        = useState(()=>localStorage.getItem('presupuesto_tab')||'ingresos')
   const [mes,        setMes]        = useState(()=>localStorage.getItem('presupuesto_mes')||thisMes)
   const [loading,    setLoading]    = useState(true)
   const [selectedDay,setSelectedDay]= useState(null)
