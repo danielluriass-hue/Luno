@@ -6,7 +6,7 @@ import { localDateStr } from '../lib/dateUtils'
 const today = () => localDateStr()
 const ICONS = ['💧','🏃','📚','🧘','🥗','😴','💊','🏋️','✍️','🎯','🧹','🎵']
 const COLORS = ['#10b981','#818cf8','#f87171','#fbbf24','#f472b6','#38bdf8']
-const emptyForm = { name: '', icon: '⭐', color: '#10b981', frequency: 'diario', description: '' }
+const emptyForm = { name: '', icon: '⭐', color: '#10b981', frequency: 'diario', description: '', hora: '' }
 
 export default function HabitosPage({ user }) {
   const isMobile = useIsMobile()
@@ -144,12 +144,13 @@ export default function HabitosPage({ user }) {
               {h.description && (
                 <div style={{ fontSize: '11px', color: 'var(--text-2)', marginTop: '1px' }}>{h.description}</div>
               )}
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                🔥 {streak} días · {weekDone}/7 esta semana
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span>🔥 {streak} días · {weekDone}/7 esta semana</span>
+                {h.hora && <span style={{ color: 'var(--accent)', fontWeight: '600' }}>⏰ {h.hora}</span>}
               </div>
             </div>
             <div style={{ display: 'flex', gap: '4px' }}>
-              <button onClick={() => { setForm({ name: h.name, icon: h.icon, color: h.color, frequency: h.frequency, description: h.description || '' }); setEditing(h.id); setShowForm(true) }}
+              <button onClick={() => { setForm({ name: h.name, icon: h.icon, color: h.color, frequency: h.frequency, description: h.description || '', hora: h.hora || '' }); setEditing(h.id); setShowForm(true) }}
                 style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '13px' }}>✏️</button>
               <button onClick={() => del(h.id)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '13px' }}>🗑️</button>
             </div>
@@ -180,6 +181,11 @@ export default function HabitosPage({ user }) {
                 <textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
                   placeholder="¿En qué consiste este hábito?" rows={2}
                   style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', background: 'var(--inner-bg)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: '13px', resize: 'none', fontFamily: 'inherit' }} />
+              </div>
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-2)', display: 'block', marginBottom: '5px' }}>Horario <span style={{ color: 'var(--text-muted)' }}>(opcional)</span></label>
+                <input type="time" value={form.hora} onChange={e => setForm(p => ({ ...p, hora: e.target.value }))}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', background: 'var(--inner-bg)', border: '1px solid var(--border)', color: form.hora ? 'var(--text-1)' : 'var(--text-muted)', fontSize: '13px' }} />
               </div>
               <div style={{ marginBottom: '14px' }}>
                 <label style={{ fontSize: '12px', color: 'var(--text-2)', display: 'block', marginBottom: '8px' }}>Ícono</label>
