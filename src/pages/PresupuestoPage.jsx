@@ -1000,10 +1000,10 @@ export default function PresupuestoPage({ user }) {
       {tab==='gastos'&&(
         <div style={{display:'flex',flexDirection:'column',gap:'20px'}}>
 
-          {/* Gastos Fijos — full width */}
+          {/* Gastos Fijos */}
           <div style={card}>
             <SubHead label="Gastos Fijos" total={totalFijos} onAdd={()=>{setFFij({nombre:'',categoria:'Vivienda',monto:'',activo:true,dia_pago:''});setModalFij({})}}/>
-            <div style={{fontSize:'11px',color:'var(--text-muted)',marginBottom:'12px',marginTop:'-8px'}}>Se aplican todos los meses. El "día de pago" aparece en el calendario.</div>
+            <div style={{fontSize:'11px',color:'var(--text-muted)',marginBottom:'12px',marginTop:'-8px'}}>Se aplican todos los meses. El "día de pago" aparece en el calendario de Resumen.</div>
             {gastosFijos.length===0
               ?<p style={{fontSize:'13px',color:'var(--text-muted)',textAlign:'center',padding:'16px 0'}}>Sin gastos fijos</p>
               :gastosFijos.map(g=>(
@@ -1030,153 +1030,195 @@ export default function PresupuestoPage({ user }) {
             }
           </div>
 
-          {/* Dos calendarios iguales — 50/50 */}
-          <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:'20px',alignItems:'start'}}>
+          {/* Calendario grande Gastos Variables */}
+          <div style={card}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'20px'}}>
+              <div>
+                <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em'}}>Gastos Variables</div>
+                <div style={{fontSize:'20px',fontWeight:'800',letterSpacing:'-0.02em',color:'var(--text-1)',marginTop:'4px'}}>{fmtMes(mes)}</div>
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                <div style={{textAlign:'right'}}>
+                  <div style={{fontSize:'10px',color:'var(--text-muted)',marginBottom:'2px'}}>Total del mes</div>
+                  <div style={{fontSize:'16px',fontWeight:'800',color:'var(--accent)'}}>{q(totalVariables)}</div>
+                </div>
+                <button onClick={()=>openAddVar(today.startsWith(mes)?today:`${mes}-01`)}
+                  style={{background:'var(--accent)',color:'#fff',border:'none',borderRadius:'10px',padding:'8px 14px',fontSize:'12px',fontWeight:'600',cursor:'pointer',whiteSpace:'nowrap'}}>
+                  + Agregar
+                </button>
+              </div>
+            </div>
 
-            {/* Gastos Variables — agregar y gestionar */}
-            <div style={card}>
-              <SubHead label="Gastos Variables" total={totalVariables} onAdd={()=>openAddVar(today.startsWith(mes)?today:`${mes}-01`)}/>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'4px',marginBottom:'4px'}}>
-                {DIAS_SEMANA.map(d=><div key={d} style={{textAlign:'center',fontSize:'11px',fontWeight:'600',color:'var(--text-muted)',padding:'4px 0'}}>{d}</div>)}
-              </div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'4px'}}>
-                {calCells.map((day,idx)=>{
-                  if(!day) return <div key={`e-${idx}`}/>
-                  const dateStr=`${mes}-${String(day).padStart(2,'0')}`
-                  const dayG=gastosByDate[dateStr]||[]
-                  const dayT=dayG.reduce((s,g)=>s+parseFloat(g.monto||0),0)
-                  const isToday=dateStr===today,isSel=dateStr===selectedDay,hasG=dayG.length>0
-                  return(
-                    <button key={dateStr} onClick={()=>setSelectedDay(isSel?null:dateStr)} style={{
-                      padding:'8px 4px 7px',borderRadius:'10px',cursor:'pointer',
-                      border:isSel?'2px solid var(--accent)':isToday?'1px solid var(--accent)':'1px solid transparent',
-                      background:isSel?'var(--accent-soft)':hasG?'var(--inner-bg)':'transparent',
-                      display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',transition:'all 0.12s',
-                    }}>
-                      <span style={{fontSize:'13px',fontWeight:isToday||isSel?'700':'400',color:isSel||isToday?'var(--accent)':'var(--text-1)'}}>{day}</span>
-                      {hasG&&<span style={{fontSize:'10px',fontWeight:'600',color:isSel?'var(--accent)':'#ff9500',lineHeight:1}}>{isMobile?'●':`Q${Math.round(dayT).toLocaleString('es-GT')}`}</span>}
-                    </button>
-                  )
-                })}
-              </div>
-              {selectedDay&&(
-                <div style={{marginTop:'16px',padding:'16px',background:'var(--inner-bg)',borderRadius:'12px',border:'1px solid var(--border)'}}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}}>
-                    <div>
-                      <div style={{fontSize:'13px',fontWeight:'600',color:'var(--text-1)'}}>{(()=>{const[,,d]=selectedDay.split('-');return`${parseInt(d)} de ${fmtMes(mes)}`})()}</div>
-                      {selectedDayGastos.length>0&&<div style={{fontSize:'11px',color:'var(--text-muted)',marginTop:'2px'}}>Total: {q(selectedDayGastos.reduce((s,g)=>s+parseFloat(g.monto||0),0))}</div>}
-                    </div>
-                    <button onClick={()=>openAddVar(selectedDay)} style={{background:'var(--accent)',color:'#fff',border:'none',borderRadius:'8px',padding:'6px 12px',fontSize:'12px',fontWeight:'600',cursor:'pointer'}}>+ Agregar</button>
-                  </div>
-                  {selectedDayGastos.length===0
-                    ?<p style={{fontSize:'13px',color:'var(--text-muted)',textAlign:'center',padding:'12px 0'}}>Sin gastos este día</p>
-                    :selectedDayGastos.map(g=>(
-                      <div key={g.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'9px 0',borderBottom:'1px solid var(--border)'}}>
-                        <div style={{flex:1}}>
-                          <div style={{fontSize:'13px',fontWeight:'500',color:'var(--text-1)'}}>{g.nombre}</div>
-                          <div style={{display:'flex',gap:'6px',marginTop:'3px',flexWrap:'wrap'}}>
-                            <span style={{fontSize:'10px',color:'var(--text-muted)'}}>{g.categoria}</span>
-                            <TarjetaChip g={g}/>
-                            {g.fecha_pago&&<span style={{fontSize:'10px',color:'var(--yellow)'}}>Pago: {new Date(g.fecha_pago+'T00:00:00').toLocaleDateString('es-GT',{day:'numeric',month:'short'})}</span>}
-                          </div>
-                        </div>
-                        <div style={{fontSize:'13px',fontWeight:'600',color:'var(--accent)'}}>{q(g.monto)}</div>
-                        <div style={{display:'flex',gap:'4px'}}>
-                          <button onClick={()=>{setFVar({nombre:g.nombre,categoria:g.categoria,monto:String(g.monto),fecha:g.fecha||selectedDay,medio_pago:g.medio_pago||'Efectivo',tarjeta:g.tarjeta||'',fecha_pago:g.fecha_pago||''});setModalVar(g)}} style={bEdit}><IcoEdit/></button>
-                          <button onClick={()=>askDel(`"${g.nombre}" se eliminará.`,()=>del('budget_gastos_variables',g.id,setGastosVar))} style={bDel}><IcoDel/></button>
+            <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
+              <div style={{minWidth:'560px'}}>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr) 80px',gap:'4px',marginBottom:'6px'}}>
+                  {DIAS_SEMANA.map(d=>(
+                    <div key={d} style={{textAlign:'center',fontSize:'11px',fontWeight:'600',color:'var(--text-muted)',padding:'4px 0'}}>{d}</div>
+                  ))}
+                  <div style={{textAlign:'center',fontSize:'11px',fontWeight:'600',color:'var(--text-muted)',padding:'4px 0'}}>Semana</div>
+                </div>
+
+                {(()=>{
+                  const weeks=[]
+                  for(let i=0;i<calCells.length;i+=7) weeks.push(calCells.slice(i,i+7))
+                  return weeks.map((week,wi)=>{
+                    const weekDays=week.filter(Boolean)
+                    const weekTotal=weekDays.reduce((s,day)=>{
+                      const ds=`${mes}-${String(day).padStart(2,'0')}`
+                      return s+(gastosByDate[ds]||[]).reduce((ss,g)=>ss+parseFloat(g.monto||0),0)
+                    },0)
+                    return(
+                      <div key={wi} style={{display:'grid',gridTemplateColumns:'repeat(7,1fr) 80px',gap:'4px',marginBottom:'4px'}}>
+                        {week.map((day,di)=>{
+                          if(!day) return <div key={`ve-${wi}-${di}`} style={{minHeight:'72px',borderRadius:'10px',background:'var(--inner-bg)',opacity:0.2}}/>
+                          const dateStr=`${mes}-${String(day).padStart(2,'0')}`
+                          const dayG=gastosByDate[dateStr]||[]
+                          const dayT=dayG.reduce((s,g)=>s+parseFloat(g.monto||0),0)
+                          const isToday=dateStr===today
+                          const isSel=dateStr===selectedDay
+                          return(
+                            <button key={dateStr} onClick={()=>setSelectedDay(isSel?null:dateStr)} style={{
+                              minHeight:'72px',borderRadius:'10px',padding:'8px 8px 6px',cursor:'pointer',
+                              border:isSel?'2px solid var(--accent)':isToday?'1px solid var(--accent)':'1px solid var(--border)',
+                              background:isSel?'var(--accent-soft)':isToday?'rgba(88,86,214,0.06)':'transparent',
+                              display:'flex',flexDirection:'column',alignItems:'flex-start',gap:'4px',
+                              transition:'all 0.12s',textAlign:'left',
+                            }}>
+                              <span style={{fontSize:'13px',fontWeight:isToday?'700':'500',color:isToday?'var(--accent)':isSel?'var(--accent)':'var(--text-1)'}}>{day}</span>
+                              {dayT>0&&<span style={{fontSize:'11px',fontWeight:'700',color:'#ff9500',lineHeight:1}}>{q(dayT)}</span>}
+                              {dayG.length>0&&(
+                                <div style={{display:'flex',gap:'3px',marginTop:'auto'}}>
+                                  {dayG.slice(0,3).map((_,i)=><div key={i} style={{width:'5px',height:'5px',borderRadius:'50%',background:'#ff9500'}}/>)}
+                                  {dayG.length>3&&<span style={{fontSize:'8px',color:'var(--text-muted)'}}>+{dayG.length-3}</span>}
+                                </div>
+                              )}
+                            </button>
+                          )
+                        })}
+                        <div style={{
+                          minHeight:'72px',borderRadius:'10px',padding:'8px 6px',
+                          background:'var(--inner-bg)',border:'1px solid var(--border)',
+                          display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'3px',
+                        }}>
+                          <div style={{fontSize:'9px',fontWeight:'600',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.05em'}}>Total</div>
+                          <div style={{fontSize:'13px',fontWeight:'800',color:weekTotal>0?'#ff9500':'var(--text-muted)'}}>{weekTotal>0?q(weekTotal):'—'}</div>
+                          {weekDays.length>0&&<div style={{fontSize:'9px',color:'var(--text-muted)',textAlign:'center'}}>{weekDays[0]}–{weekDays[weekDays.length-1]}</div>}
                         </div>
                       </div>
-                    ))
-                  }
-                </div>
-              )}
-              {varSinFecha.length>0&&(
-                <div style={{marginTop:'16px',padding:'12px 14px',background:'rgba(255,149,0,0.06)',borderRadius:'10px',border:'1px solid rgba(255,149,0,0.2)'}}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}>
-                    <div style={{fontSize:'11px',fontWeight:'700',color:'#ff9500',textTransform:'uppercase',letterSpacing:'0.05em'}}>Sin fecha — {varSinFecha.length} gasto{varSinFecha.length>1?'s':''} · {q(varSinFecha.reduce((s,g)=>s+parseFloat(g.monto||0),0))}</div>
-                    <span style={{fontSize:'10px',color:'var(--text-muted)'}}>Edítalos para asignar fecha</span>
+                    )
+                  })
+                })()}
+              </div>
+            </div>
+
+            {/* Panel día seleccionado */}
+            {selectedDay&&(
+              <div style={{marginTop:'14px',padding:'16px',background:'var(--inner-bg)',borderRadius:'12px',border:'1px solid var(--border)'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}}>
+                  <div>
+                    <div style={{fontSize:'13px',fontWeight:'600',color:'var(--text-1)'}}>{(()=>{const[,,d]=selectedDay.split('-');return`${parseInt(d)} de ${fmtMes(mes)}`})()}</div>
+                    {selectedDayGastos.length>0&&<div style={{fontSize:'11px',color:'var(--text-muted)',marginTop:'2px'}}>Total: {q(selectedDayGastos.reduce((s,g)=>s+parseFloat(g.monto||0),0))}</div>}
                   </div>
-                  {varSinFecha.map(g=>(
+                  <button onClick={()=>openAddVar(selectedDay)} style={{background:'var(--accent)',color:'#fff',border:'none',borderRadius:'8px',padding:'6px 14px',fontSize:'12px',fontWeight:'600',cursor:'pointer'}}>+ Agregar</button>
+                </div>
+                {selectedDayGastos.length===0
+                  ?<p style={{fontSize:'13px',color:'var(--text-muted)',textAlign:'center',padding:'12px 0'}}>Sin gastos este día — haz clic en "+ Agregar"</p>
+                  :selectedDayGastos.map(g=>(
                     <div key={g.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'9px 0',borderBottom:'1px solid var(--border)'}}>
                       <div style={{flex:1}}>
                         <div style={{fontSize:'13px',fontWeight:'500',color:'var(--text-1)'}}>{g.nombre}</div>
-                        <div style={{display:'flex',gap:'6px',marginTop:'3px'}}><span style={{fontSize:'10px',color:'var(--text-muted)'}}>{g.categoria}</span><TarjetaChip g={g}/></div>
+                        <div style={{display:'flex',gap:'6px',marginTop:'3px',flexWrap:'wrap'}}>
+                          <span style={{fontSize:'10px',color:'var(--text-muted)'}}>{g.categoria}</span>
+                          <TarjetaChip g={g}/>
+                          {g.fecha_pago&&<span style={{fontSize:'10px',color:'var(--yellow)'}}>Pago: {new Date(g.fecha_pago+'T00:00:00').toLocaleDateString('es-GT',{day:'numeric',month:'short'})}</span>}
+                        </div>
                       </div>
                       <div style={{fontSize:'13px',fontWeight:'600',color:'var(--accent)'}}>{q(g.monto)}</div>
                       <div style={{display:'flex',gap:'4px'}}>
-                        <button onClick={()=>{setFVar({nombre:g.nombre,categoria:g.categoria,monto:String(g.monto),fecha:g.fecha||today,medio_pago:g.medio_pago||'Efectivo',tarjeta:g.tarjeta||'',fecha_pago:g.fecha_pago||''});setModalVar(g)}} style={bEdit}><IcoEdit/></button>
+                        <button onClick={()=>{setFVar({nombre:g.nombre,categoria:g.categoria,monto:String(g.monto),fecha:g.fecha||selectedDay,medio_pago:g.medio_pago||'Efectivo',tarjeta:g.tarjeta||'',fecha_pago:g.fecha_pago||''});setModalVar(g)}} style={bEdit}><IcoEdit/></button>
                         <button onClick={()=>askDel(`"${g.nombre}" se eliminará.`,()=>del('budget_gastos_variables',g.id,setGastosVar))} style={bDel}><IcoDel/></button>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                  ))
+                }
+              </div>
+            )}
 
-            {/* Gastos del Mes — solo vista, misma estética */}
-            <div style={card}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px'}}>
-                <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                  <div style={{width:'3px',height:'14px',background:'var(--red)',borderRadius:'2px',flexShrink:0}}/>
-                  <div>
-                    <div style={{fontSize:'12px',fontWeight:'700',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em'}}>Gastos del Mes</div>
-                    <div style={{fontSize:'12px',color:'var(--text-muted)',marginTop:'1px'}}>{q(totalVariables)}</div>
-                  </div>
+            {/* Sin fecha */}
+            {varSinFecha.length>0&&(
+              <div style={{marginTop:'14px',padding:'12px 14px',background:'rgba(255,149,0,0.06)',borderRadius:'10px',border:'1px solid rgba(255,149,0,0.2)'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}>
+                  <div style={{fontSize:'11px',fontWeight:'700',color:'#ff9500',textTransform:'uppercase',letterSpacing:'0.05em'}}>Sin fecha — {varSinFecha.length} gasto{varSinFecha.length>1?'s':''} · {q(varSinFecha.reduce((s,g)=>s+parseFloat(g.monto||0),0))}</div>
+                  <span style={{fontSize:'10px',color:'var(--text-muted)'}}>Edítalos para asignar fecha</span>
                 </div>
+                {varSinFecha.map(g=>(
+                  <div key={g.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'9px 0',borderBottom:'1px solid var(--border)'}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:'13px',fontWeight:'500',color:'var(--text-1)'}}>{g.nombre}</div>
+                      <div style={{display:'flex',gap:'6px',marginTop:'3px'}}><span style={{fontSize:'10px',color:'var(--text-muted)'}}>{g.categoria}</span><TarjetaChip g={g}/></div>
+                    </div>
+                    <div style={{fontSize:'13px',fontWeight:'600',color:'var(--accent)'}}>{q(g.monto)}</div>
+                    <div style={{display:'flex',gap:'4px'}}>
+                      <button onClick={()=>{setFVar({nombre:g.nombre,categoria:g.categoria,monto:String(g.monto),fecha:g.fecha||today,medio_pago:g.medio_pago||'Efectivo',tarjeta:g.tarjeta||'',fecha_pago:g.fecha_pago||''});setModalVar(g)}} style={bEdit}><IcoEdit/></button>
+                      <button onClick={()=>askDel(`"${g.nombre}" se eliminará.`,()=>del('budget_gastos_variables',g.id,setGastosVar))} style={bDel}><IcoDel/></button>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'4px',marginBottom:'4px'}}>
-                {DIAS_SEMANA.map(d=><div key={d} style={{textAlign:'center',fontSize:'11px',fontWeight:'600',color:'var(--text-muted)',padding:'4px 0'}}>{d}</div>)}
+            )}
+
+            <div style={{display:'flex',justifyContent:'flex-end',marginTop:'16px',paddingTop:'14px',borderTop:'1px solid var(--border)'}}>
+              <div style={{fontSize:'12px',fontWeight:'800',color:'var(--text-1)',letterSpacing:'0.03em'}}>
+                MES TOTAL <span style={{color:'#ff9500',marginLeft:'6px'}}>{q(totalVariables)}</span>
               </div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'4px'}}>
-                {calCells.map((day,idx)=>{
-                  if(!day) return <div key={`ge-${idx}`}/>
-                  const dateStr  =`${mes}-${String(day).padStart(2,'0')}`
-                  const dayG     =gastosByPago[dateStr]||[]
-                  const dayTotal =dayG.reduce((s,g)=>s+parseFloat(g.monto||0),0)
-                  const isToday  =dateStr===today
-                  const isSel    =dateStr===calGastosSel
+            </div>
+          </div>
+
+          {/* Análisis por categoría */}
+          {(()=>{
+            const cats={}
+            varMes.forEach(g=>{const c=g.categoria||'Otro';cats[c]=(cats[c]||0)+parseFloat(g.monto||0)})
+            const sorted=Object.entries(cats).sort((a,b)=>b[1]-a[1])
+            const total=sorted.reduce((s,[,v])=>s+v,0)
+            const CAT_COLORS={'Alimentación':'#f87171','Transporte':'#fb923c','Salud':'#34d399','Entretenimiento':'var(--accent)','Ropa':'#f472b6','Otro':'var(--text-muted)'}
+            if(sorted.length===0) return null
+            return(
+              <div style={card}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'18px'}}>
+                  <div style={{fontSize:'13px',fontWeight:'700',color:'var(--text-1)'}}>Análisis por categoría</div>
+                  <div style={{fontSize:'11px',color:'var(--text-muted)'}}>{fmtMes(mes)} · {varMes.length} transacción{varMes.length!==1?'es':''}</div>
+                </div>
+                {sorted.map(([cat,amt])=>{
+                  const pct=(amt/total)*100
+                  const color=CAT_COLORS[cat]||'var(--accent)'
+                  const count=varMes.filter(g=>(g.categoria||'Otro')===cat).length
                   return(
-                    <button key={`g${dateStr}`} onClick={()=>setCalGastosSel(isSel?null:dateStr)} style={{
-                      padding:'8px 4px 7px',borderRadius:'10px',cursor:dayG.length?'pointer':'default',
-                      border:isSel?'2px solid var(--red)':isToday?'1px solid var(--accent)':'1px solid transparent',
-                      background:isSel?'rgba(255,59,48,0.10)':dayG.length?'var(--inner-bg)':'transparent',
-                      display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',transition:'all 0.12s',
-                    }}>
-                      <span style={{fontSize:'13px',fontWeight:isToday||isSel?'700':'400',color:isSel?'var(--red)':isToday?'var(--accent)':'var(--text-1)'}}>{day}</span>
-                      {dayG.length>0&&<span style={{fontSize:'10px',fontWeight:'600',color:isSel?'var(--red)':'var(--red)',opacity:isSel?1:0.8,lineHeight:1}}>{isMobile?'●':`Q${Math.round(dayTotal).toLocaleString('es-GT')}`}</span>}
-                    </button>
+                    <div key={cat} style={{marginBottom:'14px'}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'6px'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:'7px'}}>
+                          <div style={{width:'8px',height:'8px',borderRadius:'50%',background:color,flexShrink:0}}/>
+                          <span style={{fontSize:'13px',color:'var(--text-1)',fontWeight:'500'}}>{cat}</span>
+                          <span style={{fontSize:'10px',color:'var(--text-muted)',background:'var(--inner-bg)',padding:'1px 6px',borderRadius:'5px'}}>{count} tx</span>
+                        </div>
+                        <div style={{textAlign:'right'}}>
+                          <span style={{fontSize:'13px',fontWeight:'700',color}}>{q(amt)}</span>
+                          <span style={{fontSize:'10px',color:'var(--text-muted)',marginLeft:'6px'}}>{pct.toFixed(1)}%</span>
+                        </div>
+                      </div>
+                      <div style={{height:'6px',background:'var(--inner-bg)',borderRadius:'3px'}}>
+                        <div style={{height:'6px',background:color,borderRadius:'3px',width:`${pct}%`,transition:'width 0.3s'}}/>
+                      </div>
+                    </div>
                   )
                 })}
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',paddingTop:'12px',borderTop:'1px solid var(--border)'}}>
+                  <span style={{fontSize:'12px',color:'var(--text-muted)'}}>Total variables</span>
+                  <span style={{fontSize:'14px',fontWeight:'800',color:'var(--accent)'}}>{q(total)}</span>
+                </div>
               </div>
-              {calGastosSel&&(()=>{
-                const selEvts=gastosByPago[calGastosSel]||[]
-                return(
-                  <div style={{marginTop:'16px',padding:'16px',background:'var(--inner-bg)',borderRadius:'12px',border:'1px solid var(--border)'}}>
-                    <div style={{marginBottom:'12px'}}>
-                      <div style={{fontSize:'13px',fontWeight:'600',color:'var(--text-1)'}}>{(()=>{const[,,d]=calGastosSel.split('-');return`${parseInt(d)} de ${fmtMes(mes)}`})()}</div>
-                      {selEvts.length>0&&<div style={{fontSize:'11px',color:'var(--text-muted)',marginTop:'2px'}}>Total: {q(selEvts.reduce((s,g)=>s+parseFloat(g.monto||0),0))}</div>}
-                    </div>
-                    {selEvts.length===0
-                      ?<p style={{fontSize:'13px',color:'var(--text-muted)',textAlign:'center',padding:'12px 0'}}>Sin gastos este día</p>
-                      :selEvts.map((g,i)=>(
-                        <div key={g.id||i} style={{display:'flex',alignItems:'center',gap:'10px',padding:'9px 0',borderBottom:'1px solid var(--border)'}}>
-                          <div style={{flex:1}}>
-                            <div style={{fontSize:'13px',fontWeight:'500',color:'var(--text-1)'}}>{g.nombre}</div>
-                            <div style={{display:'flex',gap:'6px',marginTop:'3px',flexWrap:'wrap'}}>
-                              <span style={{fontSize:'10px',color:'var(--text-muted)'}}>{g.categoria}</span>
-                              <TarjetaChip g={g}/>
-                            </div>
-                          </div>
-                          <div style={{fontSize:'13px',fontWeight:'600',color:'var(--red)'}}>{q(g.monto)}</div>
-                        </div>
-                      ))
-                    }
-                  </div>
-                )
-              })()}
-            </div>
+            )
+          })()}
 
-          </div>
         </div>
       )}
 
