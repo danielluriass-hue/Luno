@@ -12,11 +12,12 @@ import RutinasPage from './pages/RutinasPage'
 import MejorasPage from './pages/MejorasPage'
 import ConfigPage from './pages/ConfigPage'
 import ContabilidadPage from './pages/ContabilidadPage'
+import PresupuestoPage from './pages/PresupuestoPage'
 
 const PAGE_LABELS = {
   HOY: 'Hoy', AGENDA: 'Agenda', TAREAS: 'Tareas', HABITOS: 'Hábitos',
   NOTAS: 'Notas', METAS: 'Metas', RUTINAS: 'Rutinas', MEJORAS: 'Mejoras',
-  CONTABILIDADES: 'Contabilidades', CONFIG: 'Configuración',
+  PRESUPUESTO: 'Presupuesto', CONTABILIDADES: 'Contabilidades', CONFIG: 'Configuración',
 }
 
 const BOTTOM_NAV = [
@@ -78,6 +79,7 @@ export default function App() {
     METAS:   <MetasPage user={user} />,
     RUTINAS: <RutinasPage user={user} />,
     MEJORAS:        <MejorasPage user={user} />,
+    PRESUPUESTO:    <PresupuestoPage user={user} />,
     ...(user.email === 'daniell.uriass@gmail.com' ? { CONTABILIDADES: <ContabilidadPage /> } : {}),
     CONFIG:         <ConfigPage user={user} />,
   }
