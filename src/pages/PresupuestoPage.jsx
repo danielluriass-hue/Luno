@@ -231,6 +231,10 @@ export default function PresupuestoPage({ user }) {
   compActivos.filter(c=>c.fecha_aprox?.startsWith(mes)).forEach(c=>{
     addCalEv(c.fecha_aprox,{label:c.persona,amount:c.monto,color:isVencido(c.fecha_aprox)?'var(--red)':isPróximo(c.fecha_aprox)?'var(--yellow)':'#a78bfa',tipo:'Compromiso'})
   })
+  ingMes.forEach(i=>{
+    if(i.tipo==='fijo'&&i.dia){ const d=Math.min(i.dia,daysInMonth); addCalEv(`${mes}-${String(d).padStart(2,'0')}`,{label:i.nombre,amount:i.monto,color:'var(--green)',tipo:'Ingreso'}) }
+    else if(i.tipo!=='fijo'&&i.fecha&&i.fecha.startsWith(mes)) addCalEv(i.fecha.slice(0,10),{label:i.nombre,amount:i.monto,color:'var(--green)',tipo:'Ingreso'})
+  })
   const calSelEvents = calSelDay?(calEvents[calSelDay]||[]):[]
 
   // ── Income calendar events ──
@@ -554,7 +558,10 @@ export default function PresupuestoPage({ user }) {
                           if(!day) return <div key={`e-${wi}-${di}`} style={{minHeight:'72px',borderRadius:'10px',background:'var(--inner-bg)',opacity:0.2}}/>
                           const dateStr=`${mes}-${String(day).padStart(2,'0')}`
                           const evts=calEvents[dateStr]||[]
-                          const dayTotal=evts.reduce((s,e)=>s+parseFloat(e.amount||0),0)
+                          const ingEvts=evts.filter(e=>e.tipo==='Ingreso')
+                          const gasEvts=evts.filter(e=>e.tipo!=='Ingreso')
+                          const ingTotal=ingEvts.reduce((s,e)=>s+parseFloat(e.amount||0),0)
+                          const gasTotal=gasEvts.reduce((s,e)=>s+parseFloat(e.amount||0),0)
                           const isToday=dateStr===today
                           const isSel=dateStr===calSelDay
                           return(
@@ -563,17 +570,16 @@ export default function PresupuestoPage({ user }) {
                               cursor:evts.length?'pointer':'default',
                               border:isSel?'2px solid var(--accent)':isToday?'1px solid var(--accent)':'1px solid var(--border)',
                               background:isSel?'var(--accent-soft)':isToday?'rgba(88,86,214,0.06)':'transparent',
-                              display:'flex',flexDirection:'column',alignItems:'flex-start',gap:'4px',
+                              display:'flex',flexDirection:'column',alignItems:'flex-start',gap:'2px',
                               transition:'all 0.12s',textAlign:'left',
                             }}>
                               <span style={{fontSize:'13px',fontWeight:isToday?'700':'500',color:isToday?'var(--accent)':isSel?'var(--accent)':'var(--text-1)'}}>{day}</span>
-                              {dayTotal>0&&(
-                                <span style={{fontSize:'11px',fontWeight:'700',color:'var(--red)',lineHeight:1}}>{q(dayTotal)}</span>
-                              )}
+                              {ingTotal>0&&<span style={{fontSize:'10px',fontWeight:'700',color:'var(--green)',lineHeight:1}}>+{q(ingTotal)}</span>}
+                              {gasTotal>0&&<span style={{fontSize:'10px',fontWeight:'700',color:'var(--red)',lineHeight:1}}>{q(gasTotal)}</span>}
                               {evts.length>0&&(
                                 <div style={{display:'flex',gap:'3px',flexWrap:'wrap',marginTop:'auto'}}>
-                                  {evts.slice(0,3).map((e,i)=><div key={i} style={{width:'5px',height:'5px',borderRadius:'50%',background:e.color}}/>)}
-                                  {evts.length>3&&<span style={{fontSize:'8px',color:'var(--text-muted)'}}>+{evts.length-3}</span>}
+                                  {evts.slice(0,4).map((e,i)=><div key={i} style={{width:'5px',height:'5px',borderRadius:'50%',background:e.color}}/>)}
+                                  {evts.length>4&&<span style={{fontSize:'8px',color:'var(--text-muted)'}}>+{evts.length-4}</span>}
                                 </div>
                               )}
                             </button>
@@ -630,7 +636,7 @@ export default function PresupuestoPage({ user }) {
             {/* Pie: leyenda + mes total */}
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:'16px',paddingTop:'14px',borderTop:'1px solid var(--border)',flexWrap:'wrap',gap:'10px'}}>
               <div style={{display:'flex',gap:'14px',flexWrap:'wrap'}}>
-                {[['var(--accent)','Gasto Fijo'],['#ff9500','Deuda'],['#a78bfa','Compromiso'],['var(--red)','Vencido']].map(([c,l])=>(
+                {[['var(--green)','Ingreso'],['var(--accent)','Gasto Fijo'],['#ff9500','Deuda'],['#a78bfa','Compromiso'],['var(--red)','Vencido']].map(([c,l])=>(
                   <div key={l} style={{display:'flex',alignItems:'center',gap:'4px'}}>
                     <div style={{width:'7px',height:'7px',borderRadius:'50%',background:c}}/>
                     <span style={{fontSize:'10px',color:'var(--text-muted)'}}>{l}</span>
