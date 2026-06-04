@@ -485,42 +485,173 @@ export default function PresupuestoPage({ user }) {
 
       {/* ══ TAB: RESUMEN ══ */}
       {tab==='resumen'&&(
-        <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 290px',gap:'16px',alignItems:'start'}}>
+        <div style={{display:'flex',flexDirection:'column',gap:'16px'}}>
 
-          {/* Columna izquierda */}
-          <div style={{display:'flex',flexDirection:'column',gap:'14px'}}>
-
-            <div style={{...card,background:disponible>=0?'rgba(52,199,89,0.08)':'rgba(255,59,48,0.08)',border:`1px solid ${disponible>=0?'rgba(52,199,89,0.25)':'rgba(255,59,48,0.25)'}`}}>
-              <div style={{fontSize:'11px',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'6px'}}>Disponible · {fmtMes(mes)}</div>
-              <div style={{fontSize:'36px',fontWeight:'800',letterSpacing:'-0.03em',color:disponible>=0?'var(--green)':'var(--red)'}}>{q(disponible)}</div>
-              <div style={{display:'flex',gap:'12px',marginTop:'10px',flexWrap:'wrap'}}>
-                <span style={{fontSize:'12px',color:'var(--green)'}}>↑ {q(totalIngresos)} ingresos</span>
-                <span style={{fontSize:'12px',color:'var(--red)'}}>↓ {q(totalGastosAll)} gastos</span>
+          {/* ── Calendario operativo full-width ── */}
+          <div style={card}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'20px'}}>
+              <div>
+                <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em'}}>Calendario Operativo</div>
+                <div style={{fontSize:'20px',fontWeight:'800',letterSpacing:'-0.02em',color:'var(--text-1)',marginTop:'4px'}}>{fmtMes(mes)}</div>
+              </div>
+              <div style={{textAlign:'right'}}>
+                <div style={{fontSize:'10px',color:'var(--text-muted)',marginBottom:'2px'}}>Total compromisos del mes</div>
+                <div style={{fontSize:'16px',fontWeight:'800',color:'#ff9500'}}>{q(Object.values(calEvents).flat().reduce((s,e)=>s+parseFloat(e.amount||0),0))}</div>
               </div>
             </div>
 
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
-              {[
-                {label:'Ingresos',amount:totalIngresos,color:'var(--green)',bg:'rgba(52,199,89,0.08)',action:()=>setTab('ingresos')},
-                {label:'Deudas',amount:totalPrestamos,color:'#ff9500',bg:'rgba(255,149,0,0.08)',action:()=>setTab('deudas')},
-                {label:'Gastos',amount:totalFijos+totalVariables,color:'#ff6b6b',bg:'rgba(255,107,107,0.08)',action:()=>setTab('gastos')},
-                {label:'Ahorros',amount:totalAhorros,color:'var(--accent)',bg:'var(--accent-soft)',action:()=>setTab('ahorros')},
-              ].map(({label,amount,color,bg,action})=>(
-                <button key={label} onClick={action} style={{background:bg,borderRadius:'12px',padding:'14px 16px',borderLeft:`3px solid ${color}`,border:'none',cursor:'pointer',textAlign:'left'}}>
-                  <div style={{fontSize:'11px',color:'var(--text-muted)',marginBottom:'4px'}}>{label}</div>
-                  <div style={{fontSize:'15px',fontWeight:'700',color}}>{q(amount)}</div>
-                </button>
-              ))}
+            <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
+              <div style={{minWidth:'560px'}}>
+                {/* Header días */}
+                <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr) 80px',gap:'4px',marginBottom:'6px'}}>
+                  {DIAS_SEMANA.map(d=>(
+                    <div key={d} style={{textAlign:'center',fontSize:'11px',fontWeight:'600',color:'var(--text-muted)',padding:'4px 0'}}>{d}</div>
+                  ))}
+                  <div style={{textAlign:'center',fontSize:'11px',fontWeight:'600',color:'var(--text-muted)',padding:'4px 0'}}>Semana</div>
+                </div>
+
+                {/* Filas por semana */}
+                {(()=>{
+                  const weeks=[]
+                  for(let i=0;i<calCells.length;i+=7) weeks.push(calCells.slice(i,i+7))
+                  return weeks.map((week,wi)=>{
+                    const weekDays=week.filter(Boolean)
+                    const weekTotal=weekDays.reduce((s,day)=>{
+                      const ds=`${mes}-${String(day).padStart(2,'0')}`
+                      return s+(calEvents[ds]||[]).reduce((ss,e)=>ss+parseFloat(e.amount||0),0)
+                    },0)
+                    return(
+                      <div key={wi} style={{display:'grid',gridTemplateColumns:'repeat(7,1fr) 80px',gap:'4px',marginBottom:'4px'}}>
+                        {week.map((day,di)=>{
+                          if(!day) return <div key={`e-${wi}-${di}`} style={{minHeight:'72px',borderRadius:'10px',background:'var(--inner-bg)',opacity:0.2}}/>
+                          const dateStr=`${mes}-${String(day).padStart(2,'0')}`
+                          const evts=calEvents[dateStr]||[]
+                          const dayTotal=evts.reduce((s,e)=>s+parseFloat(e.amount||0),0)
+                          const isToday=dateStr===today
+                          const isSel=dateStr===calSelDay
+                          return(
+                            <button key={dateStr} onClick={()=>setCalSelDay(isSel?null:dateStr)} style={{
+                              minHeight:'72px',borderRadius:'10px',padding:'8px 8px 6px',
+                              cursor:evts.length?'pointer':'default',
+                              border:isSel?'2px solid var(--accent)':isToday?'1px solid var(--accent)':'1px solid var(--border)',
+                              background:isSel?'var(--accent-soft)':isToday?'rgba(88,86,214,0.06)':'transparent',
+                              display:'flex',flexDirection:'column',alignItems:'flex-start',gap:'4px',
+                              transition:'all 0.12s',textAlign:'left',
+                            }}>
+                              <span style={{fontSize:'13px',fontWeight:isToday?'700':'500',color:isToday?'var(--accent)':isSel?'var(--accent)':'var(--text-1)'}}>{day}</span>
+                              {dayTotal>0&&(
+                                <span style={{fontSize:'11px',fontWeight:'700',color:'var(--red)',lineHeight:1}}>{q(dayTotal)}</span>
+                              )}
+                              {evts.length>0&&(
+                                <div style={{display:'flex',gap:'3px',flexWrap:'wrap',marginTop:'auto'}}>
+                                  {evts.slice(0,3).map((e,i)=><div key={i} style={{width:'5px',height:'5px',borderRadius:'50%',background:e.color}}/>)}
+                                  {evts.length>3&&<span style={{fontSize:'8px',color:'var(--text-muted)'}}>+{evts.length-3}</span>}
+                                </div>
+                              )}
+                            </button>
+                          )
+                        })}
+                        {/* Columna semana */}
+                        <div style={{
+                          minHeight:'72px',borderRadius:'10px',padding:'8px 6px',
+                          background:'var(--inner-bg)',border:'1px solid var(--border)',
+                          display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'3px',
+                        }}>
+                          <div style={{fontSize:'9px',fontWeight:'600',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.05em'}}>Total</div>
+                          <div style={{fontSize:'13px',fontWeight:'800',color:weekTotal>0?'var(--red)':'var(--text-muted)'}}>{weekTotal>0?q(weekTotal):'—'}</div>
+                          {weekDays.length>0&&(
+                            <div style={{fontSize:'9px',color:'var(--text-muted)',textAlign:'center'}}>
+                              {weekDays[0]}–{weekDays[weekDays.length-1]}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })
+                })()}
+              </div>
             </div>
 
+            {/* Panel día seleccionado */}
+            {calSelDay&&(
+              <div style={{marginTop:'14px',padding:'14px',background:'var(--inner-bg)',borderRadius:'12px',border:'1px solid var(--border)'}}>
+                <div style={{fontSize:'13px',fontWeight:'600',color:'var(--text-1)',marginBottom:'10px'}}>
+                  {(()=>{const[,,d]=calSelDay.split('-');return`${parseInt(d)} de ${fmtMes(mes)}`})()}
+                </div>
+                {calSelEvents.length===0
+                  ?<p style={{fontSize:'12px',color:'var(--text-muted)',textAlign:'center',padding:'8px 0'}}>Sin pagos este día</p>
+                  :calSelEvents.map((e,i)=>(
+                    <div key={i} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 0',borderBottom:i<calSelEvents.length-1?'1px solid var(--border)':'none'}}>
+                      <div style={{width:'8px',height:'8px',borderRadius:'50%',background:e.color,flexShrink:0}}/>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:'13px',fontWeight:'500',color:'var(--text-1)'}}>{e.label}</div>
+                        <div style={{fontSize:'10px',color:'var(--text-muted)'}}>{e.tipo}</div>
+                      </div>
+                      <div style={{fontSize:'13px',fontWeight:'700',color:e.color}}>{q(e.amount)}</div>
+                    </div>
+                  ))
+                }
+                {calSelEvents.length>0&&(
+                  <div style={{display:'flex',justifyContent:'flex-end',paddingTop:'8px'}}>
+                    <span style={{fontSize:'11px',fontWeight:'700',color:'var(--text-muted)'}}>Total: {q(calSelEvents.reduce((s,e)=>s+parseFloat(e.amount||0),0))}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Pie: leyenda + mes total */}
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:'16px',paddingTop:'14px',borderTop:'1px solid var(--border)',flexWrap:'wrap',gap:'10px'}}>
+              <div style={{display:'flex',gap:'14px',flexWrap:'wrap'}}>
+                {[['var(--accent)','Gasto Fijo'],['#ff9500','Deuda'],['#a78bfa','Compromiso'],['var(--red)','Vencido']].map(([c,l])=>(
+                  <div key={l} style={{display:'flex',alignItems:'center',gap:'4px'}}>
+                    <div style={{width:'7px',height:'7px',borderRadius:'50%',background:c}}/>
+                    <span style={{fontSize:'10px',color:'var(--text-muted)'}}>{l}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{fontSize:'12px',fontWeight:'800',color:'var(--text-1)',letterSpacing:'0.03em'}}>
+                MES TOTAL <span style={{color:'var(--red)',marginLeft:'6px'}}>
+                  {q(Object.values(calEvents).flat().reduce((s,e)=>s+parseFloat(e.amount||0),0))}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Disponible ── */}
+          <div style={{...card,background:disponible>=0?'rgba(52,199,89,0.08)':'rgba(255,59,48,0.08)',border:`1px solid ${disponible>=0?'rgba(52,199,89,0.25)':'rgba(255,59,48,0.25)'}`}}>
+            <div style={{fontSize:'11px',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'6px'}}>Disponible · {fmtMes(mes)}</div>
+            <div style={{fontSize:'36px',fontWeight:'800',letterSpacing:'-0.03em',color:disponible>=0?'var(--green)':'var(--red)'}}>{q(disponible)}</div>
+            <div style={{display:'flex',gap:'12px',marginTop:'10px',flexWrap:'wrap'}}>
+              <span style={{fontSize:'12px',color:'var(--green)'}}>↑ {q(totalIngresos)} ingresos</span>
+              <span style={{fontSize:'12px',color:'var(--red)'}}>↓ {q(totalGastosAll)} gastos</span>
+            </div>
+          </div>
+
+          {/* ── 4 mini-cards ── */}
+          <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr 1fr':'repeat(4,1fr)',gap:'10px'}}>
+            {[
+              {label:'Ingresos',amount:totalIngresos,color:'var(--green)',bg:'rgba(52,199,89,0.08)',action:()=>setTab('ingresos')},
+              {label:'Deudas',amount:totalPrestamos,color:'#ff9500',bg:'rgba(255,149,0,0.08)',action:()=>setTab('deudas')},
+              {label:'Gastos',amount:totalFijos+totalVariables,color:'#ff6b6b',bg:'rgba(255,107,107,0.08)',action:()=>setTab('gastos')},
+              {label:'Ahorros',amount:totalAhorros,color:'var(--accent)',bg:'var(--accent-soft)',action:()=>setTab('ahorros')},
+            ].map(({label,amount,color,bg,action})=>(
+              <button key={label} onClick={action} style={{background:bg,borderRadius:'12px',padding:'14px 16px',borderLeft:`3px solid ${color}`,border:'none',cursor:'pointer',textAlign:'left'}}>
+                <div style={{fontSize:'11px',color:'var(--text-muted)',marginBottom:'4px'}}>{label}</div>
+                <div style={{fontSize:'15px',fontWeight:'700',color}}>{q(amount)}</div>
+              </button>
+            ))}
+          </div>
+
+          {/* ── Desglose + Distribución ── */}
+          <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:'14px'}}>
             <div style={card}>
               <div style={{fontSize:'13px',fontWeight:'600',color:'var(--text-1)',marginBottom:'14px'}}>Desglose</div>
               {[
-                {label:'Ingresos',       amount:totalIngresos, color:'var(--green)', sign:'+'},
-                {label:'Gastos Fijos',   amount:totalFijos,    color:'var(--red)',   sign:'−'},
-                {label:'Cuotas Deudas',  amount:totalPrestamos,color:'var(--red)',   sign:'−'},
-                {label:'Gastos Variables',amount:totalVariables,color:'var(--red)',  sign:'−'},
-                {label:'Ahorros',        amount:totalAhorros,  color:'var(--yellow)',sign:'−'},
+                {label:'Ingresos',        amount:totalIngresos,  color:'var(--green)', sign:'+'},
+                {label:'Gastos Fijos',    amount:totalFijos,     color:'var(--red)',   sign:'−'},
+                {label:'Cuotas Deudas',   amount:totalPrestamos, color:'var(--red)',   sign:'−'},
+                {label:'Gastos Variables',amount:totalVariables, color:'var(--red)',   sign:'−'},
+                {label:'Ahorros',         amount:totalAhorros,   color:'var(--yellow)',sign:'−'},
               ].map(({label,amount,color,sign})=>(
                 <div key={label} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
                   <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
@@ -536,14 +667,14 @@ export default function PresupuestoPage({ user }) {
               </div>
             </div>
 
-            {totalGastosAll>0&&(
+            {totalGastosAll>0?(
               <div style={card}>
                 <div style={{fontSize:'13px',fontWeight:'600',color:'var(--text-1)',marginBottom:'16px'}}>Distribución de gastos</div>
                 {[
-                  {label:'Gastos Fijos',   amount:totalFijos,    color:'#ff6b6b'},
-                  {label:'Deudas',         amount:totalPrestamos,color:'#ff9500'},
-                  {label:'Gastos Variables',amount:totalVariables,color:'var(--accent)'},
-                  {label:'Ahorros',        amount:totalAhorros,  color:'var(--green)'},
+                  {label:'Gastos Fijos',    amount:totalFijos,     color:'#ff6b6b'},
+                  {label:'Deudas',          amount:totalPrestamos, color:'#ff9500'},
+                  {label:'Gastos Variables',amount:totalVariables, color:'var(--accent)'},
+                  {label:'Ahorros',         amount:totalAhorros,   color:'var(--green)'},
                 ].filter(x=>x.amount>0).map(({label,amount,color})=>{
                   const pct=(amount/totalGastosAll)*100
                   return(
@@ -559,11 +690,9 @@ export default function PresupuestoPage({ user }) {
                   )
                 })}
               </div>
-            )}
+            ):<div/>}
           </div>
 
-          {/* Columna derecha — calendario de pagos */}
-          <PayCalendar/>
         </div>
       )}
 
