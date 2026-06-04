@@ -1014,36 +1014,6 @@ export default function PresupuestoPage({ user }) {
       {tab==='gastos'&&(
         <div style={{display:'flex',flexDirection:'column',gap:'20px'}}>
 
-          {/* Gastos Fijos */}
-          <div style={card}>
-            <SubHead label="Gastos Fijos" total={totalFijos} onAdd={()=>{setFFij({nombre:'',categoria:'Vivienda',monto:'',activo:true,dia_pago:''});setModalFij({})}}/>
-            <div style={{fontSize:'11px',color:'var(--text-muted)',marginBottom:'12px',marginTop:'-8px'}}>Se aplican todos los meses. El "día de pago" aparece en el calendario de Resumen.</div>
-            {gastosFijos.length===0
-              ?<p style={{fontSize:'13px',color:'var(--text-muted)',textAlign:'center',padding:'16px 0'}}>Sin gastos fijos</p>
-              :gastosFijos.map(g=>(
-                <div key={g.id} style={{display:'flex',alignItems:'center',gap:'8px',padding:'9px 0',borderBottom:'1px solid var(--border)',opacity:g.activo?1:0.45}}>
-                  <button onClick={()=>toggleFijo(g)} style={{background:'none',border:'none',cursor:'pointer',padding:'2px',flexShrink:0,color:g.activo?'var(--green)':'var(--text-muted)'}}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-                      {g.activo?<><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></>:<circle cx="12" cy="12" r="10"/>}
-                    </svg>
-                  </button>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:'13.5px',fontWeight:'500',color:'var(--text-1)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{g.nombre}</div>
-                    <div style={{display:'flex',gap:'6px',marginTop:'2px'}}>
-                      <span style={{fontSize:'10px',color:'var(--text-muted)'}}>{g.categoria}</span>
-                      {g.dia_pago&&<span style={{fontSize:'10px',color:'var(--accent)'}}>día {g.dia_pago}</span>}
-                    </div>
-                  </div>
-                  <div style={{fontSize:'13.5px',fontWeight:'600',color:'var(--accent)',whiteSpace:'nowrap'}}>{q(g.monto)}</div>
-                  <div style={{display:'flex',gap:'3px'}}>
-                    <button onClick={()=>{setFFij({nombre:g.nombre,categoria:g.categoria,monto:String(g.monto),activo:g.activo,dia_pago:g.dia_pago!=null?String(g.dia_pago):''});setModalFij(g)}} style={bEdit}><IcoEdit/></button>
-                    <button onClick={()=>askDel(`"${g.nombre}" se eliminará.`,()=>del('budget_gastos_fijos',g.id,setGastosFijos))} style={bDel}><IcoDel/></button>
-                  </div>
-                </div>
-              ))
-            }
-          </div>
-
           {/* Calendario grande Gastos Variables */}
           <div style={card}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'20px'}}>
@@ -1219,6 +1189,36 @@ export default function PresupuestoPage({ user }) {
                 MES TOTAL <span style={{color:'#ff9500',marginLeft:'6px'}}>{q(totalFijos+totalVariables)}</span>
               </div>
             </div>
+          </div>
+
+          {/* Gastos Fijos */}
+          <div style={card}>
+            <SubHead label="Gastos Fijos" total={totalFijos} onAdd={()=>{setFFij({nombre:'',categoria:'Vivienda',monto:'',activo:true,dia_pago:''});setModalFij({})}}/>
+            <div style={{fontSize:'11px',color:'var(--text-muted)',marginBottom:'12px',marginTop:'-8px'}}>Se aplican todos los meses. El "día de pago" aparece en el calendario de Resumen.</div>
+            {gastosFijos.length===0
+              ?<p style={{fontSize:'13px',color:'var(--text-muted)',textAlign:'center',padding:'16px 0'}}>Sin gastos fijos</p>
+              :gastosFijos.map(g=>(
+                <div key={g.id} style={{display:'flex',alignItems:'center',gap:'8px',padding:'9px 0',borderBottom:'1px solid var(--border)',opacity:g.activo?1:0.45}}>
+                  <button onClick={()=>toggleFijo(g)} style={{background:'none',border:'none',cursor:'pointer',padding:'2px',flexShrink:0,color:g.activo?'var(--green)':'var(--text-muted)'}}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                      {g.activo?<><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></>:<circle cx="12" cy="12" r="10"/>}
+                    </svg>
+                  </button>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:'13.5px',fontWeight:'500',color:'var(--text-1)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{g.nombre}</div>
+                    <div style={{display:'flex',gap:'6px',marginTop:'2px'}}>
+                      <span style={{fontSize:'10px',color:'var(--text-muted)'}}>{g.categoria}</span>
+                      {g.dia_pago&&<span style={{fontSize:'10px',color:'var(--accent)'}}>día {g.dia_pago}</span>}
+                    </div>
+                  </div>
+                  <div style={{fontSize:'13.5px',fontWeight:'600',color:'var(--accent)',whiteSpace:'nowrap'}}>{q(g.monto)}</div>
+                  <div style={{display:'flex',gap:'3px'}}>
+                    <button onClick={()=>{setFFij({nombre:g.nombre,categoria:g.categoria,monto:String(g.monto),activo:g.activo,dia_pago:g.dia_pago!=null?String(g.dia_pago):''});setModalFij(g)}} style={bEdit}><IcoEdit/></button>
+                    <button onClick={()=>askDel(`"${g.nombre}" se eliminará.`,()=>del('budget_gastos_fijos',g.id,setGastosFijos))} style={bDel}><IcoDel/></button>
+                  </div>
+                </div>
+              ))
+            }
           </div>
 
           {/* Lista gastos variables del mes */}
