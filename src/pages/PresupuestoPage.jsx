@@ -105,11 +105,11 @@ function ModalBtns({ onClose }) {
 }
 
 const SHARED_BUDGET_OWNER = 'ca354bf9-9e8b-43d9-b10d-d1e6b0db792b'
-const SHARED_BUDGET_EMAILS = ['daniell.uriass@gmail.com', 'suleciojh@gmail.com']
 
 export default function PresupuestoPage({ user }) {
   const isMobile = useIsMobile()
-  const budgetUid = SHARED_BUDGET_EMAILS.includes(user.email) ? SHARED_BUDGET_OWNER : user.id
+  // Solo Joselin usa el ID de Daniel. Todos los demás (incluyendo Daniel) usan su propio ID.
+  const budgetUid = user.email === 'suleciojh@gmail.com' ? SHARED_BUDGET_OWNER : user.id
 
   const [tab,        setTab]        = useState(()=>localStorage.getItem('presupuesto_tab')||'ingresos')
   const [mes,        setMes]        = useState(()=>localStorage.getItem('presupuesto_mes')||thisMes)
