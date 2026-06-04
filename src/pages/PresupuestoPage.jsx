@@ -104,8 +104,12 @@ function ModalBtns({ onClose }) {
   )
 }
 
+const SHARED_BUDGET_OWNER = 'ca354bf9-9e8b-43d9-b10d-d1e6b0db792b'
+const SHARED_BUDGET_EMAILS = ['daniell.uriass@gmail.com', 'suleciojh@gmail.com']
+
 export default function PresupuestoPage({ user }) {
   const isMobile = useIsMobile()
+  const budgetUid = SHARED_BUDGET_EMAILS.includes(user.email) ? SHARED_BUDGET_OWNER : user.id
 
   const [tab,        setTab]        = useState(()=>localStorage.getItem('presupuesto_tab')||'ingresos')
   const [mes,        setMes]        = useState(()=>localStorage.getItem('presupuesto_mes')||thisMes)
@@ -142,7 +146,7 @@ export default function PresupuestoPage({ user }) {
   useEffect(()=>{localStorage.setItem('presupuesto_mes',mes);setSelectedDay(null);setCalSelDay(null);setIngSelDay(null)},[mes])
 
   useEffect(()=>{
-    const uid=user.id; setLoading(true)
+    const uid=budgetUid; setLoading(true)
     Promise.all([
       supabase.from('budget_ingresos').select('*').eq('user_id',uid).order('created_at'),
       supabase.from('budget_gastos_fijos').select('*').eq('user_id',uid).order('created_at'),
@@ -256,7 +260,7 @@ export default function PresupuestoPage({ user }) {
   const upsert=async(table,payload,id,setState)=>{
     console.log('[upsert]', table, 'id=', id, payload)
     if(id){const{data,error}=await supabase.from(table).update(payload).eq('id',id).select().single();console.log('[upsert result]',{data,error});if(error)console.error('upsert update error:',error);else if(data)setState(p=>p.map(x=>x.id===data.id?data:x))}
-    else  {const{data,error}=await supabase.from(table).insert({...payload,user_id:user.id}).select().single();console.log('[upsert result]',{data,error});if(error)console.error('upsert insert error:',error);else if(data)setState(p=>[...p,data])}
+    else  {const{data,error}=await supabase.from(table).insert({...payload,user_id:budgetUid}).select().single();console.log('[upsert result]',{data,error});if(error)console.error('upsert insert error:',error);else if(data)setState(p=>[...p,data])}
   }
   const del=async(table,id,setState)=>{await supabase.from(table).delete().eq('id',id);setState(p=>p.filter(x=>x.id!==id))}
 
