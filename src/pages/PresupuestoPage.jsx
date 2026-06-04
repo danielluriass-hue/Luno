@@ -194,6 +194,14 @@ export default function PresupuestoPage({ user }) {
     // Solo agregar al calendario si la fecha pertenece al mes actual
     if(f && f.startsWith(mes)){(gastosByDate[f]=gastosByDate[f]||[]).push(g)}
   })
+  // Gastos fijos por día de pago en el mes actual
+  const fixosByDate = {}
+  gastosFijos.filter(g=>g.activo&&g.dia_pago).forEach(g=>{
+    const d=Math.min(g.dia_pago,daysInMonth)
+    const key=`${mes}-${String(d).padStart(2,'0')}`
+    ;(fixosByDate[key]=fixosByDate[key]||[]).push(g)
+  })
+
   // Sin fecha = fecha nula O fecha que no es de este mes
   const varSinFecha = varMes.filter(g=>{
     const f=normFecha(g.fecha)
@@ -1066,16 +1074,19 @@ export default function PresupuestoPage({ user }) {
                     const weekTotal=weekDays.reduce((s,day)=>{
                       const ds=`${mes}-${String(day).padStart(2,'0')}`
                       return s+(gastosByDate[ds]||[]).reduce((ss,g)=>ss+parseFloat(g.monto||0),0)
+                           +(fixosByDate[ds]||[]).reduce((ss,g)=>ss+parseFloat(g.monto||0),0)
                     },0)
                     return(
                       <div key={wi} style={{display:'grid',gridTemplateColumns:'repeat(7,1fr) 80px',gap:'4px',marginBottom:'4px'}}>
                         {week.map((day,di)=>{
                           if(!day) return <div key={`ve-${wi}-${di}`} style={{minHeight:'72px',borderRadius:'10px',background:'var(--inner-bg)',opacity:0.2}}/>
                           const dateStr=`${mes}-${String(day).padStart(2,'0')}`
-                          const dayG=gastosByDate[dateStr]||[]
-                          const dayT=dayG.reduce((s,g)=>s+parseFloat(g.monto||0),0)
+                          const dayVar=gastosByDate[dateStr]||[]
+                          const dayFij=fixosByDate[dateStr]||[]
+                          const dayT=dayVar.reduce((s,g)=>s+parseFloat(g.monto||0),0)+dayFij.reduce((s,g)=>s+parseFloat(g.monto||0),0)
                           const isToday=dateStr===today
                           const isSel=dateStr===selectedDay
+                          const hasAny=dayVar.length>0||dayFij.length>0
                           return(
                             <button key={dateStr} onClick={()=>setSelectedDay(isSel?null:dateStr)} style={{
                               minHeight:'72px',borderRadius:'10px',padding:'8px 8px 6px',cursor:'pointer',
@@ -1086,10 +1097,11 @@ export default function PresupuestoPage({ user }) {
                             }}>
                               <span style={{fontSize:'13px',fontWeight:isToday?'700':'500',color:isToday?'var(--accent)':isSel?'var(--accent)':'var(--text-1)'}}>{day}</span>
                               {dayT>0&&<span style={{fontSize:'11px',fontWeight:'700',color:'#ff9500',lineHeight:1}}>{q(dayT)}</span>}
-                              {dayG.length>0&&(
-                                <div style={{display:'flex',gap:'3px',marginTop:'auto'}}>
-                                  {dayG.slice(0,3).map((_,i)=><div key={i} style={{width:'5px',height:'5px',borderRadius:'50%',background:'#ff9500'}}/>)}
-                                  {dayG.length>3&&<span style={{fontSize:'8px',color:'var(--text-muted)'}}>+{dayG.length-3}</span>}
+                              {hasAny&&(
+                                <div style={{display:'flex',gap:'3px',marginTop:'auto',flexWrap:'wrap'}}>
+                                  {dayFij.map((_,i)=><div key={`f${i}`} style={{width:'5px',height:'5px',borderRadius:'50%',background:'var(--accent)'}}/>)}
+                                  {dayVar.slice(0,3).map((_,i)=><div key={`v${i}`} style={{width:'5px',height:'5px',borderRadius:'50%',background:'#ff9500'}}/>)}
+                                  {dayVar.length>3&&<span style={{fontSize:'8px',color:'var(--text-muted)'}}>+{dayVar.length-3}</span>}
                                 </div>
                               )}
                             </button>
@@ -1112,19 +1124,44 @@ export default function PresupuestoPage({ user }) {
             </div>
 
             {/* Panel día seleccionado */}
-            {selectedDay&&(
-              <div style={{marginTop:'14px',padding:'16px',background:'var(--inner-bg)',borderRadius:'12px',border:'1px solid var(--border)'}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}}>
-                  <div>
-                    <div style={{fontSize:'13px',fontWeight:'600',color:'var(--text-1)'}}>{(()=>{const[,,d]=selectedDay.split('-');return`${parseInt(d)} de ${fmtMes(mes)}`})()}</div>
-                    {selectedDayGastos.length>0&&<div style={{fontSize:'11px',color:'var(--text-muted)',marginTop:'2px'}}>Total: {q(selectedDayGastos.reduce((s,g)=>s+parseFloat(g.monto||0),0))}</div>}
+            {selectedDay&&(()=>{
+              const selFijos=fixosByDate[selectedDay]||[]
+              const totalDia=(selectedDayGastos.reduce((s,g)=>s+parseFloat(g.monto||0),0))+(selFijos.reduce((s,g)=>s+parseFloat(g.monto||0),0))
+              return(
+                <div style={{marginTop:'14px',padding:'16px',background:'var(--inner-bg)',borderRadius:'12px',border:'1px solid var(--border)'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}}>
+                    <div>
+                      <div style={{fontSize:'13px',fontWeight:'600',color:'var(--text-1)'}}>{(()=>{const[,,d]=selectedDay.split('-');return`${parseInt(d)} de ${fmtMes(mes)}`})()}</div>
+                      {totalDia>0&&<div style={{fontSize:'11px',color:'var(--text-muted)',marginTop:'2px'}}>Total: {q(totalDia)}</div>}
+                    </div>
+                    <button onClick={()=>openAddVar(selectedDay)} style={{background:'var(--accent)',color:'#fff',border:'none',borderRadius:'8px',padding:'6px 14px',fontSize:'12px',fontWeight:'600',cursor:'pointer'}}>+ Variable</button>
                   </div>
-                  <button onClick={()=>openAddVar(selectedDay)} style={{background:'var(--accent)',color:'#fff',border:'none',borderRadius:'8px',padding:'6px 14px',fontSize:'12px',fontWeight:'600',cursor:'pointer'}}>+ Agregar</button>
-                </div>
-                {selectedDayGastos.length===0
-                  ?<p style={{fontSize:'13px',color:'var(--text-muted)',textAlign:'center',padding:'12px 0'}}>Sin gastos este día — haz clic en "+ Agregar"</p>
-                  :selectedDayGastos.map(g=>(
+
+                  {selFijos.length>0&&(
+                    <>
+                      <div style={{fontSize:'10px',fontWeight:'700',color:'var(--accent)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'6px'}}>Fijos</div>
+                      {selFijos.map(g=>(
+                        <div key={g.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
+                          <div style={{width:'7px',height:'7px',borderRadius:'50%',background:'var(--accent)',flexShrink:0}}/>
+                          <div style={{flex:1}}>
+                            <div style={{fontSize:'13px',fontWeight:'500',color:'var(--text-1)'}}>{g.nombre}</div>
+                            <div style={{fontSize:'10px',color:'var(--text-muted)'}}>{g.categoria}</div>
+                          </div>
+                          <div style={{fontSize:'13px',fontWeight:'600',color:'var(--accent)'}}>{q(g.monto)}</div>
+                        </div>
+                      ))}
+                    </>
+                  )}
+
+                  {selectedDayGastos.length>0&&(
+                    <div style={{fontSize:'10px',fontWeight:'700',color:'#ff9500',textTransform:'uppercase',letterSpacing:'0.06em',margin:'10px 0 6px'}}>Variables</div>
+                  )}
+                  {selectedDayGastos.length===0&&selFijos.length===0&&(
+                    <p style={{fontSize:'13px',color:'var(--text-muted)',textAlign:'center',padding:'12px 0'}}>Sin gastos este día — haz clic en "+ Variable"</p>
+                  )}
+                  {selectedDayGastos.map(g=>(
                     <div key={g.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'9px 0',borderBottom:'1px solid var(--border)'}}>
+                      <div style={{width:'7px',height:'7px',borderRadius:'50%',background:'#ff9500',flexShrink:0}}/>
                       <div style={{flex:1}}>
                         <div style={{fontSize:'13px',fontWeight:'500',color:'var(--text-1)'}}>{g.nombre}</div>
                         <div style={{display:'flex',gap:'6px',marginTop:'3px',flexWrap:'wrap'}}>
@@ -1139,10 +1176,10 @@ export default function PresupuestoPage({ user }) {
                         <button onClick={()=>askDel(`"${g.nombre}" se eliminará.`,()=>del('budget_gastos_variables',g.id,setGastosVar))} style={bDel}><IcoDel/></button>
                       </div>
                     </div>
-                  ))
-                }
-              </div>
-            )}
+                  ))}
+                </div>
+              )
+            })()}
 
             {/* Sin fecha */}
             {varSinFecha.length>0&&(
@@ -1167,9 +1204,19 @@ export default function PresupuestoPage({ user }) {
               </div>
             )}
 
-            <div style={{display:'flex',justifyContent:'flex-end',marginTop:'16px',paddingTop:'14px',borderTop:'1px solid var(--border)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:'16px',paddingTop:'14px',borderTop:'1px solid var(--border)',flexWrap:'wrap',gap:'8px'}}>
+              <div style={{display:'flex',gap:'14px'}}>
+                <div style={{display:'flex',alignItems:'center',gap:'4px'}}>
+                  <div style={{width:'7px',height:'7px',borderRadius:'50%',background:'var(--accent)'}}/>
+                  <span style={{fontSize:'10px',color:'var(--text-muted)'}}>Gasto fijo</span>
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:'4px'}}>
+                  <div style={{width:'7px',height:'7px',borderRadius:'50%',background:'#ff9500'}}/>
+                  <span style={{fontSize:'10px',color:'var(--text-muted)'}}>Gasto variable</span>
+                </div>
+              </div>
               <div style={{fontSize:'12px',fontWeight:'800',color:'var(--text-1)',letterSpacing:'0.03em'}}>
-                MES TOTAL <span style={{color:'#ff9500',marginLeft:'6px'}}>{q(totalVariables)}</span>
+                MES TOTAL <span style={{color:'#ff9500',marginLeft:'6px'}}>{q(totalFijos+totalVariables)}</span>
               </div>
             </div>
           </div>
