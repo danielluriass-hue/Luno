@@ -131,7 +131,7 @@ export default function PresupuestoPage({ user }) {
   const [modalComp,  setModalComp]  = useState(null)
   const [confirmDel, setConfirmDel] = useState(null)
 
-  const [fIng,   setFIng]   = useState({nombre:'',tipo:'fijo',monto:'',dia:''})
+  const [fIng,   setFIng]   = useState({nombre:'',tipo:'fijo',monto:'',dia:'',fecha:''})
   const [fFij,   setFFij]   = useState({nombre:'',categoria:'Vivienda',monto:'',activo:true,dia_pago:''})
   const [fVar,   setFVar]   = useState({nombre:'',categoria:'Alimentación',monto:'',fecha:today,medio_pago:'Efectivo',tarjeta:'',fecha_pago:''})
   const [fPrest, setFPrest] = useState({nombre:'',tipo:'Préstamo',monto_original:'',saldo_actual:'',cuota_mensual:'',meses_restantes:'',dia_pago:''})
@@ -227,10 +227,11 @@ export default function PresupuestoPage({ user }) {
 
   // ── Income calendar events ──
   const ingCalEvents = {}
-  ingMes.filter(i=>i.dia).forEach(i=>{
-    const d=Math.min(i.dia,daysInMonth)
-    const key=`${mes}-${String(d).padStart(2,'0')}`
-    ;(ingCalEvents[key]=ingCalEvents[key]||[]).push({label:i.nombre,amount:i.monto,tipo:i.tipo==='fijo'?'Fijo':'Variable'})
+  ingMes.forEach(i=>{
+    let key=null
+    if(i.tipo==='fijo'&&i.dia) { const d=Math.min(i.dia,daysInMonth); key=`${mes}-${String(d).padStart(2,'0')}` }
+    else if(i.tipo!=='fijo'&&i.fecha&&i.fecha.startsWith(mes)) key=i.fecha.slice(0,10)
+    if(key)(ingCalEvents[key]=ingCalEvents[key]||[]).push({label:i.nombre,amount:i.monto,tipo:i.tipo==='fijo'?'Fijo':'Variable'})
   })
   const ingSelEvents = ingSelDay?(ingCalEvents[ingSelDay]||[]):[]
 
@@ -247,7 +248,16 @@ export default function PresupuestoPage({ user }) {
   }
   const del=async(table,id,setState)=>{await supabase.from(table).delete().eq('id',id);setState(p=>p.filter(x=>x.id!==id))}
 
-  const saveIngreso=async(e)=>{e.preventDefault();await upsert('budget_ingresos',{...fIng,monto:parseFloat(fIng.monto),mes,dia:fIng.dia?parseInt(fIng.dia):null},modalIng?.id,setIngresos);setModalIng(null)}
+  const saveIngreso=async(e)=>{
+    e.preventDefault()
+    const esFijo=fIng.tipo==='fijo'
+    await upsert('budget_ingresos',{
+      nombre:fIng.nombre,tipo:fIng.tipo,monto:parseFloat(fIng.monto),mes,
+      dia:esFijo&&fIng.dia?parseInt(fIng.dia):null,
+      fecha:!esFijo?fIng.fecha||null:null,
+    },modalIng?.id,setIngresos)
+    setModalIng(null)
+  }
   const saveFijo   =async(e)=>{e.preventDefault();await upsert('budget_gastos_fijos',{...fFij,monto:parseFloat(fFij.monto),dia_pago:fFij.dia_pago?parseInt(fFij.dia_pago):null},modalFij?.id,setGastosFijos);setModalFij(null)}
   const saveVar    =async(e)=>{
     e.preventDefault()
@@ -834,12 +844,13 @@ export default function PresupuestoPage({ user }) {
                     <div style={{fontSize:'13.5px',fontWeight:'500',color:'var(--text-1)'}}>{i.nombre}</div>
                     <div style={{display:'flex',gap:'8px',marginTop:'2px'}}>
                       <span style={{fontSize:'11px',color:'var(--text-muted)'}}>{i.tipo==='fijo'?'Fijo':'Variable'}</span>
-                      {i.dia&&<span style={{fontSize:'11px',color:'var(--accent)'}}>día {i.dia}</span>}
+                      {i.tipo==='fijo'&&i.dia&&<span style={{fontSize:'11px',color:'var(--accent)'}}>día {i.dia}</span>}
+                      {i.tipo!=='fijo'&&i.fecha&&<span style={{fontSize:'11px',color:'var(--accent)'}}>{new Date(i.fecha+'T00:00:00').toLocaleDateString('es-GT',{day:'numeric',month:'short'})}</span>}
                     </div>
                   </div>
                   <div style={{fontWeight:'600',fontSize:'14px',color:'var(--green)'}}>{q(i.monto)}</div>
                   <div style={{display:'flex',gap:'4px'}}>
-                    <button onClick={()=>{setFIng({nombre:i.nombre,tipo:i.tipo,monto:String(i.monto),dia:i.dia!=null?String(i.dia):''});setModalIng(i)}} style={bEdit}><IcoEdit/></button>
+                    <button onClick={()=>{setFIng({nombre:i.nombre,tipo:i.tipo,monto:String(i.monto),dia:i.dia!=null?String(i.dia):'',fecha:i.fecha||''});setModalIng(i)}} style={bEdit}><IcoEdit/></button>
                     <button onClick={()=>askDel(`"${i.nombre}" se eliminará.`,()=>del('budget_ingresos',i.id,setIngresos))} style={bDel}><IcoDel/></button>
                   </div>
                 </div>
@@ -1204,14 +1215,25 @@ export default function PresupuestoPage({ user }) {
         <Modal title={modalIng.id?'Editar ingreso':'Nuevo ingreso'} onClose={()=>setModalIng(null)}>
           <form onSubmit={saveIngreso}>
             <FormField label="Fuente / Nombre *"><input required style={inp} value={fIng.nombre} onChange={e=>setFIng(p=>({...p,nombre:e.target.value}))} placeholder="ej. Salario, Freelance..."/></FormField>
-            <FormField label="Tipo"><select style={inp} value={fIng.tipo} onChange={e=>setFIng(p=>({...p,tipo:e.target.value}))}><option value="fijo">Fijo</option><option value="variable">Variable</option></select></FormField>
-            <FormField label="Monto *"><input required type="number" step="0.01" min="0" style={inp} value={fIng.monto} onChange={e=>setFIng(p=>({...p,monto:e.target.value}))} placeholder="0.00"/></FormField>
-            <FormField label="Día esperado del mes (opcional)">
-              <select style={inp} value={fIng.dia} onChange={e=>setFIng(p=>({...p,dia:e.target.value}))}>
-                <option value="">Sin día específico</option>
-                {DIAS_MES.map(d=><option key={d} value={d}>Día {d}</option>)}
+            <FormField label="Tipo">
+              <select style={inp} value={fIng.tipo} onChange={e=>setFIng(p=>({...p,tipo:e.target.value,dia:'',fecha:''}))}>
+                <option value="fijo">Fijo</option>
+                <option value="variable">Variable</option>
               </select>
             </FormField>
+            <FormField label="Monto *"><input required type="number" step="0.01" min="0" style={inp} value={fIng.monto} onChange={e=>setFIng(p=>({...p,monto:e.target.value}))} placeholder="0.00"/></FormField>
+            {fIng.tipo==='fijo'?(
+              <FormField label="Día de cobro (opcional)">
+                <select style={inp} value={fIng.dia} onChange={e=>setFIng(p=>({...p,dia:e.target.value}))}>
+                  <option value="">Sin día específico</option>
+                  {DIAS_MES.map(d=><option key={d} value={d}>Día {d}</option>)}
+                </select>
+              </FormField>
+            ):(
+              <FormField label="Fecha de ingreso (opcional)">
+                <input type="date" style={inp} value={fIng.fecha} onChange={e=>setFIng(p=>({...p,fecha:e.target.value}))}/>
+              </FormField>
+            )}
             <ModalBtns onClose={()=>setModalIng(null)}/>
           </form>
         </Modal>
