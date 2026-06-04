@@ -148,25 +148,53 @@ export default function HoyPage({ user }) {
 
         {/* Hábitos */}
         <div style={card}>
-          <div style={label}>Hábitos de hoy</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+            <div style={label}>Hábitos de hoy</div>
+            {habits.length > 0 && (
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '14px' }}>
+                {todayLogs.length}/{habits.length}
+              </span>
+            )}
+          </div>
           {habits.length === 0
             ? <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Agrega hábitos en la sección Hábitos</p>
-            : habits.map(h => {
-              const done = todayLogs.some(l => l.habit_id === h.id)
-              return (
-                <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                  <button onClick={() => toggleHabit(h)} style={{
-                    width: '17px', height: '17px', borderRadius: '4px', flexShrink: 0,
-                    border: `1.5px solid ${done ? (h.color || 'var(--accent)') : 'var(--border)'}`,
-                    background: done ? (h.color || 'var(--accent)') : 'transparent',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-                  }}>
-                    {done && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5"><polyline points="20 6 9 17 4 12"/></svg>}
-                  </button>
-                  <span style={{ fontSize: '13px', color: done ? 'var(--text-muted)' : 'var(--text-1)', textDecoration: done ? 'line-through' : 'none' }}>{h.name}</span>
-                </div>
-              )
-            })
+            : [...habits]
+                .sort((a, b) => {
+                  if (a.hora_inicio && b.hora_inicio) return a.hora_inicio.localeCompare(b.hora_inicio)
+                  if (a.hora_inicio) return -1
+                  if (b.hora_inicio) return 1
+                  return 0
+                })
+                .map(h => {
+                  const done = todayLogs.some(l => l.habit_id === h.id)
+                  const timeLabel = h.hora_inicio ? (h.hora_fin ? `${h.hora_inicio} - ${h.hora_fin}` : h.hora_inicio) : null
+                  return (
+                    <div key={h.id} onClick={() => toggleHabit(h)} style={{
+                      display: 'flex', alignItems: 'center', gap: '9px', padding: '7px 8px',
+                      borderRadius: '10px', marginBottom: '4px', cursor: 'pointer',
+                      background: done ? 'var(--inner-bg)' : 'transparent',
+                      transition: 'background 0.12s',
+                    }}>
+                      <div style={{
+                        width: '18px', height: '18px', borderRadius: '5px', flexShrink: 0,
+                        border: `2px solid ${done ? (h.color || 'var(--accent)') : 'var(--border)'}`,
+                        background: done ? (h.color || 'var(--accent)') : 'transparent',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        {done && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5"><polyline points="20 6 9 17 4 12"/></svg>}
+                      </div>
+                      <span style={{ fontSize: '14px', flexShrink: 0 }}>{h.icon}</span>
+                      <span style={{ fontSize: '12px', flex: 1, color: done ? 'var(--text-muted)' : 'var(--text-1)', textDecoration: done ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {h.name}
+                      </span>
+                      {timeLabel && (
+                        <span style={{ fontSize: '10px', color: done ? 'var(--text-muted)' : 'var(--accent)', fontWeight: '600', flexShrink: 0 }}>
+                          {timeLabel}
+                        </span>
+                      )}
+                    </div>
+                  )
+                })
           }
         </div>
       </div>
