@@ -10,6 +10,7 @@ const icons = {
   METAS:   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>,
   RUTINAS: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.18-8.33L23 10"/></svg>,
   MEJORAS: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>,
+  PRESUPUESTO: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/><line x1="14" y1="15" x2="16" y2="15"/></svg>,
 }
 
 const NAV_BASE = [
@@ -20,7 +21,8 @@ const NAV_BASE = [
   { key: 'NOTAS',   label: 'Notas'   },
   { key: 'METAS',   label: 'Metas'   },
   { key: 'RUTINAS', label: 'Rutinas' },
-  { key: 'MEJORAS', label: 'Mejoras' },
+  { key: 'MEJORAS',      label: 'Mejoras'     },
+  { key: 'PRESUPUESTO', label: 'Presupuesto' },
 ]
 
 const CONTA_ALLOWED = 'daniell.uriass@gmail.com'
