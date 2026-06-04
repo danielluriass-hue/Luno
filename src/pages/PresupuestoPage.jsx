@@ -113,6 +113,7 @@ export default function PresupuestoPage({ user }) {
   const [selectedDay,setSelectedDay]= useState(null)
   const [calSelDay,     setCalSelDay]     = useState(null)
   const [calGastosSel,  setCalGastosSel]  = useState(null)
+  const [ingSelDay,     setIngSelDay]     = useState(null)
   const [verPagados, setVerPagados] = useState(false)
 
   const [ingresos,    setIngresos]    = useState([])
@@ -130,7 +131,7 @@ export default function PresupuestoPage({ user }) {
   const [modalComp,  setModalComp]  = useState(null)
   const [confirmDel, setConfirmDel] = useState(null)
 
-  const [fIng,   setFIng]   = useState({nombre:'',tipo:'fijo',monto:''})
+  const [fIng,   setFIng]   = useState({nombre:'',tipo:'fijo',monto:'',dia:''})
   const [fFij,   setFFij]   = useState({nombre:'',categoria:'Vivienda',monto:'',activo:true,dia_pago:''})
   const [fVar,   setFVar]   = useState({nombre:'',categoria:'Alimentación',monto:'',fecha:today,medio_pago:'Efectivo',tarjeta:'',fecha_pago:''})
   const [fPrest, setFPrest] = useState({nombre:'',tipo:'Préstamo',monto_original:'',saldo_actual:'',cuota_mensual:'',meses_restantes:'',dia_pago:''})
@@ -138,7 +139,7 @@ export default function PresupuestoPage({ user }) {
   const [fComp,  setFComp]  = useState({persona:'',descripcion:'',monto:'',fecha_aprox:'',notas:''})
 
   useEffect(()=>{localStorage.setItem('presupuesto_tab',tab)},[tab])
-  useEffect(()=>{localStorage.setItem('presupuesto_mes',mes);setSelectedDay(null);setCalSelDay(null)},[mes])
+  useEffect(()=>{localStorage.setItem('presupuesto_mes',mes);setSelectedDay(null);setCalSelDay(null);setIngSelDay(null)},[mes])
 
   useEffect(()=>{
     const uid=user.id; setLoading(true)
@@ -224,6 +225,15 @@ export default function PresupuestoPage({ user }) {
   })
   const calSelEvents = calSelDay?(calEvents[calSelDay]||[]):[]
 
+  // ── Income calendar events ──
+  const ingCalEvents = {}
+  ingMes.filter(i=>i.dia).forEach(i=>{
+    const d=Math.min(i.dia,daysInMonth)
+    const key=`${mes}-${String(d).padStart(2,'0')}`
+    ;(ingCalEvents[key]=ingCalEvents[key]||[]).push({label:i.nombre,amount:i.monto,tipo:i.tipo==='fijo'?'Fijo':'Variable'})
+  })
+  const ingSelEvents = ingSelDay?(ingCalEvents[ingSelDay]||[]):[]
+
   // ── Nav ──
   const prevMes=()=>{const[y,m]=mes.split('-').map(Number);const d=new Date(y,m-2);setMes(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`)}
   const nextMes=()=>{const[y,m]=mes.split('-').map(Number);const d=new Date(y,m);  setMes(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`)}
@@ -237,7 +247,7 @@ export default function PresupuestoPage({ user }) {
   }
   const del=async(table,id,setState)=>{await supabase.from(table).delete().eq('id',id);setState(p=>p.filter(x=>x.id!==id))}
 
-  const saveIngreso=async(e)=>{e.preventDefault();await upsert('budget_ingresos',{...fIng,monto:parseFloat(fIng.monto),mes},modalIng?.id,setIngresos);setModalIng(null)}
+  const saveIngreso=async(e)=>{e.preventDefault();await upsert('budget_ingresos',{...fIng,monto:parseFloat(fIng.monto),mes,dia:fIng.dia?parseInt(fIng.dia):null},modalIng?.id,setIngresos);setModalIng(null)}
   const saveFijo   =async(e)=>{e.preventDefault();await upsert('budget_gastos_fijos',{...fFij,monto:parseFloat(fFij.monto),dia_pago:fFij.dia_pago?parseInt(fFij.dia_pago):null},modalFij?.id,setGastosFijos);setModalFij(null)}
   const saveVar    =async(e)=>{
     e.preventDefault()
@@ -698,25 +708,146 @@ export default function PresupuestoPage({ user }) {
 
       {/* ══ TAB: INGRESOS ══ */}
       {tab==='ingresos'&&(
-        <div style={card}>
-          <SubHead label="Ingresos del mes" total={totalIngresos} onAdd={()=>{setFIng({nombre:'',tipo:'fijo',monto:''});setModalIng({})}}/>
-          {ingMes.length===0
-            ?<p style={{fontSize:'13px',color:'var(--text-muted)',textAlign:'center',padding:'20px 0'}}>Sin ingresos registrados</p>
-            :ingMes.map(i=>(
-              <div key={i.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'11px 0',borderBottom:'1px solid var(--border)'}}>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:'13.5px',fontWeight:'500',color:'var(--text-1)'}}>{i.nombre}</div>
-                  <div style={{fontSize:'11px',color:'var(--text-muted)',marginTop:'2px'}}>{i.tipo==='fijo'?'Fijo':'Variable'}</div>
-                </div>
-                <div style={{fontWeight:'600',fontSize:'14px',color:'var(--green)'}}>{q(i.monto)}</div>
-                <div style={{display:'flex',gap:'4px'}}>
-                  <button onClick={()=>{setFIng({nombre:i.nombre,tipo:i.tipo,monto:String(i.monto)});setModalIng(i)}} style={bEdit}><IcoEdit/></button>
-                  <button onClick={()=>askDel(`"${i.nombre}" se eliminará.`,()=>del('budget_ingresos',i.id,setIngresos))} style={bDel}><IcoDel/></button>
-                </div>
+        <div style={{display:'flex',flexDirection:'column',gap:'16px'}}>
+
+          {/* Calendario de ingresos */}
+          <div style={card}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'20px'}}>
+              <div>
+                <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em'}}>Calendario de Ingresos</div>
+                <div style={{fontSize:'20px',fontWeight:'800',letterSpacing:'-0.02em',color:'var(--text-1)',marginTop:'4px'}}>{fmtMes(mes)}</div>
               </div>
-            ))
-          }
-          {ingMes.length>0&&<div style={{display:'flex',justifyContent:'flex-end',paddingTop:'14px'}}><span style={{fontSize:'14px',fontWeight:'700',color:'var(--green)'}}>Total: {q(totalIngresos)}</span></div>}
+              <div style={{textAlign:'right'}}>
+                <div style={{fontSize:'10px',color:'var(--text-muted)',marginBottom:'2px'}}>Total del mes</div>
+                <div style={{fontSize:'16px',fontWeight:'800',color:'var(--green)'}}>{q(totalIngresos)}</div>
+              </div>
+            </div>
+
+            <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
+              <div style={{minWidth:'560px'}}>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr) 80px',gap:'4px',marginBottom:'6px'}}>
+                  {DIAS_SEMANA.map(d=>(
+                    <div key={d} style={{textAlign:'center',fontSize:'11px',fontWeight:'600',color:'var(--text-muted)',padding:'4px 0'}}>{d}</div>
+                  ))}
+                  <div style={{textAlign:'center',fontSize:'11px',fontWeight:'600',color:'var(--text-muted)',padding:'4px 0'}}>Semana</div>
+                </div>
+
+                {(()=>{
+                  const weeks=[]
+                  for(let i=0;i<calCells.length;i+=7) weeks.push(calCells.slice(i,i+7))
+                  return weeks.map((week,wi)=>{
+                    const weekDays=week.filter(Boolean)
+                    const weekTotal=weekDays.reduce((s,day)=>{
+                      const ds=`${mes}-${String(day).padStart(2,'0')}`
+                      return s+(ingCalEvents[ds]||[]).reduce((ss,e)=>ss+parseFloat(e.amount||0),0)
+                    },0)
+                    return(
+                      <div key={wi} style={{display:'grid',gridTemplateColumns:'repeat(7,1fr) 80px',gap:'4px',marginBottom:'4px'}}>
+                        {week.map((day,di)=>{
+                          if(!day) return <div key={`ie-${wi}-${di}`} style={{minHeight:'72px',borderRadius:'10px',background:'var(--inner-bg)',opacity:0.2}}/>
+                          const dateStr=`${mes}-${String(day).padStart(2,'0')}`
+                          const evts=ingCalEvents[dateStr]||[]
+                          const dayTotal=evts.reduce((s,e)=>s+parseFloat(e.amount||0),0)
+                          const isToday=dateStr===today
+                          const isSel=dateStr===ingSelDay
+                          return(
+                            <button key={`i${dateStr}`} onClick={()=>setIngSelDay(isSel?null:dateStr)} style={{
+                              minHeight:'72px',borderRadius:'10px',padding:'8px 8px 6px',
+                              cursor:evts.length?'pointer':'default',
+                              border:isSel?'2px solid var(--green)':isToday?'1px solid var(--accent)':'1px solid var(--border)',
+                              background:isSel?'rgba(52,199,89,0.1)':isToday?'rgba(88,86,214,0.06)':'transparent',
+                              display:'flex',flexDirection:'column',alignItems:'flex-start',gap:'4px',
+                              transition:'all 0.12s',textAlign:'left',
+                            }}>
+                              <span style={{fontSize:'13px',fontWeight:isToday?'700':'500',color:isToday?'var(--accent)':isSel?'var(--green)':'var(--text-1)'}}>{day}</span>
+                              {dayTotal>0&&(
+                                <span style={{fontSize:'11px',fontWeight:'700',color:'var(--green)',lineHeight:1}}>+{q(dayTotal)}</span>
+                              )}
+                              {evts.length>0&&(
+                                <div style={{display:'flex',gap:'3px',marginTop:'auto'}}>
+                                  {evts.slice(0,3).map((_,i)=><div key={i} style={{width:'5px',height:'5px',borderRadius:'50%',background:'var(--green)'}}/>)}
+                                  {evts.length>3&&<span style={{fontSize:'8px',color:'var(--text-muted)'}}>+{evts.length-3}</span>}
+                                </div>
+                              )}
+                            </button>
+                          )
+                        })}
+                        <div style={{
+                          minHeight:'72px',borderRadius:'10px',padding:'8px 6px',
+                          background:'var(--inner-bg)',border:'1px solid var(--border)',
+                          display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'3px',
+                        }}>
+                          <div style={{fontSize:'9px',fontWeight:'600',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.05em'}}>Total</div>
+                          <div style={{fontSize:'13px',fontWeight:'800',color:weekTotal>0?'var(--green)':'var(--text-muted)'}}>{weekTotal>0?`+${q(weekTotal)}`:'—'}</div>
+                          {weekDays.length>0&&(
+                            <div style={{fontSize:'9px',color:'var(--text-muted)',textAlign:'center'}}>{weekDays[0]}–{weekDays[weekDays.length-1]}</div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })
+                })()}
+              </div>
+            </div>
+
+            {ingSelDay&&(
+              <div style={{marginTop:'14px',padding:'14px',background:'var(--inner-bg)',borderRadius:'12px',border:'1px solid var(--border)'}}>
+                <div style={{fontSize:'13px',fontWeight:'600',color:'var(--text-1)',marginBottom:'10px'}}>
+                  {(()=>{const[,,d]=ingSelDay.split('-');return`${parseInt(d)} de ${fmtMes(mes)}`})()}
+                </div>
+                {ingSelEvents.length===0
+                  ?<p style={{fontSize:'12px',color:'var(--text-muted)',textAlign:'center',padding:'8px 0'}}>Sin ingresos este día</p>
+                  :ingSelEvents.map((e,i)=>(
+                    <div key={i} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 0',borderBottom:i<ingSelEvents.length-1?'1px solid var(--border)':'none'}}>
+                      <div style={{width:'8px',height:'8px',borderRadius:'50%',background:'var(--green)',flexShrink:0}}/>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:'13px',fontWeight:'500',color:'var(--text-1)'}}>{e.label}</div>
+                        <div style={{fontSize:'10px',color:'var(--text-muted)'}}>{e.tipo}</div>
+                      </div>
+                      <div style={{fontSize:'13px',fontWeight:'700',color:'var(--green)'}}>+{q(e.amount)}</div>
+                    </div>
+                  ))
+                }
+                {ingSelEvents.length>0&&(
+                  <div style={{display:'flex',justifyContent:'flex-end',paddingTop:'8px'}}>
+                    <span style={{fontSize:'11px',fontWeight:'700',color:'var(--text-muted)'}}>Total: +{q(ingSelEvents.reduce((s,e)=>s+parseFloat(e.amount||0),0))}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div style={{display:'flex',justifyContent:'flex-end',marginTop:'16px',paddingTop:'14px',borderTop:'1px solid var(--border)'}}>
+              <div style={{fontSize:'12px',fontWeight:'800',color:'var(--text-1)',letterSpacing:'0.03em'}}>
+                MES TOTAL <span style={{color:'var(--green)',marginLeft:'6px'}}>{q(totalIngresos)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Lista de ingresos */}
+          <div style={card}>
+            <SubHead label="Ingresos del mes" total={totalIngresos} onAdd={()=>{setFIng({nombre:'',tipo:'fijo',monto:'',dia:''});setModalIng({})}}/>
+            {ingMes.length===0
+              ?<p style={{fontSize:'13px',color:'var(--text-muted)',textAlign:'center',padding:'20px 0'}}>Sin ingresos registrados</p>
+              :ingMes.map(i=>(
+                <div key={i.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'11px 0',borderBottom:'1px solid var(--border)'}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:'13.5px',fontWeight:'500',color:'var(--text-1)'}}>{i.nombre}</div>
+                    <div style={{display:'flex',gap:'8px',marginTop:'2px'}}>
+                      <span style={{fontSize:'11px',color:'var(--text-muted)'}}>{i.tipo==='fijo'?'Fijo':'Variable'}</span>
+                      {i.dia&&<span style={{fontSize:'11px',color:'var(--accent)'}}>día {i.dia}</span>}
+                    </div>
+                  </div>
+                  <div style={{fontWeight:'600',fontSize:'14px',color:'var(--green)'}}>{q(i.monto)}</div>
+                  <div style={{display:'flex',gap:'4px'}}>
+                    <button onClick={()=>{setFIng({nombre:i.nombre,tipo:i.tipo,monto:String(i.monto),dia:i.dia!=null?String(i.dia):''});setModalIng(i)}} style={bEdit}><IcoEdit/></button>
+                    <button onClick={()=>askDel(`"${i.nombre}" se eliminará.`,()=>del('budget_ingresos',i.id,setIngresos))} style={bDel}><IcoDel/></button>
+                  </div>
+                </div>
+              ))
+            }
+            {ingMes.length>0&&<div style={{display:'flex',justifyContent:'flex-end',paddingTop:'14px'}}><span style={{fontSize:'14px',fontWeight:'700',color:'var(--green)'}}>Total: {q(totalIngresos)}</span></div>}
+          </div>
+
         </div>
       )}
 
@@ -1075,6 +1206,12 @@ export default function PresupuestoPage({ user }) {
             <FormField label="Fuente / Nombre *"><input required style={inp} value={fIng.nombre} onChange={e=>setFIng(p=>({...p,nombre:e.target.value}))} placeholder="ej. Salario, Freelance..."/></FormField>
             <FormField label="Tipo"><select style={inp} value={fIng.tipo} onChange={e=>setFIng(p=>({...p,tipo:e.target.value}))}><option value="fijo">Fijo</option><option value="variable">Variable</option></select></FormField>
             <FormField label="Monto *"><input required type="number" step="0.01" min="0" style={inp} value={fIng.monto} onChange={e=>setFIng(p=>({...p,monto:e.target.value}))} placeholder="0.00"/></FormField>
+            <FormField label="Día esperado del mes (opcional)">
+              <select style={inp} value={fIng.dia} onChange={e=>setFIng(p=>({...p,dia:e.target.value}))}>
+                <option value="">Sin día específico</option>
+                {DIAS_MES.map(d=><option key={d} value={d}>Día {d}</option>)}
+              </select>
+            </FormField>
             <ModalBtns onClose={()=>setModalIng(null)}/>
           </form>
         </Modal>
