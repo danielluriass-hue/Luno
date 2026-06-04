@@ -201,7 +201,7 @@ export default function PresupuestoPage({ user }) {
   // Calendario derecho: agrupa por fecha_pago (tarjeta) o fecha (efectivo), de todos los gastos
   const gastosByPago = {}
   gastosVar.forEach(g=>{
-    const fp = g.fecha_pago && g.medio_pago && g.medio_pago!=='Efectivo' ? normFecha(g.fecha_pago) : normFecha(g.fecha)
+    const fp = normFecha(g.fecha_pago || g.fecha)
     if(fp && fp.startsWith(mes))(gastosByPago[fp]=gastosByPago[fp]||[]).push(g)
   })
   const totalPagosVar = Object.values(gastosByPago).flat().reduce((s,g)=>s+parseFloat(g.monto||0),0)
@@ -248,7 +248,7 @@ export default function PresupuestoPage({ user }) {
       nombre:fVar.nombre,categoria:fVar.categoria,monto:parseFloat(fVar.monto),mes:mesFinal,
       fecha:fVar.fecha||null,medio_pago:fVar.medio_pago,
       tarjeta:usaT?fVar.tarjeta||null:null,
-      fecha_pago:usaT&&fVar.fecha_pago?fVar.fecha_pago:null,
+      fecha_pago: fVar.medio_pago==='Tarjeta de Crédito' ? (fVar.fecha_pago||null) : (fVar.fecha||null),
     },modalVar?.id,setGastosVar)
     setModalVar(null)
   }
