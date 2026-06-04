@@ -198,6 +198,13 @@ export default function PresupuestoPage({ user }) {
     const f=normFecha(g.fecha)
     return !f || !f.startsWith(mes)
   })
+  // Calendario derecho: agrupa por fecha_pago (tarjeta) o fecha (efectivo), de todos los gastos
+  const gastosByPago = {}
+  gastosVar.forEach(g=>{
+    const fp = g.fecha_pago && g.medio_pago && g.medio_pago!=='Efectivo' ? normFecha(g.fecha_pago) : normFecha(g.fecha)
+    if(fp && fp.startsWith(mes))(gastosByPago[fp]=gastosByPago[fp]||[]).push(g)
+  })
+  const totalPagosVar = Object.values(gastosByPago).flat().reduce((s,g)=>s+parseFloat(g.monto||0),0)
   const calCells       = [...Array(firstDayOfWeek).fill(null),...Array.from({length:daysInMonth},(_,i)=>i+1)]
   const selectedDayGastos = selectedDay?(gastosByDate[selectedDay]||[]):[]
 
@@ -289,15 +296,15 @@ export default function PresupuestoPage({ user }) {
 
   // ── Compact gastos calendar renderer ──
   const GastosCalendar=()=>{
-    const selEvts = calGastosSel ? (gastosByDate[calGastosSel]||[]) : []
+    const selEvts = calGastosSel ? (gastosByPago[calGastosSel]||[]) : []
     return (
       <div style={{...card,alignSelf:'start'}}>
         <div style={{fontSize:'12px',fontWeight:'700',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'14px'}}>Gastos del Mes</div>
 
-        {totalVariables>0&&(
+        {totalPagosVar>0&&(
           <div style={{marginBottom:'12px',padding:'10px 12px',background:'rgba(255,59,48,0.08)',borderRadius:'10px',border:'1px solid rgba(255,59,48,0.2)'}}>
-            <div style={{fontSize:'10px',color:'var(--text-muted)',marginBottom:'3px'}}>Total gastado</div>
-            <div style={{fontSize:'15px',fontWeight:'800',color:'var(--red)'}}>{q(totalVariables)}</div>
+            <div style={{fontSize:'10px',color:'var(--text-muted)',marginBottom:'3px'}}>Total pagado</div>
+            <div style={{fontSize:'15px',fontWeight:'800',color:'var(--red)'}}>{q(totalPagosVar)}</div>
           </div>
         )}
 
@@ -309,7 +316,7 @@ export default function PresupuestoPage({ user }) {
           {calCells.map((day,idx)=>{
             if(!day) return <div key={`ge-${idx}`}/>
             const dateStr  =`${mes}-${String(day).padStart(2,'0')}`
-            const dayG     =gastosByDate[dateStr]||[]
+            const dayG     =gastosByPago[dateStr]||[]
             const dayTotal =dayG.reduce((s,g)=>s+parseFloat(g.monto||0),0)
             const isToday  =dateStr===today
             const isSel    =dateStr===calGastosSel
@@ -853,7 +860,7 @@ export default function PresupuestoPage({ user }) {
                 {calCells.map((day,idx)=>{
                   if(!day) return <div key={`ge-${idx}`}/>
                   const dateStr  =`${mes}-${String(day).padStart(2,'0')}`
-                  const dayG     =gastosByDate[dateStr]||[]
+                  const dayG     =gastosByPago[dateStr]||[]
                   const dayTotal =dayG.reduce((s,g)=>s+parseFloat(g.monto||0),0)
                   const isToday  =dateStr===today
                   const isSel    =dateStr===calGastosSel
@@ -871,7 +878,7 @@ export default function PresupuestoPage({ user }) {
                 })}
               </div>
               {calGastosSel&&(()=>{
-                const selEvts=gastosByDate[calGastosSel]||[]
+                const selEvts=gastosByPago[calGastosSel]||[]
                 return(
                   <div style={{marginTop:'16px',padding:'16px',background:'var(--inner-bg)',borderRadius:'12px',border:'1px solid var(--border)'}}>
                     <div style={{marginBottom:'12px'}}>
