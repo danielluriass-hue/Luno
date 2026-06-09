@@ -1211,7 +1211,11 @@ function MayorTab({ cuentas, asientos }) {
 // ── MÓDULO 6: ESTADO DE RESULTADOS ───────────────────────────────────────────
 
 function ResultadosTab({ cuentas, asientos }) {
-  const activos = asientos.filter(a=>a.estado==='ACTIVO')
+  const anos = [...new Set(asientos.map(a => new Date(a.fecha+'T00:00:00').getFullYear()))].sort((a,b)=>b-a)
+  const hoy  = new Date().getFullYear()
+  const [ano, setAno] = useState(() => anos.includes(hoy) ? hoy : (anos[0] || hoy))
+
+  const activos = asientos.filter(a => a.estado==='ACTIVO' && new Date(a.fecha+'T00:00:00').getFullYear()===ano)
   const saldoMap = {}
   activos.forEach(a => {
     (a.conta_lineas||[]).forEach(l => {
@@ -1249,7 +1253,7 @@ function ResultadosTab({ cuentas, asientos }) {
   )}
 
   const descargarPDF = () => {
-    const doc = initPDF('Estado de Resultados', 'Acumulado — todos los períodos')
+    const doc = initPDF('Estado de Resultados', `Enero – Diciembre ${ano}`)
     // Ingresos
     autoTable(doc, {
       startY: 36,
@@ -1296,17 +1300,30 @@ function ResultadosTab({ cuentas, asientos }) {
     doc.setTextColor(utilidad>=0 ? 22:220, utilidad>=0 ? 163:38, utilidad>=0 ? 74:38)
     doc.text(utilidad>=0 ? 'UTILIDAD DEL EJERCICIO' : 'PÉRDIDA DEL EJERCICIO', 14, y)
     doc.text(Qp(Math.abs(utilidad)), 196, y, { align:'right' })
-    doc.save('estado-resultados.pdf')
+    doc.save(`estado-resultados-${ano}.pdf`)
   }
 
   return (
     <div style={{ maxWidth:'580px' }}>
+      {/* Selector de año */}
+      {anos.length > 0 && (
+        <div style={{ display:'flex', gap:'6px', marginBottom:'20px', flexWrap:'wrap' }}>
+          {anos.map(y => (
+            <button key={y} onClick={() => setAno(y)} style={{
+              padding:'5px 16px', borderRadius:'7px', border:'none', fontSize:'13px',
+              fontWeight: ano===y ? '700':'400',
+              background: ano===y ? 'var(--accent)' : 'var(--inner-bg)',
+              color: ano===y ? '#fff' : 'var(--text-muted)', cursor:'pointer',
+            }}>{y}</button>
+          ))}
+        </div>
+      )}
       <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:'16px' }}>
         <button onClick={descargarPDF} style={{ padding:'7px 14px', borderRadius:'8px', border:'1.5px solid var(--accent)', background:'transparent', color:'var(--accent)', fontWeight:'600', fontSize:'12px', cursor:'pointer' }}>Descargar PDF</button>
       </div>
       <div style={{ textAlign:'center', marginBottom:'24px' }}>
         <div style={{ fontSize:'15px', fontWeight:'700', color:'var(--text-1)', textTransform:'uppercase', letterSpacing:'0.04em' }}>Estado de Resultados</div>
-        <div style={{ fontSize:'12px', color:'var(--text-muted)' }}>Acumulado — todos los períodos</div>
+        <div style={{ fontSize:'12px', color:'var(--text-muted)' }}>Enero – Diciembre {ano}</div>
       </div>
 
       {/* INGRESOS — lista plana */}
@@ -1368,9 +1385,13 @@ function ResultadosTab({ cuentas, asientos }) {
 // ── MÓDULO 7: BALANCE GENERAL ─────────────────────────────────────────────────
 
 function BalanceTab({ cuentas, asientos }) {
-  const activos = asientos.filter(a=>a.estado==='ACTIVO')
+  const anos = [...new Set(asientos.map(a => new Date(a.fecha+'T00:00:00').getFullYear()))].sort((a,b)=>b-a)
+  const hoy  = new Date().getFullYear()
+  const [ano, setAno] = useState(() => anos.includes(hoy) ? hoy : (anos[0] || hoy))
+
+  const activosAno = asientos.filter(a => a.estado==='ACTIVO' && new Date(a.fecha+'T00:00:00').getFullYear()===ano)
   const saldoMap = {}
-  activos.forEach(a => {
+  activosAno.forEach(a => {
     (a.conta_lineas||[]).forEach(l => {
       if (!saldoMap[l.cuenta_id]) saldoMap[l.cuenta_id] = { deb:0, cre:0 }
       saldoMap[l.cuenta_id].deb += parseFloat(l.debito)||0
@@ -1437,7 +1458,7 @@ function BalanceTab({ cuentas, asientos }) {
     <div style={{ maxWidth:'580px' }}>
       <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:'16px' }}>
         <button onClick={() => {
-          const doc = initPDF('Balance General', 'Acumulado — todos los períodos')
+          const doc = initPDF('Balance General', `Enero – Diciembre ${ano}`)
           autoTable(doc, {
             startY: 36,
             head: [['ACTIVOS','','']],
@@ -1475,12 +1496,25 @@ function BalanceTab({ cuentas, asientos }) {
           doc.setFontSize(9); doc.setFont('helvetica','bold')
           doc.setTextColor(cuadra ? 22:220, cuadra ? 163:38, cuadra ? 74:38)
           doc.text(`Activos = Pasivos + Capital: ${cuadra ? 'CUADRA ✓':'NO CUADRA ✗'}`, 14, y2)
-          doc.save('balance-general.pdf')
+          doc.save(`balance-general-${ano}.pdf`)
         }} style={{ padding:'7px 14px', borderRadius:'8px', border:'1.5px solid var(--accent)', background:'transparent', color:'var(--accent)', fontWeight:'600', fontSize:'12px', cursor:'pointer' }}>Descargar PDF</button>
       </div>
+      {/* Selector de año */}
+      {anos.length > 0 && (
+        <div style={{ display:'flex', gap:'6px', marginBottom:'20px', flexWrap:'wrap' }}>
+          {anos.map(y => (
+            <button key={y} onClick={() => setAno(y)} style={{
+              padding:'5px 16px', borderRadius:'7px', border:'none', fontSize:'13px',
+              fontWeight: ano===y ? '700':'400',
+              background: ano===y ? 'var(--accent)' : 'var(--inner-bg)',
+              color: ano===y ? '#fff' : 'var(--text-muted)', cursor:'pointer',
+            }}>{y}</button>
+          ))}
+        </div>
+      )}
       <div style={{ textAlign:'center', marginBottom:'24px' }}>
         <div style={{ fontSize:'15px', fontWeight:'700', color:'var(--text-1)', textTransform:'uppercase', letterSpacing:'0.04em' }}>Balance General</div>
-        <div style={{ fontSize:'12px', color:'var(--text-muted)' }}>Acumulado — todos los períodos</div>
+        <div style={{ fontSize:'12px', color:'var(--text-muted)' }}>Enero – Diciembre {ano}</div>
       </div>
 
       <Seccion titulo="Activos"  rows={cActivos} tot={totAct} color="#16a34a" borderColor="#16a34a40" />
