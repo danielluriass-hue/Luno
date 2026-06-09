@@ -94,6 +94,8 @@ const CATALOGO_BASE = [
   { codigo:'5150', nombre:'Parqueos',                                         tipo:'GASTO',   subtipo:'Operación de Transporte' },
   { codigo:'5160', nombre:'Lavado y Limpieza de Vehículos',                   tipo:'GASTO',   subtipo:'Operación de Transporte' },
   { codigo:'5170', nombre:'Seguros de Vehículos',                             tipo:'GASTO',   subtipo:'Operación de Transporte' },
+  { codigo:'5171', nombre:'GPS Vehículos',                                    tipo:'GASTO',   subtipo:'Operación de Transporte' },
+  { codigo:'5172', nombre:'Rastreo Satelital',                                tipo:'GASTO',   subtipo:'Operación de Transporte' },
   { codigo:'5180', nombre:'Impuesto a la Distribución del Petróleo (IDP)',    tipo:'GASTO',   subtipo:'Operación de Transporte' },
   // 52XX — Personal
   { codigo:'5200', nombre:'Sueldos y Salarios',                               tipo:'GASTO',   subtipo:'Personal' },
