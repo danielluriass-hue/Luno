@@ -14,22 +14,42 @@ const Q = (n) => {
 
 const Qp = (n) => `Q ${Number(n||0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-const initPDF = (titulo, subtitulo = '') => {
+const initPDF = (titulo, subtitulo = '', empresa = '') => {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' })
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(14)
-  doc.text(titulo, 105, 18, { align: 'center' })
-  if (subtitulo) {
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(10)
-    doc.text(subtitulo, 105, 26, { align: 'center' })
+  const fecha = new Date().toLocaleDateString('es-GT', { day:'2-digit', month:'2-digit', year:'numeric' })
+  // Franja superior oscura
+  doc.setFillColor(22, 31, 48)
+  doc.rect(0, 0, 216, 20, 'F')
+  // Nombre empresa (izquierda)
+  if (empresa) {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(255,255,255)
+    doc.text(empresa.toUpperCase(), 14, 8)
   }
-  doc.setFontSize(7)
-  doc.setTextColor(150)
-  doc.text(`Generado el ${new Date().toLocaleDateString('es-GT', { day:'2-digit', month:'2-digit', year:'numeric' })}`, 105, 32, { align: 'center' })
-  doc.setTextColor(0)
+  // Fecha generado (derecha)
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(160,172,190)
+  doc.text(`Generado: ${fecha}`, 202, 8, { align:'right' })
+  // Título del documento
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.setTextColor(22,31,48)
+  doc.text(titulo, 14, 32)
+  // Subtítulo / período
+  if (subtitulo) {
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(100,116,139)
+    doc.text(subtitulo, 14, 39)
+  }
+  // Línea divisora
+  doc.setDrawColor(203,213,225); doc.setLineWidth(0.4)
+  doc.line(14, 43, 202, 43)
+  doc.setTextColor(15,23,42)
   return doc
 }
+
+// Estilos de tabla profesionales reutilizables
+const tblHead  = { fillColor:[30,41,59],  textColor:[255,255,255], fontStyle:'bold', fontSize:9,   cellPadding:{ top:4, bottom:4, left:6, right:6 } }
+const tblGroup = { fillColor:[71,85,105], textColor:[255,255,255], fontStyle:'bold', fontSize:8,   cellPadding:{ top:3, bottom:3, left:8, right:6 } }
+const tblBody  = { fontSize:8.5, textColor:[15,23,42], cellPadding:{ top:3, bottom:3, left:6, right:6 } }
+const tblAlt   = { fillColor:[248,250,252] }
+const tblFoot  = { fillColor:[241,245,249], textColor:[15,23,42], fontStyle:'bold', fontSize:8.5 }
+const tblTotal = { fillColor:[226,232,240], textColor:[15,23,42], fontStyle:'bold', fontSize:9 }
 
 const CATALOGO_BASE = [
   // 11XX — Activo Corriente
@@ -1210,7 +1230,7 @@ function MayorTab({ cuentas, asientos }) {
 
 // ── MÓDULO 6: ESTADO DE RESULTADOS ───────────────────────────────────────────
 
-function ResultadosTab({ cuentas, asientos }) {
+function ResultadosTab({ cuentas, asientos, empresaNombre = '' }) {
   const anos = [...new Set(asientos.map(a => new Date(a.fecha+'T00:00:00').getFullYear()))].sort((a,b)=>b-a)
   const hoy  = new Date().getFullYear()
   const [ano, setAno] = useState(() => anos.includes(hoy) ? hoy : (anos[0] || hoy))
@@ -1253,53 +1273,62 @@ function ResultadosTab({ cuentas, asientos }) {
   )}
 
   const descargarPDF = () => {
-    const doc = initPDF('Estado de Resultados', `Enero – Diciembre ${ano}`)
-    // Ingresos
+    const doc = initPDF('ESTADO DE RESULTADOS', `Período: 1 de enero al 31 de diciembre de ${ano}`, empresaNombre)
+    const col = { 0:{cellWidth:18}, 1:{cellWidth:'auto'}, 2:{cellWidth:38, halign:'right'} }
+
+    // ── INGRESOS ──────────────────────────────────────────────────
     autoTable(doc, {
-      startY: 36,
-      head: [['INGRESOS','','']],
+      startY: 47,
+      head: [['CÓD.', 'INGRESOS', 'MONTO']],
       body: ingresos.filter(c=>getSaldo(c)!==0).map(c=>[c.codigo, c.nombre, Qp(getSaldo(c))]),
-      foot: [['','Total Ingresos', Qp(totIng)]],
-      headStyles: { fillColor:[22,163,74], fontSize:9 },
-      bodyStyles: { fontSize:8 },
-      footStyles: { fillColor:[220,252,231], textColor:0, fontStyle:'bold', fontSize:9 },
-      columnStyles: { 2:{halign:'right'} },
+      foot: [['', 'TOTAL INGRESOS', Qp(totIng)]],
+      headStyles: tblHead, bodyStyles: tblBody, footStyles: tblTotal,
+      alternateRowStyles: tblAlt, columnStyles: col, margin:{left:14,right:14},
+      theme: 'plain',
     })
-    // Encabezado GASTOS
-    let y = doc.lastAutoTable.finalY + 8
-    doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setFillColor(234,88,12); doc.setTextColor(255,255,255)
-    doc.rect(14, y, 182, 6, 'F')
-    doc.text('GASTOS', 16, y+4.2)
-    doc.setTextColor(0); y += 8
-    // Un bloque por grupo
+
+    // ── GASTOS por grupo ──────────────────────────────────────────
+    let y = doc.lastAutoTable.finalY + 6
+    // Encabezado sección GASTOS
+    doc.setFillColor(30,41,59); doc.rect(14, y, 182, 7, 'F')
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(255,255,255)
+    doc.text('COSTOS Y GASTOS', 18, y+4.8)
+    y += 9
+
     gruposGastos.forEach(({ label, cuentas: gc }) => {
       const filas = gc.filter(c=>getSaldo(c)!==0)
       if (!filas.length) return
       const subTotal = gc.reduce((s,c)=>s+getSaldo(c),0)
       autoTable(doc, {
         startY: y,
-        head: [[{ content: label, colSpan:3, styles:{ fillColor:[60,60,60], textColor:220, fontSize:8, fontStyle:'bold' } }]],
+        head: [[{ content: label.toUpperCase(), colSpan:3, styles: tblGroup }]],
         body: filas.map(c=>[c.codigo, c.nombre, Qp(getSaldo(c))]),
-        foot: [['','Subtotal '+label, Qp(subTotal)]],
-        headStyles: { fontSize:8 },
-        bodyStyles: { fontSize:8 },
-        footStyles: { fillColor:[245,245,245], textColor:80, fontStyle:'bold', fontSize:8 },
-        columnStyles: { 2:{halign:'right'} },
-        margin: { left:14, right:14 },
+        foot: [['', `Subtotal ${label}`, Qp(subTotal)]],
+        headStyles: tblGroup, bodyStyles: tblBody, footStyles: tblFoot,
+        alternateRowStyles: tblAlt, columnStyles: col, margin:{left:14,right:14},
+        theme: 'plain',
       })
-      y = doc.lastAutoTable.finalY + 4
+      y = doc.lastAutoTable.finalY + 3
     })
+
     // Total Gastos
-    doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setFillColor(254,226,226); doc.setTextColor(0)
-    doc.rect(14, y, 182, 6, 'F')
-    doc.text('Total Gastos', 16, y+4.2)
-    doc.text(Qp(totGas), 196, y+4.2, { align:'right' })
-    y += 12
-    // Utilidad
-    doc.setFontSize(11); doc.setFont('helvetica','bold')
-    doc.setTextColor(utilidad>=0 ? 22:220, utilidad>=0 ? 163:38, utilidad>=0 ? 74:38)
-    doc.text(utilidad>=0 ? 'UTILIDAD DEL EJERCICIO' : 'PÉRDIDA DEL EJERCICIO', 14, y)
-    doc.text(Qp(Math.abs(utilidad)), 196, y, { align:'right' })
+    doc.setFillColor(226,232,240); doc.rect(14, y, 182, 8, 'F')
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(15,23,42)
+    doc.text('TOTAL GASTOS', 18, y+5.2)
+    doc.text(Qp(totGas), 198, y+5.2, { align:'right' })
+    y += 14
+
+    // ── RESULTADO ─────────────────────────────────────────────────
+    const esUtil = utilidad >= 0
+    doc.setFillColor(esUtil ? 240:254, esUtil ? 253:242, esUtil ? 244:242)
+    doc.rect(14, y, 182, 10, 'F')
+    doc.setDrawColor(esUtil ? 21:185, esUtil ? 128:28, esUtil ? 61:28)
+    doc.setLineWidth(0.3); doc.rect(14, y, 182, 10, 'S')
+    doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(15,23,42)
+    doc.text(esUtil ? 'UTILIDAD DEL EJERCICIO' : 'PÉRDIDA DEL EJERCICIO', 18, y+6.5)
+    doc.setTextColor(esUtil ? 21:185, esUtil ? 128:28, esUtil ? 61:28)
+    doc.text(Qp(Math.abs(utilidad)), 198, y+6.5, { align:'right' })
+
     doc.save(`estado-resultados-${ano}.pdf`)
   }
 
@@ -1384,7 +1413,7 @@ function ResultadosTab({ cuentas, asientos }) {
 
 // ── MÓDULO 7: BALANCE GENERAL ─────────────────────────────────────────────────
 
-function BalanceTab({ cuentas, asientos }) {
+function BalanceTab({ cuentas, asientos, empresaNombre = '' }) {
   const anos = [...new Set(asientos.map(a => new Date(a.fecha+'T00:00:00').getFullYear()))].sort((a,b)=>b-a)
   const hoy  = new Date().getFullYear()
   const [ano, setAno] = useState(() => anos.includes(hoy) ? hoy : (anos[0] || hoy))
@@ -1458,44 +1487,53 @@ function BalanceTab({ cuentas, asientos }) {
     <div style={{ maxWidth:'580px' }}>
       <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:'16px' }}>
         <button onClick={() => {
-          const doc = initPDF('Balance General', `Enero – Diciembre ${ano}`)
+          const doc = initPDF('BALANCE GENERAL', `Al 31 de diciembre de ${ano}`, empresaNombre)
+          const col = { 0:{cellWidth:18}, 1:{cellWidth:'auto'}, 2:{cellWidth:38, halign:'right'} }
+
+          // ACTIVOS
           autoTable(doc, {
-            startY: 36,
-            head: [['ACTIVOS','','']],
+            startY: 47,
+            head: [['CÓD.', 'ACTIVOS', 'SALDO']],
             body: cActivos.filter(c=>getSaldo(c)!==0).map(c=>[c.codigo, c.nombre, Qp(getSaldo(c))]),
-            foot: [['','Total Activos', Qp(totAct)]],
-            headStyles: { fillColor:[22,163,74], fontSize:9 },
-            bodyStyles: { fontSize:8 },
-            footStyles: { fillColor:[220,252,231], textColor:0, fontStyle:'bold', fontSize:9 },
-            columnStyles: { 2:{halign:'right'} },
+            foot: [['', 'TOTAL ACTIVOS', Qp(totAct)]],
+            headStyles: tblHead, bodyStyles: tblBody, footStyles: tblTotal,
+            alternateRowStyles: tblAlt, columnStyles: col, margin:{left:14,right:14},
+            theme: 'plain',
           })
+          // PASIVOS
           autoTable(doc, {
-            startY: doc.lastAutoTable.finalY + 8,
-            head: [['PASIVOS','','']],
+            startY: doc.lastAutoTable.finalY + 6,
+            head: [['CÓD.', 'PASIVOS', 'SALDO']],
             body: cPasivos.filter(c=>getSaldo(c)!==0).map(c=>[c.codigo, c.nombre, Qp(getSaldo(c))]),
-            foot: [['','Total Pasivos', Qp(totPas)]],
-            headStyles: { fillColor:[220,38,38], fontSize:9 },
-            bodyStyles: { fontSize:8 },
-            footStyles: { fillColor:[254,226,226], textColor:0, fontStyle:'bold', fontSize:9 },
-            columnStyles: { 2:{halign:'right'} },
+            foot: [['', 'TOTAL PASIVOS', Qp(totPas)]],
+            headStyles: tblHead, bodyStyles: tblBody, footStyles: tblTotal,
+            alternateRowStyles: tblAlt, columnStyles: col, margin:{left:14,right:14},
+            theme: 'plain',
           })
+          // CAPITAL
           autoTable(doc, {
-            startY: doc.lastAutoTable.finalY + 8,
-            head: [['CAPITAL','','']],
+            startY: doc.lastAutoTable.finalY + 6,
+            head: [['CÓD.', 'CAPITAL', 'SALDO']],
             body: [
               ...cCapital.filter(c=>getSaldo(c)!==0).map(c=>[c.codigo, c.nombre, Qp(getSaldo(c))]),
-              ['—', utilidad>=0 ? 'Utilidad del ejercicio':'Pérdida del ejercicio', Qp(utilidad)],
+              ['—', utilidad>=0 ? 'Utilidad del ejercicio' : 'Pérdida del ejercicio', Qp(utilidad)],
             ],
-            foot: [['','Total Capital', Qp(totCap+utilidad)]],
-            headStyles: { fillColor:[124,58,237], fontSize:9 },
-            bodyStyles: { fontSize:8 },
-            footStyles: { fillColor:[237,233,254], textColor:0, fontStyle:'bold', fontSize:9 },
-            columnStyles: { 2:{halign:'right'} },
+            foot: [['', 'TOTAL CAPITAL', Qp(totCap+utilidad)]],
+            headStyles: tblHead, bodyStyles: tblBody, footStyles: tblTotal,
+            alternateRowStyles: tblAlt, columnStyles: col, margin:{left:14,right:14},
+            theme: 'plain',
           })
-          const y2 = doc.lastAutoTable.finalY + 10
-          doc.setFontSize(9); doc.setFont('helvetica','bold')
-          doc.setTextColor(cuadra ? 22:220, cuadra ? 163:38, cuadra ? 74:38)
-          doc.text(`Activos = Pasivos + Capital: ${cuadra ? 'CUADRA ✓':'NO CUADRA ✗'}`, 14, y2)
+          // Verificación cuadre
+          const yv = doc.lastAutoTable.finalY + 8
+          doc.setFillColor(cuadra ? 240:254, cuadra ? 253:242, cuadra ? 244:242)
+          doc.rect(14, yv, 182, 8, 'F')
+          doc.setFont('helvetica','bold'); doc.setFontSize(8.5)
+          doc.setTextColor(cuadra ? 21:185, cuadra ? 128:28, cuadra ? 61:28)
+          doc.text(`Activos = Pasivos + Capital: ${cuadra ? 'CUADRA ✓' : 'NO CUADRA ✗'}`, 18, yv+5)
+          doc.setTextColor(100,116,139)
+          doc.setFont('helvetica','normal'); doc.setFontSize(7.5)
+          doc.text(`Activos: ${Qp(totAct)}    Pas + Cap: ${Qp(totPasCap)}`, 198, yv+5, { align:'right' })
+
           doc.save(`balance-general-${ano}.pdf`)
         }} style={{ padding:'7px 14px', borderRadius:'8px', border:'1.5px solid var(--accent)', background:'transparent', color:'var(--accent)', fontWeight:'600', fontSize:'12px', cursor:'pointer' }}>Descargar PDF</button>
       </div>
@@ -1856,7 +1894,7 @@ function CuentaSearch({ cuentas, value, onChange, style, onAddNueva }) {
   )
 }
 
-export default function ContabilidadCompleta({ userId, empresaId }) {
+export default function ContabilidadCompleta({ userId, empresaId, empresaNombre = '' }) {
   const [tab,       setTab]       = useState(() => localStorage.getItem('cc_tab') || 'DIARIO')
   const [cuentas,   setCuentas]   = useState([])
   const [asientos,  setAsientos]  = useState([])
@@ -1920,8 +1958,8 @@ export default function ContabilidadCompleta({ userId, empresaId }) {
       {tab==='VENTAS'     && <LibroTab    tipo="VENTA"  asientos={asientos} />}
       {tab==='COMPRAS'    && <LibroTab    tipo="COMPRA" asientos={asientos} />}
       {tab==='MAYOR'      && <MayorTab    cuentas={cuentas}  asientos={asientos} />}
-      {tab==='RESULTADOS' && <ResultadosTab cuentas={cuentas} asientos={asientos} />}
-      {tab==='BALANCE'    && <BalanceTab   cuentas={cuentas} asientos={asientos} />}
+      {tab==='RESULTADOS' && <ResultadosTab cuentas={cuentas} asientos={asientos} empresaNombre={empresaNombre} />}
+      {tab==='BALANCE'    && <BalanceTab   cuentas={cuentas} asientos={asientos} empresaNombre={empresaNombre} />}
       {tab==='BITACORA'   && <BitacoraTab  auditoria={auditoria} cuentas={cuentas} />}
     </div>
   )

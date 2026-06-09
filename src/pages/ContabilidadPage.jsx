@@ -1637,7 +1637,7 @@ export default function ContabilidadPage({ user }) {
             <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-1)' }}>{empresaActual.nombre}</span>
           </div>
 
-          <ContabilidadCompleta userId={user?.id} empresaId={empresaActual.id} />
+          <ContabilidadCompleta userId={user?.id} empresaId={empresaActual.id} empresaNombre={empresaActual.nombre} />
         </div>
       )}
     </div>
