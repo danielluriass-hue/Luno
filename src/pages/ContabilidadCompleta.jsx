@@ -1112,7 +1112,7 @@ function LibroTab({ tipo, asientos }) {
 
 // ── MÓDULO 5: LIBRO MAYOR ────────────────────────────────────────────────────
 
-function MayorTab({ cuentas, asientos }) {
+function MayorTab({ cuentas, asientos, empresaNombre = '' }) {
   const [expanded, setExpanded] = useState(null)
   const activos = asientos.filter(a=>a.estado==='ACTIVO')
 
@@ -1152,28 +1152,25 @@ function MayorTab({ cuentas, asientos }) {
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px' }}>
         <div style={{ fontSize:'13px', color:'var(--text-muted)' }}>Saldos acumulados — solo asientos activos. Haz clic en una cuenta para ver movimientos.</div>
         <button onClick={() => {
-          const doc = initPDF('Libro Mayor', 'Acumulado — todos los períodos')
-          let y = 36
-          rows.forEach((r, idx) => {
-            if (idx > 0 && y > 230) { doc.addPage(); y = 14 }
-            doc.setFontSize(9); doc.setFont('helvetica','bold')
-            doc.setTextColor(88,86,214)
-            doc.text(`${r.cuenta.codigo} — ${r.cuenta.nombre} (${r.cuenta.tipo})`, 14, y)
-            doc.setTextColor(0)
-            y += 3
-            const movRows = r.movs.sort((a,b)=>a.fecha.localeCompare(b.fecha)).map(m=>[m.fecha, m.desc, m.deb>0?Qp(m.deb):'–', m.cre>0?Qp(m.cre):'–'])
+          const doc = initPDF('LIBRO MAYOR', 'Saldos acumulados — asientos activos', empresaNombre)
+          const colMov = { 0:{cellWidth:24}, 1:{cellWidth:'auto'}, 2:{cellWidth:36, halign:'right'}, 3:{cellWidth:36, halign:'right'} }
+          let y = 47
+          rows.forEach((r) => {
+            if (y > 240) { doc.addPage(); y = 14 }
+            const saldo = getSaldo(r)
+            const movRows = r.movs.sort((a,b)=>a.fecha.localeCompare(b.fecha)).map(m=>[m.fecha||'', m.desc, m.deb>0?Qp(m.deb):'–', m.cre>0?Qp(m.cre):'–'])
             autoTable(doc, {
               startY: y,
-              head: [['Fecha','Descripción','Debe','Haber']],
+              head: [[{ content: `${r.cuenta.codigo}   ${r.cuenta.nombre}`, colSpan:3, styles: tblGroup },
+                      { content: r.cuenta.tipo, styles:{ ...tblGroup, halign:'right', fontStyle:'normal', fontSize:7 } }]],
               body: movRows,
-              foot: [['','Saldo acumulado', Qp(r.deb), Qp(r.cre)]],
-              headStyles: { fillColor:[88,86,214], fontSize:7 },
-              bodyStyles: { fontSize:7 },
-              footStyles: { fillColor:[235,233,255], textColor:0, fontStyle:'bold', fontSize:7 },
-              columnStyles: { 2:{halign:'right'}, 3:{halign:'right'} },
-              margin: { left:14, right:14 },
+              foot: [['', 'SALDO', Qp(Math.abs(saldo)) + (saldo < 0 ? ' CR' : ''), '']],
+              headStyles: tblGroup, bodyStyles: { ...tblBody, fontSize:7.5 },
+              footStyles: { ...tblFoot, fontSize:7.5 },
+              alternateRowStyles: tblAlt, columnStyles: colMov,
+              margin: { left:14, right:14 }, theme:'plain',
             })
-            y = doc.lastAutoTable.finalY + 8
+            y = doc.lastAutoTable.finalY + 5
           })
           doc.save('libro-mayor.pdf')
         }} style={{ padding:'7px 14px', borderRadius:'8px', border:'1.5px solid var(--accent)', background:'transparent', color:'var(--accent)', fontWeight:'600', fontSize:'12px', cursor:'pointer' }}>Descargar PDF</button>
@@ -1274,26 +1271,27 @@ function ResultadosTab({ cuentas, asientos, empresaNombre = '' }) {
 
   const descargarPDF = () => {
     const doc = initPDF('ESTADO DE RESULTADOS', `Período: 1 de enero al 31 de diciembre de ${ano}`, empresaNombre)
-    const col = { 0:{cellWidth:18}, 1:{cellWidth:'auto'}, 2:{cellWidth:38, halign:'right'} }
+    const col = { 0:{cellWidth:24}, 2:{cellWidth:46, halign:'right'} }
 
     // ── INGRESOS ──────────────────────────────────────────────────
     autoTable(doc, {
       startY: 47,
-      head: [['CÓD.', 'INGRESOS', 'MONTO']],
+      head: [[{ content: 'INGRESOS', colSpan:3, styles: tblHead }]],
       body: ingresos.filter(c=>getSaldo(c)!==0).map(c=>[c.codigo, c.nombre, Qp(getSaldo(c))]),
       foot: [['', 'TOTAL INGRESOS', Qp(totIng)]],
       headStyles: tblHead, bodyStyles: tblBody, footStyles: tblTotal,
-      alternateRowStyles: tblAlt, columnStyles: col, margin:{left:14,right:14},
-      theme: 'plain',
+      alternateRowStyles: tblAlt, columnStyles: col, margin:{left:14,right:14}, theme:'plain',
     })
 
     // ── GASTOS por grupo ──────────────────────────────────────────
-    let y = doc.lastAutoTable.finalY + 6
-    // Encabezado sección GASTOS
-    doc.setFillColor(30,41,59); doc.rect(14, y, 182, 7, 'F')
-    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(255,255,255)
-    doc.text('COSTOS Y GASTOS', 18, y+4.8)
-    y += 9
+    let y = doc.lastAutoTable.finalY + 5
+    autoTable(doc, {
+      startY: y,
+      head: [[{ content: 'COSTOS Y GASTOS', colSpan:3, styles: tblHead }]],
+      body: [], headStyles: tblHead, margin:{left:14,right:14}, theme:'plain',
+      tableLineWidth: 0,
+    })
+    y = doc.lastAutoTable.finalY
 
     gruposGastos.forEach(({ label, cuentas: gc }) => {
       const filas = gc.filter(c=>getSaldo(c)!==0)
@@ -1301,17 +1299,17 @@ function ResultadosTab({ cuentas, asientos, empresaNombre = '' }) {
       const subTotal = gc.reduce((s,c)=>s+getSaldo(c),0)
       autoTable(doc, {
         startY: y,
-        head: [[{ content: label.toUpperCase(), colSpan:3, styles: tblGroup }]],
+        head: [[{ content: label, colSpan:3, styles: tblGroup }]],
         body: filas.map(c=>[c.codigo, c.nombre, Qp(getSaldo(c))]),
         foot: [['', `Subtotal ${label}`, Qp(subTotal)]],
         headStyles: tblGroup, bodyStyles: tblBody, footStyles: tblFoot,
-        alternateRowStyles: tblAlt, columnStyles: col, margin:{left:14,right:14},
-        theme: 'plain',
+        alternateRowStyles: tblAlt, columnStyles: col, margin:{left:14,right:14}, theme:'plain',
       })
-      y = doc.lastAutoTable.finalY + 3
+      y = doc.lastAutoTable.finalY + 2
     })
 
     // Total Gastos
+    y += 2
     doc.setFillColor(226,232,240); doc.rect(14, y, 182, 8, 'F')
     doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(15,23,42)
     doc.text('TOTAL GASTOS', 18, y+5.2)
@@ -1488,40 +1486,37 @@ function BalanceTab({ cuentas, asientos, empresaNombre = '' }) {
       <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:'16px' }}>
         <button onClick={() => {
           const doc = initPDF('BALANCE GENERAL', `Al 31 de diciembre de ${ano}`, empresaNombre)
-          const col = { 0:{cellWidth:18}, 1:{cellWidth:'auto'}, 2:{cellWidth:38, halign:'right'} }
+          const colB = { 0:{cellWidth:24}, 2:{cellWidth:46, halign:'right'} }
 
           // ACTIVOS
           autoTable(doc, {
             startY: 47,
-            head: [['CÓD.', 'ACTIVOS', 'SALDO']],
+            head: [[{ content: 'ACTIVOS', colSpan:3, styles: tblHead }]],
             body: cActivos.filter(c=>getSaldo(c)!==0).map(c=>[c.codigo, c.nombre, Qp(getSaldo(c))]),
             foot: [['', 'TOTAL ACTIVOS', Qp(totAct)]],
             headStyles: tblHead, bodyStyles: tblBody, footStyles: tblTotal,
-            alternateRowStyles: tblAlt, columnStyles: col, margin:{left:14,right:14},
-            theme: 'plain',
+            alternateRowStyles: tblAlt, columnStyles: colB, margin:{left:14,right:14}, theme:'plain',
           })
           // PASIVOS
           autoTable(doc, {
             startY: doc.lastAutoTable.finalY + 6,
-            head: [['CÓD.', 'PASIVOS', 'SALDO']],
+            head: [[{ content: 'PASIVOS', colSpan:3, styles: tblHead }]],
             body: cPasivos.filter(c=>getSaldo(c)!==0).map(c=>[c.codigo, c.nombre, Qp(getSaldo(c))]),
             foot: [['', 'TOTAL PASIVOS', Qp(totPas)]],
             headStyles: tblHead, bodyStyles: tblBody, footStyles: tblTotal,
-            alternateRowStyles: tblAlt, columnStyles: col, margin:{left:14,right:14},
-            theme: 'plain',
+            alternateRowStyles: tblAlt, columnStyles: col, margin:{left:14,right:14}, theme:'plain',
           })
           // CAPITAL
           autoTable(doc, {
             startY: doc.lastAutoTable.finalY + 6,
-            head: [['CÓD.', 'CAPITAL', 'SALDO']],
+            head: [[{ content: 'CAPITAL', colSpan:3, styles: tblHead }]],
             body: [
               ...cCapital.filter(c=>getSaldo(c)!==0).map(c=>[c.codigo, c.nombre, Qp(getSaldo(c))]),
-              ['—', utilidad>=0 ? 'Utilidad del ejercicio' : 'Pérdida del ejercicio', Qp(utilidad)],
+              [{ content:'—', styles:{textColor:[150,150,150]} }, utilidad>=0 ? 'Utilidad del ejercicio' : 'Pérdida del ejercicio', Qp(utilidad)],
             ],
             foot: [['', 'TOTAL CAPITAL', Qp(totCap+utilidad)]],
             headStyles: tblHead, bodyStyles: tblBody, footStyles: tblTotal,
-            alternateRowStyles: tblAlt, columnStyles: col, margin:{left:14,right:14},
-            theme: 'plain',
+            alternateRowStyles: tblAlt, columnStyles: col, margin:{left:14,right:14}, theme:'plain',
           })
           // Verificación cuadre
           const yv = doc.lastAutoTable.finalY + 8
@@ -1530,9 +1525,8 @@ function BalanceTab({ cuentas, asientos, empresaNombre = '' }) {
           doc.setFont('helvetica','bold'); doc.setFontSize(8.5)
           doc.setTextColor(cuadra ? 21:185, cuadra ? 128:28, cuadra ? 61:28)
           doc.text(`Activos = Pasivos + Capital: ${cuadra ? 'CUADRA ✓' : 'NO CUADRA ✗'}`, 18, yv+5)
-          doc.setTextColor(100,116,139)
-          doc.setFont('helvetica','normal'); doc.setFontSize(7.5)
-          doc.text(`Activos: ${Qp(totAct)}    Pas + Cap: ${Qp(totPasCap)}`, 198, yv+5, { align:'right' })
+          doc.setTextColor(100,116,139); doc.setFont('helvetica','normal'); doc.setFontSize(7.5)
+          doc.text(`Activos: ${Qp(totAct)}   Pas + Cap: ${Qp(totPasCap)}`, 198, yv+5, { align:'right' })
 
           doc.save(`balance-general-${ano}.pdf`)
         }} style={{ padding:'7px 14px', borderRadius:'8px', border:'1.5px solid var(--accent)', background:'transparent', color:'var(--accent)', fontWeight:'600', fontSize:'12px', cursor:'pointer' }}>Descargar PDF</button>
@@ -1957,7 +1951,7 @@ export default function ContabilidadCompleta({ userId, empresaId, empresaNombre 
       {tab==='DIARIO'     && <DiarioTab   cuentas={cuentas}  asientos={asientos} onReload={load} userId={userId} empresaId={empresaId} />}
       {tab==='VENTAS'     && <LibroTab    tipo="VENTA"  asientos={asientos} />}
       {tab==='COMPRAS'    && <LibroTab    tipo="COMPRA" asientos={asientos} />}
-      {tab==='MAYOR'      && <MayorTab    cuentas={cuentas}  asientos={asientos} />}
+      {tab==='MAYOR'      && <MayorTab    cuentas={cuentas}  asientos={asientos} empresaNombre={empresaNombre} />}
       {tab==='RESULTADOS' && <ResultadosTab cuentas={cuentas} asientos={asientos} empresaNombre={empresaNombre} />}
       {tab==='BALANCE'    && <BalanceTab   cuentas={cuentas} asientos={asientos} empresaNombre={empresaNombre} />}
       {tab==='BITACORA'   && <BitacoraTab  auditoria={auditoria} cuentas={cuentas} />}
