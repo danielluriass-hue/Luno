@@ -1212,67 +1212,132 @@ function ResultadosTab({ cuentas, asientos }) {
   const totGas   = gastos.reduce((s,c)=>s+getSaldo(c),0)
   const utilidad = totIng - totGas
 
+  // Agrupar gastos por subtipo, ordenando grupos por el primer código de cuenta
+  const gruposMap = {}
+  gastos.forEach(c => {
+    const g = c.subtipo || 'Otros'
+    if (!gruposMap[g]) gruposMap[g] = { cuentas:[], minCodigo: c.codigo }
+    gruposMap[g].cuentas.push(c)
+    if (c.codigo < gruposMap[g].minCodigo) gruposMap[g].minCodigo = c.codigo
+  })
+  const gruposGastos = Object.entries(gruposMap)
+    .sort((a,b) => a[1].minCodigo.localeCompare(b[1].minCodigo))
+    .map(([label, { cuentas }]) => ({ label, cuentas }))
+
   const Fila = ({ c }) => { const saldo=getSaldo(c); if (!saldo) return null; return (
     <tr style={{ borderBottom:'1px solid var(--border)' }}>
-      <td style={{ padding:'7px 12px', fontSize:'12px', color:'var(--text-muted)', fontFamily:'monospace' }}>{c.codigo}</td>
-      <td style={{ padding:'7px 12px', fontSize:'13px' }}>{c.nombre}</td>
-      <td style={{ padding:'7px 12px', fontSize:'13px', textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{Q(saldo)}</td>
+      <td style={{ padding:'6px 12px', fontSize:'12px', color:'var(--text-muted)', fontFamily:'monospace' }}>{c.codigo}</td>
+      <td style={{ padding:'6px 12px', fontSize:'13px' }}>{c.nombre}</td>
+      <td style={{ padding:'6px 12px', fontSize:'13px', textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{Q(saldo)}</td>
     </tr>
   )}
+
+  const descargarPDF = () => {
+    const doc = initPDF('Estado de Resultados', 'Acumulado — todos los períodos')
+    // Ingresos
+    autoTable(doc, {
+      startY: 36,
+      head: [['INGRESOS','','']],
+      body: ingresos.filter(c=>getSaldo(c)!==0).map(c=>[c.codigo, c.nombre, Qp(getSaldo(c))]),
+      foot: [['','Total Ingresos', Qp(totIng)]],
+      headStyles: { fillColor:[22,163,74], fontSize:9 },
+      bodyStyles: { fontSize:8 },
+      footStyles: { fillColor:[220,252,231], textColor:0, fontStyle:'bold', fontSize:9 },
+      columnStyles: { 2:{halign:'right'} },
+    })
+    // Encabezado GASTOS
+    let y = doc.lastAutoTable.finalY + 8
+    doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setFillColor(234,88,12); doc.setTextColor(255,255,255)
+    doc.rect(14, y, 182, 6, 'F')
+    doc.text('GASTOS', 16, y+4.2)
+    doc.setTextColor(0); y += 8
+    // Un bloque por grupo
+    gruposGastos.forEach(({ label, cuentas: gc }) => {
+      const filas = gc.filter(c=>getSaldo(c)!==0)
+      if (!filas.length) return
+      const subTotal = gc.reduce((s,c)=>s+getSaldo(c),0)
+      autoTable(doc, {
+        startY: y,
+        head: [[{ content: label, colSpan:3, styles:{ fillColor:[60,60,60], textColor:220, fontSize:8, fontStyle:'bold' } }]],
+        body: filas.map(c=>[c.codigo, c.nombre, Qp(getSaldo(c))]),
+        foot: [['','Subtotal '+label, Qp(subTotal)]],
+        headStyles: { fontSize:8 },
+        bodyStyles: { fontSize:8 },
+        footStyles: { fillColor:[245,245,245], textColor:80, fontStyle:'bold', fontSize:8 },
+        columnStyles: { 2:{halign:'right'} },
+        margin: { left:14, right:14 },
+      })
+      y = doc.lastAutoTable.finalY + 4
+    })
+    // Total Gastos
+    doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setFillColor(254,226,226); doc.setTextColor(0)
+    doc.rect(14, y, 182, 6, 'F')
+    doc.text('Total Gastos', 16, y+4.2)
+    doc.text(Qp(totGas), 196, y+4.2, { align:'right' })
+    y += 12
+    // Utilidad
+    doc.setFontSize(11); doc.setFont('helvetica','bold')
+    doc.setTextColor(utilidad>=0 ? 22:220, utilidad>=0 ? 163:38, utilidad>=0 ? 74:38)
+    doc.text(utilidad>=0 ? 'UTILIDAD DEL EJERCICIO' : 'PÉRDIDA DEL EJERCICIO', 14, y)
+    doc.text(Qp(Math.abs(utilidad)), 196, y, { align:'right' })
+    doc.save('estado-resultados.pdf')
+  }
 
   return (
     <div style={{ maxWidth:'580px' }}>
       <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:'16px' }}>
-        <button onClick={() => {
-          const doc = initPDF('Estado de Resultados', 'Acumulado — todos los períodos')
-          autoTable(doc, {
-            startY: 36,
-            head: [['INGRESOS','','']],
-            body: ingresos.filter(c=>getSaldo(c)!==0).map(c=>[c.codigo, c.nombre, Qp(getSaldo(c))]),
-            foot: [['','Total Ingresos', Qp(totIng)]],
-            headStyles: { fillColor:[22,163,74], fontSize:9 },
-            bodyStyles: { fontSize:8 },
-            footStyles: { fillColor:[220,252,231], textColor:0, fontStyle:'bold', fontSize:9 },
-            columnStyles: { 2:{halign:'right'} },
-          })
-          autoTable(doc, {
-            startY: doc.lastAutoTable.finalY + 8,
-            head: [['GASTOS','','']],
-            body: gastos.filter(c=>getSaldo(c)!==0).map(c=>[c.codigo, c.nombre, Qp(getSaldo(c))]),
-            foot: [['','Total Gastos', Qp(totGas)]],
-            headStyles: { fillColor:[234,88,12], fontSize:9 },
-            bodyStyles: { fontSize:8 },
-            footStyles: { fillColor:[254,226,226], textColor:0, fontStyle:'bold', fontSize:9 },
-            columnStyles: { 2:{halign:'right'} },
-          })
-          const y2 = doc.lastAutoTable.finalY + 12
-          doc.setFontSize(11); doc.setFont('helvetica','bold')
-          doc.setTextColor(utilidad>=0 ? 22:220, utilidad>=0 ? 163:38, utilidad>=0 ? 74:38)
-          doc.text(utilidad>=0 ? 'UTILIDAD DEL EJERCICIO' : 'PÉRDIDA DEL EJERCICIO', 14, y2)
-          doc.text(Qp(Math.abs(utilidad)), 196, y2, { align:'right' })
-          doc.save('estado-resultados.pdf')
-        }} style={{ padding:'7px 14px', borderRadius:'8px', border:'1.5px solid var(--accent)', background:'transparent', color:'var(--accent)', fontWeight:'600', fontSize:'12px', cursor:'pointer' }}>Descargar PDF</button>
+        <button onClick={descargarPDF} style={{ padding:'7px 14px', borderRadius:'8px', border:'1.5px solid var(--accent)', background:'transparent', color:'var(--accent)', fontWeight:'600', fontSize:'12px', cursor:'pointer' }}>Descargar PDF</button>
       </div>
       <div style={{ textAlign:'center', marginBottom:'24px' }}>
         <div style={{ fontSize:'15px', fontWeight:'700', color:'var(--text-1)', textTransform:'uppercase', letterSpacing:'0.04em' }}>Estado de Resultados</div>
         <div style={{ fontSize:'12px', color:'var(--text-muted)' }}>Acumulado — todos los períodos</div>
       </div>
 
-      {[{ label:'Ingresos', rows:ingresos, tot:totIng, color:'#16a34a' },
-        { label:'Gastos',   rows:gastos,   tot:totGas, color:'#ea580c' }].map(({ label, rows, tot, color }) => (
-        <div key={label} style={{ marginBottom:'20px' }}>
-          <div style={{ fontSize:'11px', fontWeight:'700', color, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:'8px', padding:'0 12px' }}>{label}</div>
-          <table style={{ width:'100%', borderCollapse:'collapse' }}>
-            <tbody>{rows.map(c=><Fila key={c.id} c={c} />)}</tbody>
-            <tfoot>
-              <tr style={{ borderTop:'2px solid var(--border)', background:'var(--inner-bg)' }}>
-                <td colSpan={2} style={{ padding:'8px 12px', fontSize:'13px', fontWeight:'700' }}>Total {label}</td>
-                <td style={{ padding:'8px 12px', fontSize:'14px', fontWeight:'700', textAlign:'right', color }}>{Q(tot)}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      ))}
+      {/* INGRESOS — lista plana */}
+      <div style={{ marginBottom:'20px' }}>
+        <div style={{ fontSize:'11px', fontWeight:'700', color:'#16a34a', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:'8px', padding:'0 12px' }}>Ingresos</div>
+        <table style={{ width:'100%', borderCollapse:'collapse' }}>
+          <tbody>{ingresos.map(c=><Fila key={c.id} c={c} />)}</tbody>
+          <tfoot>
+            <tr style={{ borderTop:'2px solid var(--border)', background:'var(--inner-bg)' }}>
+              <td colSpan={2} style={{ padding:'8px 12px', fontSize:'13px', fontWeight:'700' }}>Total Ingresos</td>
+              <td style={{ padding:'8px 12px', fontSize:'14px', fontWeight:'700', textAlign:'right', color:'#16a34a' }}>{Q(totIng)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      {/* GASTOS — agrupados por subtipo */}
+      <div style={{ marginBottom:'20px' }}>
+        <div style={{ fontSize:'11px', fontWeight:'700', color:'#ea580c', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:'8px', padding:'0 12px' }}>Gastos</div>
+        {gruposGastos.map(({ label, cuentas: gc }) => {
+          const subTotal = gc.reduce((s,c)=>s+getSaldo(c),0)
+          const filas = gc.filter(c=>getSaldo(c)!==0)
+          if (!filas.length) return null
+          return (
+            <div key={label} style={{ marginBottom:'12px' }}>
+              <div style={{ fontSize:'11px', fontWeight:'600', color:'var(--text-muted)', padding:'5px 12px', background:'var(--inner-bg)', borderRadius:'6px', marginBottom:'2px' }}>{label}</div>
+              <table style={{ width:'100%', borderCollapse:'collapse' }}>
+                <tbody>{gc.map(c=><Fila key={c.id} c={c} />)}</tbody>
+                <tfoot>
+                  <tr style={{ borderTop:'1px solid var(--border)' }}>
+                    <td colSpan={2} style={{ padding:'6px 12px', fontSize:'12px', color:'var(--text-muted)' }}>Subtotal {label}</td>
+                    <td style={{ padding:'6px 12px', fontSize:'12px', fontWeight:'600', textAlign:'right', color:'var(--text-muted)', fontVariantNumeric:'tabular-nums' }}>{Q(subTotal)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )
+        })}
+        <table style={{ width:'100%', borderCollapse:'collapse' }}>
+          <tfoot>
+            <tr style={{ borderTop:'2px solid var(--border)', background:'var(--inner-bg)' }}>
+              <td colSpan={2} style={{ padding:'8px 12px', fontSize:'13px', fontWeight:'700' }}>Total Gastos</td>
+              <td style={{ padding:'8px 12px', fontSize:'14px', fontWeight:'700', textAlign:'right', color:'#ea580c' }}>{Q(totGas)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
 
       <div style={{ padding:'18px', borderRadius:'12px', background: utilidad>=0 ? '#dcfce720':'#fee2e220', border:`1.5px solid ${utilidad>=0 ? '#16a34a40':'#dc262640'}` }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
