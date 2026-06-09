@@ -288,7 +288,16 @@ function CatalogTab({ cuentas, onReload, userId, empresaId }) {
 
   const handleBulkDelete = async () => {
     const ids = [...seleccionados]
-    await supabase.from('conta_cuentas').delete().in('id', ids)
+    const { error } = await supabase.from('conta_cuentas').delete().in('id', ids)
+    if (error) {
+      if (error.message?.includes('foreign key') || error.code === '23503') {
+        alert('Algunas cuentas tienen movimientos registrados y no se pueden eliminar. Elimina primero los asientos que las usan.')
+      } else {
+        alert('Error al eliminar: ' + error.message)
+      }
+      setConfirmBulk(false)
+      return
+    }
     setSelec(new Set()); setConfirmBulk(false); onReload()
   }
 
@@ -595,7 +604,14 @@ function DiarioTab({ cuentas, asientos, onReload, userId, empresaId }) {
         </thead>
         <tbody>
           {filtered.length === 0 && (
-            <tr><td colSpan={7} style={{ padding:'36px', textAlign:'center', color:'var(--text-muted)', fontSize:'13px' }}>Sin asientos en este período</td></tr>
+            <tr><td colSpan={7} style={{ padding:'36px', textAlign:'center', color:'var(--text-muted)', fontSize:'13px' }}>
+              Sin asientos en este período
+              {asientos.length > 0 && (
+                <div style={{ marginTop:'6px', fontSize:'12px', color:'var(--accent)' }}>
+                  Hay {asientos.length} asiento{asientos.length > 1 ? 's' : ''} en otros períodos — cambia el mes para verlos
+                </div>
+              )}
+            </td></tr>
           )}
           {filtered.map(a => (
             <Fragment key={a.id}>
