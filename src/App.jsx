@@ -27,6 +27,81 @@ const BOTTOM_NAV = [
   { key: 'MEJORAS', label: 'Mejoras', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> },
 ]
 
+const PRESUPUESTO_PIN = '180497'
+
+const INACTIVITY_MS = 60_000
+
+function PresupuestoGate({ children }) {
+  const [unlocked, setUnlocked] = useState(() => sessionStorage.getItem('presupuesto_ok') === '1')
+  const [input, setInput] = useState('')
+  const [error, setError] = useState(false)
+
+  const lock = () => {
+    sessionStorage.removeItem('presupuesto_ok')
+    setUnlocked(false)
+  }
+
+  useEffect(() => {
+    if (!unlocked) return
+    let timer = setTimeout(lock, INACTIVITY_MS)
+    const reset = () => { clearTimeout(timer); timer = setTimeout(lock, INACTIVITY_MS) }
+    const events = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart']
+    events.forEach(e => window.addEventListener(e, reset))
+    return () => { clearTimeout(timer); events.forEach(e => window.removeEventListener(e, reset)) }
+  }, [unlocked])
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    if (input === PRESUPUESTO_PIN) {
+      sessionStorage.setItem('presupuesto_ok', '1')
+      setUnlocked(true)
+    } else {
+      setError(true)
+      setInput('')
+      setTimeout(() => setError(false), 1500)
+    }
+  }
+
+  if (unlocked) return children
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '24px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+        <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'var(--accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+        </div>
+        <div style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text-1)' }}>Presupuesto</div>
+        <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Ingresa la contraseña para continuar</div>
+      </div>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+        <input
+          type="password"
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          placeholder="Contraseña"
+          autoFocus
+          style={{
+            padding: '10px 16px', borderRadius: '10px', fontSize: '15px', width: '220px',
+            border: `1.5px solid ${error ? '#ef4444' : 'var(--border)'}`,
+            background: 'var(--card-bg)', color: 'var(--text-1)', outline: 'none',
+            textAlign: 'center', letterSpacing: '4px',
+            transition: 'border-color 0.15s',
+          }}
+        />
+        {error && <div style={{ fontSize: '12px', color: '#ef4444' }}>Contraseña incorrecta</div>}
+        <button type="submit" style={{
+          padding: '9px 32px', borderRadius: '10px', border: 'none',
+          background: 'var(--accent)', color: '#fff', fontWeight: '600', fontSize: '14px', cursor: 'pointer',
+        }}>
+          Entrar
+        </button>
+      </form>
+    </div>
+  )
+}
+
 export default function App() {
   const [session, setSession] = useState(undefined)
   const [page, setPage] = useState(() => localStorage.getItem('luno_page') || 'HOY')
@@ -79,8 +154,8 @@ export default function App() {
     METAS:   <MetasPage user={user} />,
     RUTINAS: <RutinasPage user={user} />,
     MEJORAS:        <MejorasPage user={user} />,
-    PRESUPUESTO:    <PresupuestoPage user={user} />,
-    ...(user.email === 'daniell.uriass@gmail.com' ? { CONTABILIDADES: <ContabilidadPage /> } : {}),
+    PRESUPUESTO:    <PresupuestoGate><PresupuestoPage user={user} /></PresupuestoGate>,
+    ...(user.email === 'daniell.uriass@gmail.com' ? { CONTABILIDADES: <ContabilidadPage user={user} /> } : {}),
     CONFIG:         <ConfigPage user={user} />,
   }
 

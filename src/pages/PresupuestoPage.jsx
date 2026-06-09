@@ -15,11 +15,11 @@ const TARJETAS_DEB   = ['Joss BANRURAL','Joss INDUSTRIAL','Joss BAC','Melvin Ind
 const DIAS_MES       = Array.from({length:31},(_,i)=>i+1)
 
 const TABS = [
-  {key:'resumen', label:'Resumen'},
   {key:'ingresos',label:'Ingresos'},
-  {key:'deudas',  label:'Deudas'},
   {key:'gastos',  label:'Gastos'},
   {key:'ahorros', label:'Ahorros'},
+  {key:'deudas',  label:'Deudas'},
+  {key:'resumen', label:'Resumen'},
 ]
 
 const now     = new Date()
@@ -104,15 +104,20 @@ function ModalBtns({ onClose }) {
   )
 }
 
+const SHARED_BUDGET_OWNER = 'ca354bf9-9e8b-43d9-b10d-d1e6b0db792b'
+
 export default function PresupuestoPage({ user }) {
   const isMobile = useIsMobile()
+  // Solo Joselin usa el ID de Daniel. Todos los demás (incluyendo Daniel) usan su propio ID.
+  const budgetUid = user.email === 'suleciojh@gmail.com' ? SHARED_BUDGET_OWNER : user.id
 
-  const [tab,        setTab]        = useState(()=>localStorage.getItem('presupuesto_tab')||'resumen')
+  const [tab,        setTab]        = useState(()=>localStorage.getItem('presupuesto_tab')||'ingresos')
   const [mes,        setMes]        = useState(()=>localStorage.getItem('presupuesto_mes')||thisMes)
   const [loading,    setLoading]    = useState(true)
   const [selectedDay,setSelectedDay]= useState(null)
   const [calSelDay,     setCalSelDay]     = useState(null)
   const [calGastosSel,  setCalGastosSel]  = useState(null)
+  const [ingSelDay,     setIngSelDay]     = useState(null)
   const [verPagados, setVerPagados] = useState(false)
 
   const [ingresos,    setIngresos]    = useState([])
@@ -130,7 +135,7 @@ export default function PresupuestoPage({ user }) {
   const [modalComp,  setModalComp]  = useState(null)
   const [confirmDel, setConfirmDel] = useState(null)
 
-  const [fIng,   setFIng]   = useState({nombre:'',tipo:'fijo',monto:''})
+  const [fIng,   setFIng]   = useState({nombre:'',tipo:'fijo',monto:'',dia:'',fecha:''})
   const [fFij,   setFFij]   = useState({nombre:'',categoria:'Vivienda',monto:'',activo:true,dia_pago:''})
   const [fVar,   setFVar]   = useState({nombre:'',categoria:'Alimentación',monto:'',fecha:today,medio_pago:'Efectivo',tarjeta:'',fecha_pago:''})
   const [fPrest, setFPrest] = useState({nombre:'',tipo:'Préstamo',monto_original:'',saldo_actual:'',cuota_mensual:'',meses_restantes:'',dia_pago:''})
@@ -138,10 +143,10 @@ export default function PresupuestoPage({ user }) {
   const [fComp,  setFComp]  = useState({persona:'',descripcion:'',monto:'',fecha_aprox:'',notas:''})
 
   useEffect(()=>{localStorage.setItem('presupuesto_tab',tab)},[tab])
-  useEffect(()=>{localStorage.setItem('presupuesto_mes',mes);setSelectedDay(null);setCalSelDay(null)},[mes])
+  useEffect(()=>{localStorage.setItem('presupuesto_mes',mes);setSelectedDay(null);setCalSelDay(null);setIngSelDay(null)},[mes])
 
   useEffect(()=>{
-    const uid=user.id; setLoading(true)
+    const uid=budgetUid; setLoading(true)
     Promise.all([
       supabase.from('budget_ingresos').select('*').eq('user_id',uid).order('created_at'),
       supabase.from('budget_gastos_fijos').select('*').eq('user_id',uid).order('created_at'),
@@ -193,6 +198,14 @@ export default function PresupuestoPage({ user }) {
     // Solo agregar al calendario si la fecha pertenece al mes actual
     if(f && f.startsWith(mes)){(gastosByDate[f]=gastosByDate[f]||[]).push(g)}
   })
+  // Gastos fijos por día de pago en el mes actual
+  const fixosByDate = {}
+  gastosFijos.filter(g=>g.activo&&g.dia_pago).forEach(g=>{
+    const d=Math.min(g.dia_pago,daysInMonth)
+    const key=`${mes}-${String(d).padStart(2,'0')}`
+    ;(fixosByDate[key]=fixosByDate[key]||[]).push(g)
+  })
+
   // Sin fecha = fecha nula O fecha que no es de este mes
   const varSinFecha = varMes.filter(g=>{
     const f=normFecha(g.fecha)
@@ -222,7 +235,21 @@ export default function PresupuestoPage({ user }) {
   compActivos.filter(c=>c.fecha_aprox?.startsWith(mes)).forEach(c=>{
     addCalEv(c.fecha_aprox,{label:c.persona,amount:c.monto,color:isVencido(c.fecha_aprox)?'var(--red)':isPróximo(c.fecha_aprox)?'var(--yellow)':'#a78bfa',tipo:'Compromiso'})
   })
+  ingMes.forEach(i=>{
+    if(i.tipo==='fijo'&&i.dia){ const d=Math.min(i.dia,daysInMonth); addCalEv(`${mes}-${String(d).padStart(2,'0')}`,{label:i.nombre,amount:i.monto,color:'var(--green)',tipo:'Ingreso'}) }
+    else if(i.tipo!=='fijo'&&i.fecha&&i.fecha.startsWith(mes)) addCalEv(i.fecha.slice(0,10),{label:i.nombre,amount:i.monto,color:'var(--green)',tipo:'Ingreso'})
+  })
   const calSelEvents = calSelDay?(calEvents[calSelDay]||[]):[]
+
+  // ── Income calendar events ──
+  const ingCalEvents = {}
+  ingMes.forEach(i=>{
+    let key=null
+    if(i.tipo==='fijo'&&i.dia) { const d=Math.min(i.dia,daysInMonth); key=`${mes}-${String(d).padStart(2,'0')}` }
+    else if(i.tipo!=='fijo'&&i.fecha&&i.fecha.startsWith(mes)) key=i.fecha.slice(0,10)
+    if(key)(ingCalEvents[key]=ingCalEvents[key]||[]).push({label:i.nombre,amount:i.monto,tipo:i.tipo==='fijo'?'Fijo':'Variable'})
+  })
+  const ingSelEvents = ingSelDay?(ingCalEvents[ingSelDay]||[]):[]
 
   // ── Nav ──
   const prevMes=()=>{const[y,m]=mes.split('-').map(Number);const d=new Date(y,m-2);setMes(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`)}
@@ -233,11 +260,20 @@ export default function PresupuestoPage({ user }) {
   const upsert=async(table,payload,id,setState)=>{
     console.log('[upsert]', table, 'id=', id, payload)
     if(id){const{data,error}=await supabase.from(table).update(payload).eq('id',id).select().single();console.log('[upsert result]',{data,error});if(error)console.error('upsert update error:',error);else if(data)setState(p=>p.map(x=>x.id===data.id?data:x))}
-    else  {const{data,error}=await supabase.from(table).insert({...payload,user_id:user.id}).select().single();console.log('[upsert result]',{data,error});if(error)console.error('upsert insert error:',error);else if(data)setState(p=>[...p,data])}
+    else  {const{data,error}=await supabase.from(table).insert({...payload,user_id:budgetUid}).select().single();console.log('[upsert result]',{data,error});if(error)console.error('upsert insert error:',error);else if(data)setState(p=>[...p,data])}
   }
   const del=async(table,id,setState)=>{await supabase.from(table).delete().eq('id',id);setState(p=>p.filter(x=>x.id!==id))}
 
-  const saveIngreso=async(e)=>{e.preventDefault();await upsert('budget_ingresos',{...fIng,monto:parseFloat(fIng.monto),mes},modalIng?.id,setIngresos);setModalIng(null)}
+  const saveIngreso=async(e)=>{
+    e.preventDefault()
+    const esFijo=fIng.tipo==='fijo'
+    await upsert('budget_ingresos',{
+      nombre:fIng.nombre,tipo:fIng.tipo,monto:parseFloat(fIng.monto),mes,
+      dia:esFijo&&fIng.dia?parseInt(fIng.dia):null,
+      fecha:!esFijo?fIng.fecha||null:null,
+    },modalIng?.id,setIngresos)
+    setModalIng(null)
+  }
   const saveFijo   =async(e)=>{e.preventDefault();await upsert('budget_gastos_fijos',{...fFij,monto:parseFloat(fFij.monto),dia_pago:fFij.dia_pago?parseInt(fFij.dia_pago):null},modalFij?.id,setGastosFijos);setModalFij(null)}
   const saveVar    =async(e)=>{
     e.preventDefault()
@@ -485,42 +521,175 @@ export default function PresupuestoPage({ user }) {
 
       {/* ══ TAB: RESUMEN ══ */}
       {tab==='resumen'&&(
-        <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 290px',gap:'16px',alignItems:'start'}}>
+        <div style={{display:'flex',flexDirection:'column',gap:'16px'}}>
 
-          {/* Columna izquierda */}
-          <div style={{display:'flex',flexDirection:'column',gap:'14px'}}>
-
-            <div style={{...card,background:disponible>=0?'rgba(52,199,89,0.08)':'rgba(255,59,48,0.08)',border:`1px solid ${disponible>=0?'rgba(52,199,89,0.25)':'rgba(255,59,48,0.25)'}`}}>
-              <div style={{fontSize:'11px',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'6px'}}>Disponible · {fmtMes(mes)}</div>
-              <div style={{fontSize:'36px',fontWeight:'800',letterSpacing:'-0.03em',color:disponible>=0?'var(--green)':'var(--red)'}}>{q(disponible)}</div>
-              <div style={{display:'flex',gap:'12px',marginTop:'10px',flexWrap:'wrap'}}>
-                <span style={{fontSize:'12px',color:'var(--green)'}}>↑ {q(totalIngresos)} ingresos</span>
-                <span style={{fontSize:'12px',color:'var(--red)'}}>↓ {q(totalGastosAll)} gastos</span>
+          {/* ── Calendario operativo full-width ── */}
+          <div style={card}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'20px'}}>
+              <div>
+                <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em'}}>Calendario Operativo</div>
+                <div style={{fontSize:'20px',fontWeight:'800',letterSpacing:'-0.02em',color:'var(--text-1)',marginTop:'4px'}}>{fmtMes(mes)}</div>
+              </div>
+              <div style={{textAlign:'right'}}>
+                <div style={{fontSize:'10px',color:'var(--text-muted)',marginBottom:'2px'}}>Total compromisos del mes</div>
+                <div style={{fontSize:'16px',fontWeight:'800',color:'#ff9500'}}>{q(Object.values(calEvents).flat().reduce((s,e)=>s+parseFloat(e.amount||0),0))}</div>
               </div>
             </div>
 
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
-              {[
-                {label:'Ingresos',amount:totalIngresos,color:'var(--green)',bg:'rgba(52,199,89,0.08)',action:()=>setTab('ingresos')},
-                {label:'Deudas',amount:totalPrestamos,color:'#ff9500',bg:'rgba(255,149,0,0.08)',action:()=>setTab('deudas')},
-                {label:'Gastos',amount:totalFijos+totalVariables,color:'#ff6b6b',bg:'rgba(255,107,107,0.08)',action:()=>setTab('gastos')},
-                {label:'Ahorros',amount:totalAhorros,color:'var(--accent)',bg:'var(--accent-soft)',action:()=>setTab('ahorros')},
-              ].map(({label,amount,color,bg,action})=>(
-                <button key={label} onClick={action} style={{background:bg,borderRadius:'12px',padding:'14px 16px',borderLeft:`3px solid ${color}`,border:'none',cursor:'pointer',textAlign:'left'}}>
-                  <div style={{fontSize:'11px',color:'var(--text-muted)',marginBottom:'4px'}}>{label}</div>
-                  <div style={{fontSize:'15px',fontWeight:'700',color}}>{q(amount)}</div>
-                </button>
-              ))}
+            <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
+              <div style={{minWidth:'560px'}}>
+                {/* Header días */}
+                <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr) 80px',gap:'4px',marginBottom:'6px'}}>
+                  {DIAS_SEMANA.map(d=>(
+                    <div key={d} style={{textAlign:'center',fontSize:'11px',fontWeight:'600',color:'var(--text-muted)',padding:'4px 0'}}>{d}</div>
+                  ))}
+                  <div style={{textAlign:'center',fontSize:'11px',fontWeight:'600',color:'var(--text-muted)',padding:'4px 0'}}>Semana</div>
+                </div>
+
+                {/* Filas por semana */}
+                {(()=>{
+                  const weeks=[]
+                  for(let i=0;i<calCells.length;i+=7) weeks.push(calCells.slice(i,i+7))
+                  return weeks.map((week,wi)=>{
+                    const weekDays=week.filter(Boolean)
+                    const weekTotal=weekDays.reduce((s,day)=>{
+                      const ds=`${mes}-${String(day).padStart(2,'0')}`
+                      return s+(calEvents[ds]||[]).reduce((ss,e)=>ss+parseFloat(e.amount||0),0)
+                    },0)
+                    return(
+                      <div key={wi} style={{display:'grid',gridTemplateColumns:'repeat(7,1fr) 80px',gap:'4px',marginBottom:'4px'}}>
+                        {week.map((day,di)=>{
+                          if(!day) return <div key={`e-${wi}-${di}`} style={{minHeight:'72px',borderRadius:'10px',background:'var(--inner-bg)',opacity:0.2}}/>
+                          const dateStr=`${mes}-${String(day).padStart(2,'0')}`
+                          const evts=calEvents[dateStr]||[]
+                          const ingEvts=evts.filter(e=>e.tipo==='Ingreso')
+                          const gasEvts=evts.filter(e=>e.tipo!=='Ingreso')
+                          const ingTotal=ingEvts.reduce((s,e)=>s+parseFloat(e.amount||0),0)
+                          const gasTotal=gasEvts.reduce((s,e)=>s+parseFloat(e.amount||0),0)
+                          const isToday=dateStr===today
+                          const isSel=dateStr===calSelDay
+                          return(
+                            <button key={dateStr} onClick={()=>setCalSelDay(isSel?null:dateStr)} style={{
+                              minHeight:'72px',borderRadius:'10px',padding:'8px 8px 6px',
+                              cursor:evts.length?'pointer':'default',
+                              border:isSel?'2px solid var(--accent)':isToday?'1px solid var(--accent)':'1px solid var(--border)',
+                              background:isSel?'var(--accent-soft)':isToday?'rgba(88,86,214,0.06)':'transparent',
+                              display:'flex',flexDirection:'column',alignItems:'flex-start',gap:'2px',
+                              transition:'all 0.12s',textAlign:'left',
+                            }}>
+                              <span style={{fontSize:'13px',fontWeight:isToday?'700':'500',color:isToday?'var(--accent)':isSel?'var(--accent)':'var(--text-1)'}}>{day}</span>
+                              {ingTotal>0&&<span style={{fontSize:'10px',fontWeight:'700',color:'var(--green)',lineHeight:1}}>+{q(ingTotal)}</span>}
+                              {gasTotal>0&&<span style={{fontSize:'10px',fontWeight:'700',color:'var(--red)',lineHeight:1}}>{q(gasTotal)}</span>}
+                              {evts.length>0&&(
+                                <div style={{display:'flex',gap:'3px',flexWrap:'wrap',marginTop:'auto'}}>
+                                  {evts.slice(0,4).map((e,i)=><div key={i} style={{width:'5px',height:'5px',borderRadius:'50%',background:e.color}}/>)}
+                                  {evts.length>4&&<span style={{fontSize:'8px',color:'var(--text-muted)'}}>+{evts.length-4}</span>}
+                                </div>
+                              )}
+                            </button>
+                          )
+                        })}
+                        {/* Columna semana */}
+                        <div style={{
+                          minHeight:'72px',borderRadius:'10px',padding:'8px 6px',
+                          background:'var(--inner-bg)',border:'1px solid var(--border)',
+                          display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'3px',
+                        }}>
+                          <div style={{fontSize:'9px',fontWeight:'600',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.05em'}}>Total</div>
+                          <div style={{fontSize:'13px',fontWeight:'800',color:weekTotal>0?'var(--red)':'var(--text-muted)'}}>{weekTotal>0?q(weekTotal):'—'}</div>
+                          {weekDays.length>0&&(
+                            <div style={{fontSize:'9px',color:'var(--text-muted)',textAlign:'center'}}>
+                              {weekDays[0]}–{weekDays[weekDays.length-1]}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })
+                })()}
+              </div>
             </div>
 
+            {/* Panel día seleccionado */}
+            {calSelDay&&(
+              <div style={{marginTop:'14px',padding:'14px',background:'var(--inner-bg)',borderRadius:'12px',border:'1px solid var(--border)'}}>
+                <div style={{fontSize:'13px',fontWeight:'600',color:'var(--text-1)',marginBottom:'10px'}}>
+                  {(()=>{const[,,d]=calSelDay.split('-');return`${parseInt(d)} de ${fmtMes(mes)}`})()}
+                </div>
+                {calSelEvents.length===0
+                  ?<p style={{fontSize:'12px',color:'var(--text-muted)',textAlign:'center',padding:'8px 0'}}>Sin pagos este día</p>
+                  :calSelEvents.map((e,i)=>(
+                    <div key={i} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 0',borderBottom:i<calSelEvents.length-1?'1px solid var(--border)':'none'}}>
+                      <div style={{width:'8px',height:'8px',borderRadius:'50%',background:e.color,flexShrink:0}}/>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:'13px',fontWeight:'500',color:'var(--text-1)'}}>{e.label}</div>
+                        <div style={{fontSize:'10px',color:'var(--text-muted)'}}>{e.tipo}</div>
+                      </div>
+                      <div style={{fontSize:'13px',fontWeight:'700',color:e.color}}>{q(e.amount)}</div>
+                    </div>
+                  ))
+                }
+                {calSelEvents.length>0&&(
+                  <div style={{display:'flex',justifyContent:'flex-end',paddingTop:'8px'}}>
+                    <span style={{fontSize:'11px',fontWeight:'700',color:'var(--text-muted)'}}>Total: {q(calSelEvents.reduce((s,e)=>s+parseFloat(e.amount||0),0))}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Pie: leyenda + mes total */}
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:'16px',paddingTop:'14px',borderTop:'1px solid var(--border)',flexWrap:'wrap',gap:'10px'}}>
+              <div style={{display:'flex',gap:'14px',flexWrap:'wrap'}}>
+                {[['var(--green)','Ingreso'],['var(--accent)','Gasto Fijo'],['#ff9500','Deuda'],['#a78bfa','Compromiso'],['var(--red)','Vencido']].map(([c,l])=>(
+                  <div key={l} style={{display:'flex',alignItems:'center',gap:'4px'}}>
+                    <div style={{width:'7px',height:'7px',borderRadius:'50%',background:c}}/>
+                    <span style={{fontSize:'10px',color:'var(--text-muted)'}}>{l}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{fontSize:'12px',fontWeight:'800',color:'var(--text-1)',letterSpacing:'0.03em'}}>
+                MES TOTAL <span style={{color:'var(--red)',marginLeft:'6px'}}>
+                  {q(Object.values(calEvents).flat().reduce((s,e)=>s+parseFloat(e.amount||0),0))}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Disponible ── */}
+          <div style={{...card,background:disponible>=0?'rgba(52,199,89,0.08)':'rgba(255,59,48,0.08)',border:`1px solid ${disponible>=0?'rgba(52,199,89,0.25)':'rgba(255,59,48,0.25)'}`}}>
+            <div style={{fontSize:'11px',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'6px'}}>Disponible · {fmtMes(mes)}</div>
+            <div style={{fontSize:'36px',fontWeight:'800',letterSpacing:'-0.03em',color:disponible>=0?'var(--green)':'var(--red)'}}>{q(disponible)}</div>
+            <div style={{display:'flex',gap:'12px',marginTop:'10px',flexWrap:'wrap'}}>
+              <span style={{fontSize:'12px',color:'var(--green)'}}>↑ {q(totalIngresos)} ingresos</span>
+              <span style={{fontSize:'12px',color:'var(--red)'}}>↓ {q(totalGastosAll)} gastos</span>
+            </div>
+          </div>
+
+          {/* ── 4 mini-cards ── */}
+          <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr 1fr':'repeat(4,1fr)',gap:'10px'}}>
+            {[
+              {label:'Ingresos',amount:totalIngresos,color:'var(--green)',bg:'rgba(52,199,89,0.08)',action:()=>setTab('ingresos')},
+              {label:'Deudas',amount:totalPrestamos,color:'#ff9500',bg:'rgba(255,149,0,0.08)',action:()=>setTab('deudas')},
+              {label:'Gastos',amount:totalFijos+totalVariables,color:'#ff6b6b',bg:'rgba(255,107,107,0.08)',action:()=>setTab('gastos')},
+              {label:'Ahorros',amount:totalAhorros,color:'var(--accent)',bg:'var(--accent-soft)',action:()=>setTab('ahorros')},
+            ].map(({label,amount,color,bg,action})=>(
+              <button key={label} onClick={action} style={{background:bg,borderRadius:'12px',padding:'14px 16px',borderLeft:`3px solid ${color}`,border:'none',cursor:'pointer',textAlign:'left'}}>
+                <div style={{fontSize:'11px',color:'var(--text-muted)',marginBottom:'4px'}}>{label}</div>
+                <div style={{fontSize:'15px',fontWeight:'700',color}}>{q(amount)}</div>
+              </button>
+            ))}
+          </div>
+
+          {/* ── Desglose + Distribución ── */}
+          <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:'14px'}}>
             <div style={card}>
               <div style={{fontSize:'13px',fontWeight:'600',color:'var(--text-1)',marginBottom:'14px'}}>Desglose</div>
               {[
-                {label:'Ingresos',       amount:totalIngresos, color:'var(--green)', sign:'+'},
-                {label:'Gastos Fijos',   amount:totalFijos,    color:'var(--red)',   sign:'−'},
-                {label:'Cuotas Deudas',  amount:totalPrestamos,color:'var(--red)',   sign:'−'},
-                {label:'Gastos Variables',amount:totalVariables,color:'var(--red)',  sign:'−'},
-                {label:'Ahorros',        amount:totalAhorros,  color:'var(--yellow)',sign:'−'},
+                {label:'Ingresos',        amount:totalIngresos,  color:'var(--green)', sign:'+'},
+                {label:'Gastos Fijos',    amount:totalFijos,     color:'var(--red)',   sign:'−'},
+                {label:'Cuotas Deudas',   amount:totalPrestamos, color:'var(--red)',   sign:'−'},
+                {label:'Gastos Variables',amount:totalVariables, color:'var(--red)',   sign:'−'},
+                {label:'Ahorros',         amount:totalAhorros,   color:'var(--yellow)',sign:'−'},
               ].map(({label,amount,color,sign})=>(
                 <div key={label} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
                   <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
@@ -536,14 +705,14 @@ export default function PresupuestoPage({ user }) {
               </div>
             </div>
 
-            {totalGastosAll>0&&(
+            {totalGastosAll>0?(
               <div style={card}>
                 <div style={{fontSize:'13px',fontWeight:'600',color:'var(--text-1)',marginBottom:'16px'}}>Distribución de gastos</div>
                 {[
-                  {label:'Gastos Fijos',   amount:totalFijos,    color:'#ff6b6b'},
-                  {label:'Deudas',         amount:totalPrestamos,color:'#ff9500'},
-                  {label:'Gastos Variables',amount:totalVariables,color:'var(--accent)'},
-                  {label:'Ahorros',        amount:totalAhorros,  color:'var(--green)'},
+                  {label:'Gastos Fijos',    amount:totalFijos,     color:'#ff6b6b'},
+                  {label:'Deudas',          amount:totalPrestamos, color:'#ff9500'},
+                  {label:'Gastos Variables',amount:totalVariables, color:'var(--accent)'},
+                  {label:'Ahorros',         amount:totalAhorros,   color:'var(--green)'},
                 ].filter(x=>x.amount>0).map(({label,amount,color})=>{
                   const pct=(amount/totalGastosAll)*100
                   return(
@@ -559,35 +728,155 @@ export default function PresupuestoPage({ user }) {
                   )
                 })}
               </div>
-            )}
+            ):<div/>}
           </div>
 
-          {/* Columna derecha — calendario de pagos */}
-          <PayCalendar/>
         </div>
       )}
 
       {/* ══ TAB: INGRESOS ══ */}
       {tab==='ingresos'&&(
-        <div style={card}>
-          <SubHead label="Ingresos del mes" total={totalIngresos} onAdd={()=>{setFIng({nombre:'',tipo:'fijo',monto:''});setModalIng({})}}/>
-          {ingMes.length===0
-            ?<p style={{fontSize:'13px',color:'var(--text-muted)',textAlign:'center',padding:'20px 0'}}>Sin ingresos registrados</p>
-            :ingMes.map(i=>(
-              <div key={i.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'11px 0',borderBottom:'1px solid var(--border)'}}>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:'13.5px',fontWeight:'500',color:'var(--text-1)'}}>{i.nombre}</div>
-                  <div style={{fontSize:'11px',color:'var(--text-muted)',marginTop:'2px'}}>{i.tipo==='fijo'?'Fijo':'Variable'}</div>
-                </div>
-                <div style={{fontWeight:'600',fontSize:'14px',color:'var(--green)'}}>{q(i.monto)}</div>
-                <div style={{display:'flex',gap:'4px'}}>
-                  <button onClick={()=>{setFIng({nombre:i.nombre,tipo:i.tipo,monto:String(i.monto)});setModalIng(i)}} style={bEdit}><IcoEdit/></button>
-                  <button onClick={()=>askDel(`"${i.nombre}" se eliminará.`,()=>del('budget_ingresos',i.id,setIngresos))} style={bDel}><IcoDel/></button>
-                </div>
+        <div style={{display:'flex',flexDirection:'column',gap:'16px'}}>
+
+          {/* Calendario de ingresos */}
+          <div style={card}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'20px'}}>
+              <div>
+                <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em'}}>Calendario de Ingresos</div>
+                <div style={{fontSize:'20px',fontWeight:'800',letterSpacing:'-0.02em',color:'var(--text-1)',marginTop:'4px'}}>{fmtMes(mes)}</div>
               </div>
-            ))
-          }
-          {ingMes.length>0&&<div style={{display:'flex',justifyContent:'flex-end',paddingTop:'14px'}}><span style={{fontSize:'14px',fontWeight:'700',color:'var(--green)'}}>Total: {q(totalIngresos)}</span></div>}
+              <div style={{textAlign:'right'}}>
+                <div style={{fontSize:'10px',color:'var(--text-muted)',marginBottom:'2px'}}>Total del mes</div>
+                <div style={{fontSize:'16px',fontWeight:'800',color:'var(--green)'}}>{q(totalIngresos)}</div>
+              </div>
+            </div>
+
+            <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
+              <div style={{minWidth:'560px'}}>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr) 80px',gap:'4px',marginBottom:'6px'}}>
+                  {DIAS_SEMANA.map(d=>(
+                    <div key={d} style={{textAlign:'center',fontSize:'11px',fontWeight:'600',color:'var(--text-muted)',padding:'4px 0'}}>{d}</div>
+                  ))}
+                  <div style={{textAlign:'center',fontSize:'11px',fontWeight:'600',color:'var(--text-muted)',padding:'4px 0'}}>Semana</div>
+                </div>
+
+                {(()=>{
+                  const weeks=[]
+                  for(let i=0;i<calCells.length;i+=7) weeks.push(calCells.slice(i,i+7))
+                  return weeks.map((week,wi)=>{
+                    const weekDays=week.filter(Boolean)
+                    const weekTotal=weekDays.reduce((s,day)=>{
+                      const ds=`${mes}-${String(day).padStart(2,'0')}`
+                      return s+(ingCalEvents[ds]||[]).reduce((ss,e)=>ss+parseFloat(e.amount||0),0)
+                    },0)
+                    return(
+                      <div key={wi} style={{display:'grid',gridTemplateColumns:'repeat(7,1fr) 80px',gap:'4px',marginBottom:'4px'}}>
+                        {week.map((day,di)=>{
+                          if(!day) return <div key={`ie-${wi}-${di}`} style={{minHeight:'72px',borderRadius:'10px',background:'var(--inner-bg)',opacity:0.2}}/>
+                          const dateStr=`${mes}-${String(day).padStart(2,'0')}`
+                          const evts=ingCalEvents[dateStr]||[]
+                          const dayTotal=evts.reduce((s,e)=>s+parseFloat(e.amount||0),0)
+                          const isToday=dateStr===today
+                          const isSel=dateStr===ingSelDay
+                          return(
+                            <button key={`i${dateStr}`} onClick={()=>setIngSelDay(isSel?null:dateStr)} style={{
+                              minHeight:'72px',borderRadius:'10px',padding:'8px 8px 6px',
+                              cursor:evts.length?'pointer':'default',
+                              border:isSel?'2px solid var(--green)':isToday?'1px solid var(--accent)':'1px solid var(--border)',
+                              background:isSel?'rgba(52,199,89,0.1)':isToday?'rgba(88,86,214,0.06)':'transparent',
+                              display:'flex',flexDirection:'column',alignItems:'flex-start',gap:'4px',
+                              transition:'all 0.12s',textAlign:'left',
+                            }}>
+                              <span style={{fontSize:'13px',fontWeight:isToday?'700':'500',color:isToday?'var(--accent)':isSel?'var(--green)':'var(--text-1)'}}>{day}</span>
+                              {dayTotal>0&&(
+                                <span style={{fontSize:'11px',fontWeight:'700',color:'var(--green)',lineHeight:1}}>+{q(dayTotal)}</span>
+                              )}
+                              {evts.length>0&&(
+                                <div style={{display:'flex',gap:'3px',marginTop:'auto'}}>
+                                  {evts.slice(0,3).map((_,i)=><div key={i} style={{width:'5px',height:'5px',borderRadius:'50%',background:'var(--green)'}}/>)}
+                                  {evts.length>3&&<span style={{fontSize:'8px',color:'var(--text-muted)'}}>+{evts.length-3}</span>}
+                                </div>
+                              )}
+                            </button>
+                          )
+                        })}
+                        <div style={{
+                          minHeight:'72px',borderRadius:'10px',padding:'8px 6px',
+                          background:'var(--inner-bg)',border:'1px solid var(--border)',
+                          display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'3px',
+                        }}>
+                          <div style={{fontSize:'9px',fontWeight:'600',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.05em'}}>Total</div>
+                          <div style={{fontSize:'13px',fontWeight:'800',color:weekTotal>0?'var(--green)':'var(--text-muted)'}}>{weekTotal>0?`+${q(weekTotal)}`:'—'}</div>
+                          {weekDays.length>0&&(
+                            <div style={{fontSize:'9px',color:'var(--text-muted)',textAlign:'center'}}>{weekDays[0]}–{weekDays[weekDays.length-1]}</div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })
+                })()}
+              </div>
+            </div>
+
+            {ingSelDay&&(
+              <div style={{marginTop:'14px',padding:'14px',background:'var(--inner-bg)',borderRadius:'12px',border:'1px solid var(--border)'}}>
+                <div style={{fontSize:'13px',fontWeight:'600',color:'var(--text-1)',marginBottom:'10px'}}>
+                  {(()=>{const[,,d]=ingSelDay.split('-');return`${parseInt(d)} de ${fmtMes(mes)}`})()}
+                </div>
+                {ingSelEvents.length===0
+                  ?<p style={{fontSize:'12px',color:'var(--text-muted)',textAlign:'center',padding:'8px 0'}}>Sin ingresos este día</p>
+                  :ingSelEvents.map((e,i)=>(
+                    <div key={i} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 0',borderBottom:i<ingSelEvents.length-1?'1px solid var(--border)':'none'}}>
+                      <div style={{width:'8px',height:'8px',borderRadius:'50%',background:'var(--green)',flexShrink:0}}/>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:'13px',fontWeight:'500',color:'var(--text-1)'}}>{e.label}</div>
+                        <div style={{fontSize:'10px',color:'var(--text-muted)'}}>{e.tipo}</div>
+                      </div>
+                      <div style={{fontSize:'13px',fontWeight:'700',color:'var(--green)'}}>+{q(e.amount)}</div>
+                    </div>
+                  ))
+                }
+                {ingSelEvents.length>0&&(
+                  <div style={{display:'flex',justifyContent:'flex-end',paddingTop:'8px'}}>
+                    <span style={{fontSize:'11px',fontWeight:'700',color:'var(--text-muted)'}}>Total: +{q(ingSelEvents.reduce((s,e)=>s+parseFloat(e.amount||0),0))}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div style={{display:'flex',justifyContent:'flex-end',marginTop:'16px',paddingTop:'14px',borderTop:'1px solid var(--border)'}}>
+              <div style={{fontSize:'12px',fontWeight:'800',color:'var(--text-1)',letterSpacing:'0.03em'}}>
+                MES TOTAL <span style={{color:'var(--green)',marginLeft:'6px'}}>{q(totalIngresos)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Lista de ingresos */}
+          <div style={card}>
+            <SubHead label="Ingresos del mes" total={totalIngresos} onAdd={()=>{setFIng({nombre:'',tipo:'fijo',monto:'',dia:''});setModalIng({})}}/>
+            {ingMes.length===0
+              ?<p style={{fontSize:'13px',color:'var(--text-muted)',textAlign:'center',padding:'20px 0'}}>Sin ingresos registrados</p>
+              :ingMes.map(i=>(
+                <div key={i.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'11px 0',borderBottom:'1px solid var(--border)'}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:'13.5px',fontWeight:'500',color:'var(--text-1)'}}>{i.nombre}</div>
+                    <div style={{display:'flex',gap:'8px',marginTop:'2px'}}>
+                      <span style={{fontSize:'11px',color:'var(--text-muted)'}}>{i.tipo==='fijo'?'Fijo':'Variable'}</span>
+                      {i.tipo==='fijo'&&i.dia&&<span style={{fontSize:'11px',color:'var(--accent)'}}>día {i.dia}</span>}
+                      {i.tipo!=='fijo'&&i.fecha&&<span style={{fontSize:'11px',color:'var(--accent)'}}>{new Date(i.fecha+'T00:00:00').toLocaleDateString('es-GT',{day:'numeric',month:'short'})}</span>}
+                    </div>
+                  </div>
+                  <div style={{fontWeight:'600',fontSize:'14px',color:'var(--green)'}}>{q(i.monto)}</div>
+                  <div style={{display:'flex',gap:'4px'}}>
+                    <button onClick={()=>{setFIng({nombre:i.nombre,tipo:i.tipo,monto:String(i.monto),dia:i.dia!=null?String(i.dia):'',fecha:i.fecha||''});setModalIng(i)}} style={bEdit}><IcoEdit/></button>
+                    <button onClick={()=>askDel(`"${i.nombre}" se eliminará.`,()=>del('budget_ingresos',i.id,setIngresos))} style={bDel}><IcoDel/></button>
+                  </div>
+                </div>
+              ))
+            }
+            {ingMes.length>0&&<div style={{display:'flex',justifyContent:'flex-end',paddingTop:'14px'}}><span style={{fontSize:'14px',fontWeight:'700',color:'var(--green)'}}>Total: {q(totalIngresos)}</span></div>}
+          </div>
+
         </div>
       )}
 
@@ -729,10 +1018,187 @@ export default function PresupuestoPage({ user }) {
       {tab==='gastos'&&(
         <div style={{display:'flex',flexDirection:'column',gap:'20px'}}>
 
-          {/* Gastos Fijos — full width */}
+          {/* Calendario grande Gastos Variables */}
+          <div style={card}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'20px'}}>
+              <div>
+                <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em'}}>Gastos Variables</div>
+                <div style={{fontSize:'20px',fontWeight:'800',letterSpacing:'-0.02em',color:'var(--text-1)',marginTop:'4px'}}>{fmtMes(mes)}</div>
+              </div>
+              <div style={{textAlign:'right'}}>
+                <div style={{fontSize:'10px',color:'var(--text-muted)',marginBottom:'2px'}}>Total del mes</div>
+                <div style={{fontSize:'16px',fontWeight:'800',color:'var(--accent)'}}>{q(totalVariables)}</div>
+              </div>
+            </div>
+
+            <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
+              <div style={{minWidth:'560px'}}>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr) 80px',gap:'4px',marginBottom:'6px'}}>
+                  {DIAS_SEMANA.map(d=>(
+                    <div key={d} style={{textAlign:'center',fontSize:'11px',fontWeight:'600',color:'var(--text-muted)',padding:'4px 0'}}>{d}</div>
+                  ))}
+                  <div style={{textAlign:'center',fontSize:'11px',fontWeight:'600',color:'var(--text-muted)',padding:'4px 0'}}>Semana</div>
+                </div>
+
+                {(()=>{
+                  const weeks=[]
+                  for(let i=0;i<calCells.length;i+=7) weeks.push(calCells.slice(i,i+7))
+                  return weeks.map((week,wi)=>{
+                    const weekDays=week.filter(Boolean)
+                    const weekTotal=weekDays.reduce((s,day)=>{
+                      const ds=`${mes}-${String(day).padStart(2,'0')}`
+                      return s+(gastosByDate[ds]||[]).reduce((ss,g)=>ss+parseFloat(g.monto||0),0)
+                           +(fixosByDate[ds]||[]).reduce((ss,g)=>ss+parseFloat(g.monto||0),0)
+                    },0)
+                    return(
+                      <div key={wi} style={{display:'grid',gridTemplateColumns:'repeat(7,1fr) 80px',gap:'4px',marginBottom:'4px'}}>
+                        {week.map((day,di)=>{
+                          if(!day) return <div key={`ve-${wi}-${di}`} style={{minHeight:'72px',borderRadius:'10px',background:'var(--inner-bg)',opacity:0.2}}/>
+                          const dateStr=`${mes}-${String(day).padStart(2,'0')}`
+                          const dayVar=gastosByDate[dateStr]||[]
+                          const dayFij=fixosByDate[dateStr]||[]
+                          const dayT=dayVar.reduce((s,g)=>s+parseFloat(g.monto||0),0)+dayFij.reduce((s,g)=>s+parseFloat(g.monto||0),0)
+                          const isToday=dateStr===today
+                          const isSel=dateStr===selectedDay
+                          const hasAny=dayVar.length>0||dayFij.length>0
+                          return(
+                            <button key={dateStr} onClick={()=>setSelectedDay(isSel?null:dateStr)} style={{
+                              minHeight:'72px',borderRadius:'10px',padding:'8px 8px 6px',cursor:'pointer',
+                              border:isSel?'2px solid var(--accent)':isToday?'1px solid var(--accent)':'1px solid var(--border)',
+                              background:isSel?'var(--accent-soft)':isToday?'rgba(88,86,214,0.06)':'transparent',
+                              display:'flex',flexDirection:'column',alignItems:'flex-start',gap:'4px',
+                              transition:'all 0.12s',textAlign:'left',
+                            }}>
+                              <span style={{fontSize:'13px',fontWeight:isToday?'700':'500',color:isToday?'var(--accent)':isSel?'var(--accent)':'var(--text-1)'}}>{day}</span>
+                              {dayT>0&&<span style={{fontSize:'11px',fontWeight:'700',color:'#ff9500',lineHeight:1}}>{q(dayT)}</span>}
+                              {hasAny&&(
+                                <div style={{display:'flex',gap:'3px',marginTop:'auto',flexWrap:'wrap'}}>
+                                  {dayFij.map((_,i)=><div key={`f${i}`} style={{width:'5px',height:'5px',borderRadius:'50%',background:'var(--accent)'}}/>)}
+                                  {dayVar.slice(0,3).map((_,i)=><div key={`v${i}`} style={{width:'5px',height:'5px',borderRadius:'50%',background:'#ff9500'}}/>)}
+                                  {dayVar.length>3&&<span style={{fontSize:'8px',color:'var(--text-muted)'}}>+{dayVar.length-3}</span>}
+                                </div>
+                              )}
+                            </button>
+                          )
+                        })}
+                        <div style={{
+                          minHeight:'72px',borderRadius:'10px',padding:'8px 6px',
+                          background:'var(--inner-bg)',border:'1px solid var(--border)',
+                          display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'3px',
+                        }}>
+                          <div style={{fontSize:'9px',fontWeight:'600',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.05em'}}>Total</div>
+                          <div style={{fontSize:'13px',fontWeight:'800',color:weekTotal>0?'#ff9500':'var(--text-muted)'}}>{weekTotal>0?q(weekTotal):'—'}</div>
+                          {weekDays.length>0&&<div style={{fontSize:'9px',color:'var(--text-muted)',textAlign:'center'}}>{weekDays[0]}–{weekDays[weekDays.length-1]}</div>}
+                        </div>
+                      </div>
+                    )
+                  })
+                })()}
+              </div>
+            </div>
+
+            {/* Panel día seleccionado */}
+            {selectedDay&&(()=>{
+              const selFijos=fixosByDate[selectedDay]||[]
+              const totalDia=(selectedDayGastos.reduce((s,g)=>s+parseFloat(g.monto||0),0))+(selFijos.reduce((s,g)=>s+parseFloat(g.monto||0),0))
+              return(
+                <div style={{marginTop:'14px',padding:'16px',background:'var(--inner-bg)',borderRadius:'12px',border:'1px solid var(--border)'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}}>
+                    <div>
+                      <div style={{fontSize:'13px',fontWeight:'600',color:'var(--text-1)'}}>{(()=>{const[,,d]=selectedDay.split('-');return`${parseInt(d)} de ${fmtMes(mes)}`})()}</div>
+                      {totalDia>0&&<div style={{fontSize:'11px',color:'var(--text-muted)',marginTop:'2px'}}>Total: {q(totalDia)}</div>}
+                    </div>
+                    <button onClick={()=>openAddVar(selectedDay)} style={{background:'var(--accent)',color:'#fff',border:'none',borderRadius:'8px',padding:'6px 14px',fontSize:'12px',fontWeight:'600',cursor:'pointer'}}>+ Variable</button>
+                  </div>
+
+                  {selFijos.length>0&&(
+                    <>
+                      <div style={{fontSize:'10px',fontWeight:'700',color:'var(--accent)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'6px'}}>Fijos</div>
+                      {selFijos.map(g=>(
+                        <div key={g.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
+                          <div style={{width:'7px',height:'7px',borderRadius:'50%',background:'var(--accent)',flexShrink:0}}/>
+                          <div style={{flex:1}}>
+                            <div style={{fontSize:'13px',fontWeight:'500',color:'var(--text-1)'}}>{g.nombre}</div>
+                            <div style={{fontSize:'10px',color:'var(--text-muted)'}}>{g.categoria}</div>
+                          </div>
+                          <div style={{fontSize:'13px',fontWeight:'600',color:'var(--accent)'}}>{q(g.monto)}</div>
+                        </div>
+                      ))}
+                    </>
+                  )}
+
+                  {selectedDayGastos.length>0&&(
+                    <div style={{fontSize:'10px',fontWeight:'700',color:'#ff9500',textTransform:'uppercase',letterSpacing:'0.06em',margin:'10px 0 6px'}}>Variables</div>
+                  )}
+                  {selectedDayGastos.length===0&&selFijos.length===0&&(
+                    <p style={{fontSize:'13px',color:'var(--text-muted)',textAlign:'center',padding:'12px 0'}}>Sin gastos este día — haz clic en "+ Variable"</p>
+                  )}
+                  {selectedDayGastos.map(g=>(
+                    <div key={g.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'9px 0',borderBottom:'1px solid var(--border)'}}>
+                      <div style={{width:'7px',height:'7px',borderRadius:'50%',background:'#ff9500',flexShrink:0}}/>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:'13px',fontWeight:'500',color:'var(--text-1)'}}>{g.nombre}</div>
+                        <div style={{display:'flex',gap:'6px',marginTop:'3px',flexWrap:'wrap'}}>
+                          <span style={{fontSize:'10px',color:'var(--text-muted)'}}>{g.categoria}</span>
+                          <TarjetaChip g={g}/>
+                          {g.fecha_pago&&<span style={{fontSize:'10px',color:'var(--yellow)'}}>Pago: {new Date(g.fecha_pago+'T00:00:00').toLocaleDateString('es-GT',{day:'numeric',month:'short'})}</span>}
+                        </div>
+                      </div>
+                      <div style={{fontSize:'13px',fontWeight:'600',color:'var(--accent)'}}>{q(g.monto)}</div>
+                      <div style={{display:'flex',gap:'4px'}}>
+                        <button onClick={()=>{setFVar({nombre:g.nombre,categoria:g.categoria,monto:String(g.monto),fecha:g.fecha||selectedDay,medio_pago:g.medio_pago||'Efectivo',tarjeta:g.tarjeta||'',fecha_pago:g.fecha_pago||''});setModalVar(g)}} style={bEdit}><IcoEdit/></button>
+                        <button onClick={()=>askDel(`"${g.nombre}" se eliminará.`,()=>del('budget_gastos_variables',g.id,setGastosVar))} style={bDel}><IcoDel/></button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
+
+            {/* Sin fecha */}
+            {varSinFecha.length>0&&(
+              <div style={{marginTop:'14px',padding:'12px 14px',background:'rgba(255,149,0,0.06)',borderRadius:'10px',border:'1px solid rgba(255,149,0,0.2)'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}>
+                  <div style={{fontSize:'11px',fontWeight:'700',color:'#ff9500',textTransform:'uppercase',letterSpacing:'0.05em'}}>Sin fecha — {varSinFecha.length} gasto{varSinFecha.length>1?'s':''} · {q(varSinFecha.reduce((s,g)=>s+parseFloat(g.monto||0),0))}</div>
+                  <span style={{fontSize:'10px',color:'var(--text-muted)'}}>Edítalos para asignar fecha</span>
+                </div>
+                {varSinFecha.map(g=>(
+                  <div key={g.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'9px 0',borderBottom:'1px solid var(--border)'}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:'13px',fontWeight:'500',color:'var(--text-1)'}}>{g.nombre}</div>
+                      <div style={{display:'flex',gap:'6px',marginTop:'3px'}}><span style={{fontSize:'10px',color:'var(--text-muted)'}}>{g.categoria}</span><TarjetaChip g={g}/></div>
+                    </div>
+                    <div style={{fontSize:'13px',fontWeight:'600',color:'var(--accent)'}}>{q(g.monto)}</div>
+                    <div style={{display:'flex',gap:'4px'}}>
+                      <button onClick={()=>{setFVar({nombre:g.nombre,categoria:g.categoria,monto:String(g.monto),fecha:g.fecha||today,medio_pago:g.medio_pago||'Efectivo',tarjeta:g.tarjeta||'',fecha_pago:g.fecha_pago||''});setModalVar(g)}} style={bEdit}><IcoEdit/></button>
+                      <button onClick={()=>askDel(`"${g.nombre}" se eliminará.`,()=>del('budget_gastos_variables',g.id,setGastosVar))} style={bDel}><IcoDel/></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:'16px',paddingTop:'14px',borderTop:'1px solid var(--border)',flexWrap:'wrap',gap:'8px'}}>
+              <div style={{display:'flex',gap:'14px'}}>
+                <div style={{display:'flex',alignItems:'center',gap:'4px'}}>
+                  <div style={{width:'7px',height:'7px',borderRadius:'50%',background:'var(--accent)'}}/>
+                  <span style={{fontSize:'10px',color:'var(--text-muted)'}}>Gasto fijo</span>
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:'4px'}}>
+                  <div style={{width:'7px',height:'7px',borderRadius:'50%',background:'#ff9500'}}/>
+                  <span style={{fontSize:'10px',color:'var(--text-muted)'}}>Gasto variable</span>
+                </div>
+              </div>
+              <div style={{fontSize:'12px',fontWeight:'800',color:'var(--text-1)',letterSpacing:'0.03em'}}>
+                MES TOTAL <span style={{color:'#ff9500',marginLeft:'6px'}}>{q(totalFijos+totalVariables)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Gastos Fijos */}
           <div style={card}>
             <SubHead label="Gastos Fijos" total={totalFijos} onAdd={()=>{setFFij({nombre:'',categoria:'Vivienda',monto:'',activo:true,dia_pago:''});setModalFij({})}}/>
-            <div style={{fontSize:'11px',color:'var(--text-muted)',marginBottom:'12px',marginTop:'-8px'}}>Se aplican todos los meses. El "día de pago" aparece en el calendario.</div>
+            <div style={{fontSize:'11px',color:'var(--text-muted)',marginBottom:'12px',marginTop:'-8px'}}>Se aplican todos los meses. El "día de pago" aparece en el calendario de Resumen.</div>
             {gastosFijos.length===0
               ?<p style={{fontSize:'13px',color:'var(--text-muted)',textAlign:'center',padding:'16px 0'}}>Sin gastos fijos</p>
               :gastosFijos.map(g=>(
@@ -759,153 +1225,81 @@ export default function PresupuestoPage({ user }) {
             }
           </div>
 
-          {/* Dos calendarios iguales — 50/50 */}
-          <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:'20px',alignItems:'start'}}>
-
-            {/* Gastos Variables — agregar y gestionar */}
-            <div style={card}>
-              <SubHead label="Gastos Variables" total={totalVariables} onAdd={()=>openAddVar(today.startsWith(mes)?today:`${mes}-01`)}/>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'4px',marginBottom:'4px'}}>
-                {DIAS_SEMANA.map(d=><div key={d} style={{textAlign:'center',fontSize:'11px',fontWeight:'600',color:'var(--text-muted)',padding:'4px 0'}}>{d}</div>)}
-              </div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'4px'}}>
-                {calCells.map((day,idx)=>{
-                  if(!day) return <div key={`e-${idx}`}/>
-                  const dateStr=`${mes}-${String(day).padStart(2,'0')}`
-                  const dayG=gastosByDate[dateStr]||[]
-                  const dayT=dayG.reduce((s,g)=>s+parseFloat(g.monto||0),0)
-                  const isToday=dateStr===today,isSel=dateStr===selectedDay,hasG=dayG.length>0
-                  return(
-                    <button key={dateStr} onClick={()=>setSelectedDay(isSel?null:dateStr)} style={{
-                      padding:'8px 4px 7px',borderRadius:'10px',cursor:'pointer',
-                      border:isSel?'2px solid var(--accent)':isToday?'1px solid var(--accent)':'1px solid transparent',
-                      background:isSel?'var(--accent-soft)':hasG?'var(--inner-bg)':'transparent',
-                      display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',transition:'all 0.12s',
-                    }}>
-                      <span style={{fontSize:'13px',fontWeight:isToday||isSel?'700':'400',color:isSel||isToday?'var(--accent)':'var(--text-1)'}}>{day}</span>
-                      {hasG&&<span style={{fontSize:'10px',fontWeight:'600',color:isSel?'var(--accent)':'#ff9500',lineHeight:1}}>{isMobile?'●':`Q${Math.round(dayT).toLocaleString('es-GT')}`}</span>}
-                    </button>
-                  )
-                })}
-              </div>
-              {selectedDay&&(
-                <div style={{marginTop:'16px',padding:'16px',background:'var(--inner-bg)',borderRadius:'12px',border:'1px solid var(--border)'}}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}}>
-                    <div>
-                      <div style={{fontSize:'13px',fontWeight:'600',color:'var(--text-1)'}}>{(()=>{const[,,d]=selectedDay.split('-');return`${parseInt(d)} de ${fmtMes(mes)}`})()}</div>
-                      {selectedDayGastos.length>0&&<div style={{fontSize:'11px',color:'var(--text-muted)',marginTop:'2px'}}>Total: {q(selectedDayGastos.reduce((s,g)=>s+parseFloat(g.monto||0),0))}</div>}
+          {/* Lista gastos variables del mes */}
+          <div style={card}>
+            <SubHead label="Gastos Variables del mes" total={totalVariables} onAdd={()=>openAddVar(today.startsWith(mes)?today:`${mes}-01`)}/>
+            {varMes.length===0
+              ?<p style={{fontSize:'13px',color:'var(--text-muted)',textAlign:'center',padding:'20px 0'}}>Sin gastos variables registrados</p>
+              :[...varMes].sort((a,b)=>{
+                  const fa=normFecha(a.fecha)||'9999'
+                  const fb=normFecha(b.fecha)||'9999'
+                  return fa.localeCompare(fb)
+                }).map(g=>(
+                <div key={g.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:'13px',fontWeight:'500',color:'var(--text-1)'}}>{g.nombre}</div>
+                    <div style={{display:'flex',gap:'6px',marginTop:'3px',flexWrap:'wrap',alignItems:'center'}}>
+                      {g.fecha&&<span style={{fontSize:'10px',color:'var(--text-muted)'}}>{new Date(g.fecha+'T00:00:00').toLocaleDateString('es-GT',{day:'numeric',month:'short'})}</span>}
+                      <span style={{fontSize:'10px',color:'var(--text-muted)'}}>{g.categoria}</span>
+                      <TarjetaChip g={g}/>
                     </div>
-                    <button onClick={()=>openAddVar(selectedDay)} style={{background:'var(--accent)',color:'#fff',border:'none',borderRadius:'8px',padding:'6px 12px',fontSize:'12px',fontWeight:'600',cursor:'pointer'}}>+ Agregar</button>
                   </div>
-                  {selectedDayGastos.length===0
-                    ?<p style={{fontSize:'13px',color:'var(--text-muted)',textAlign:'center',padding:'12px 0'}}>Sin gastos este día</p>
-                    :selectedDayGastos.map(g=>(
-                      <div key={g.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'9px 0',borderBottom:'1px solid var(--border)'}}>
-                        <div style={{flex:1}}>
-                          <div style={{fontSize:'13px',fontWeight:'500',color:'var(--text-1)'}}>{g.nombre}</div>
-                          <div style={{display:'flex',gap:'6px',marginTop:'3px',flexWrap:'wrap'}}>
-                            <span style={{fontSize:'10px',color:'var(--text-muted)'}}>{g.categoria}</span>
-                            <TarjetaChip g={g}/>
-                            {g.fecha_pago&&<span style={{fontSize:'10px',color:'var(--yellow)'}}>Pago: {new Date(g.fecha_pago+'T00:00:00').toLocaleDateString('es-GT',{day:'numeric',month:'short'})}</span>}
-                          </div>
-                        </div>
-                        <div style={{fontSize:'13px',fontWeight:'600',color:'var(--accent)'}}>{q(g.monto)}</div>
-                        <div style={{display:'flex',gap:'4px'}}>
-                          <button onClick={()=>{setFVar({nombre:g.nombre,categoria:g.categoria,monto:String(g.monto),fecha:g.fecha||selectedDay,medio_pago:g.medio_pago||'Efectivo',tarjeta:g.tarjeta||'',fecha_pago:g.fecha_pago||''});setModalVar(g)}} style={bEdit}><IcoEdit/></button>
-                          <button onClick={()=>askDel(`"${g.nombre}" se eliminará.`,()=>del('budget_gastos_variables',g.id,setGastosVar))} style={bDel}><IcoDel/></button>
-                        </div>
-                      </div>
-                    ))
-                  }
-                </div>
-              )}
-              {varSinFecha.length>0&&(
-                <div style={{marginTop:'16px',padding:'12px 14px',background:'rgba(255,149,0,0.06)',borderRadius:'10px',border:'1px solid rgba(255,149,0,0.2)'}}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}>
-                    <div style={{fontSize:'11px',fontWeight:'700',color:'#ff9500',textTransform:'uppercase',letterSpacing:'0.05em'}}>Sin fecha — {varSinFecha.length} gasto{varSinFecha.length>1?'s':''} · {q(varSinFecha.reduce((s,g)=>s+parseFloat(g.monto||0),0))}</div>
-                    <span style={{fontSize:'10px',color:'var(--text-muted)'}}>Edítalos para asignar fecha</span>
-                  </div>
-                  {varSinFecha.map(g=>(
-                    <div key={g.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'9px 0',borderBottom:'1px solid var(--border)'}}>
-                      <div style={{flex:1}}>
-                        <div style={{fontSize:'13px',fontWeight:'500',color:'var(--text-1)'}}>{g.nombre}</div>
-                        <div style={{display:'flex',gap:'6px',marginTop:'3px'}}><span style={{fontSize:'10px',color:'var(--text-muted)'}}>{g.categoria}</span><TarjetaChip g={g}/></div>
-                      </div>
-                      <div style={{fontSize:'13px',fontWeight:'600',color:'var(--accent)'}}>{q(g.monto)}</div>
-                      <div style={{display:'flex',gap:'4px'}}>
-                        <button onClick={()=>{setFVar({nombre:g.nombre,categoria:g.categoria,monto:String(g.monto),fecha:g.fecha||today,medio_pago:g.medio_pago||'Efectivo',tarjeta:g.tarjeta||'',fecha_pago:g.fecha_pago||''});setModalVar(g)}} style={bEdit}><IcoEdit/></button>
-                        <button onClick={()=>askDel(`"${g.nombre}" se eliminará.`,()=>del('budget_gastos_variables',g.id,setGastosVar))} style={bDel}><IcoDel/></button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Gastos del Mes — solo vista, misma estética */}
-            <div style={card}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px'}}>
-                <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                  <div style={{width:'3px',height:'14px',background:'var(--red)',borderRadius:'2px',flexShrink:0}}/>
-                  <div>
-                    <div style={{fontSize:'12px',fontWeight:'700',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em'}}>Gastos del Mes</div>
-                    <div style={{fontSize:'12px',color:'var(--text-muted)',marginTop:'1px'}}>{q(totalVariables)}</div>
+                  <div style={{fontSize:'13px',fontWeight:'600',color:'var(--accent)',whiteSpace:'nowrap'}}>{q(g.monto)}</div>
+                  <div style={{display:'flex',gap:'4px'}}>
+                    <button onClick={()=>{setFVar({nombre:g.nombre,categoria:g.categoria,monto:String(g.monto),fecha:g.fecha||today,medio_pago:g.medio_pago||'Efectivo',tarjeta:g.tarjeta||'',fecha_pago:g.fecha_pago||''});setModalVar(g)}} style={bEdit}><IcoEdit/></button>
+                    <button onClick={()=>askDel(`"${g.nombre}" se eliminará.`,()=>del('budget_gastos_variables',g.id,setGastosVar))} style={bDel}><IcoDel/></button>
                   </div>
                 </div>
-              </div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'4px',marginBottom:'4px'}}>
-                {DIAS_SEMANA.map(d=><div key={d} style={{textAlign:'center',fontSize:'11px',fontWeight:'600',color:'var(--text-muted)',padding:'4px 0'}}>{d}</div>)}
-              </div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'4px'}}>
-                {calCells.map((day,idx)=>{
-                  if(!day) return <div key={`ge-${idx}`}/>
-                  const dateStr  =`${mes}-${String(day).padStart(2,'0')}`
-                  const dayG     =gastosByPago[dateStr]||[]
-                  const dayTotal =dayG.reduce((s,g)=>s+parseFloat(g.monto||0),0)
-                  const isToday  =dateStr===today
-                  const isSel    =dateStr===calGastosSel
-                  return(
-                    <button key={`g${dateStr}`} onClick={()=>setCalGastosSel(isSel?null:dateStr)} style={{
-                      padding:'8px 4px 7px',borderRadius:'10px',cursor:dayG.length?'pointer':'default',
-                      border:isSel?'2px solid var(--red)':isToday?'1px solid var(--accent)':'1px solid transparent',
-                      background:isSel?'rgba(255,59,48,0.10)':dayG.length?'var(--inner-bg)':'transparent',
-                      display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',transition:'all 0.12s',
-                    }}>
-                      <span style={{fontSize:'13px',fontWeight:isToday||isSel?'700':'400',color:isSel?'var(--red)':isToday?'var(--accent)':'var(--text-1)'}}>{day}</span>
-                      {dayG.length>0&&<span style={{fontSize:'10px',fontWeight:'600',color:isSel?'var(--red)':'var(--red)',opacity:isSel?1:0.8,lineHeight:1}}>{isMobile?'●':`Q${Math.round(dayTotal).toLocaleString('es-GT')}`}</span>}
-                    </button>
-                  )
-                })}
-              </div>
-              {calGastosSel&&(()=>{
-                const selEvts=gastosByPago[calGastosSel]||[]
-                return(
-                  <div style={{marginTop:'16px',padding:'16px',background:'var(--inner-bg)',borderRadius:'12px',border:'1px solid var(--border)'}}>
-                    <div style={{marginBottom:'12px'}}>
-                      <div style={{fontSize:'13px',fontWeight:'600',color:'var(--text-1)'}}>{(()=>{const[,,d]=calGastosSel.split('-');return`${parseInt(d)} de ${fmtMes(mes)}`})()}</div>
-                      {selEvts.length>0&&<div style={{fontSize:'11px',color:'var(--text-muted)',marginTop:'2px'}}>Total: {q(selEvts.reduce((s,g)=>s+parseFloat(g.monto||0),0))}</div>}
-                    </div>
-                    {selEvts.length===0
-                      ?<p style={{fontSize:'13px',color:'var(--text-muted)',textAlign:'center',padding:'12px 0'}}>Sin gastos este día</p>
-                      :selEvts.map((g,i)=>(
-                        <div key={g.id||i} style={{display:'flex',alignItems:'center',gap:'10px',padding:'9px 0',borderBottom:'1px solid var(--border)'}}>
-                          <div style={{flex:1}}>
-                            <div style={{fontSize:'13px',fontWeight:'500',color:'var(--text-1)'}}>{g.nombre}</div>
-                            <div style={{display:'flex',gap:'6px',marginTop:'3px',flexWrap:'wrap'}}>
-                              <span style={{fontSize:'10px',color:'var(--text-muted)'}}>{g.categoria}</span>
-                              <TarjetaChip g={g}/>
-                            </div>
-                          </div>
-                          <div style={{fontSize:'13px',fontWeight:'600',color:'var(--red)'}}>{q(g.monto)}</div>
-                        </div>
-                      ))
-                    }
-                  </div>
-                )
-              })()}
-            </div>
-
+              ))
+            }
+            {varMes.length>0&&<div style={{display:'flex',justifyContent:'flex-end',paddingTop:'14px'}}><span style={{fontSize:'14px',fontWeight:'700',color:'var(--accent)'}}>Total: {q(totalVariables)}</span></div>}
           </div>
+
+          {/* Análisis por categoría */}
+          {(()=>{
+            const cats={}
+            varMes.forEach(g=>{const c=g.categoria||'Otro';cats[c]=(cats[c]||0)+parseFloat(g.monto||0)})
+            const sorted=Object.entries(cats).sort((a,b)=>b[1]-a[1])
+            const total=sorted.reduce((s,[,v])=>s+v,0)
+            const CAT_COLORS={'Alimentación':'#f87171','Transporte':'#fb923c','Salud':'#34d399','Entretenimiento':'var(--accent)','Ropa':'#f472b6','Otro':'var(--text-muted)'}
+            if(sorted.length===0) return null
+            return(
+              <div style={card}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'18px'}}>
+                  <div style={{fontSize:'13px',fontWeight:'700',color:'var(--text-1)'}}>Análisis por categoría</div>
+                  <div style={{fontSize:'11px',color:'var(--text-muted)'}}>{fmtMes(mes)} · {varMes.length} transacción{varMes.length!==1?'es':''}</div>
+                </div>
+                {sorted.map(([cat,amt])=>{
+                  const pct=(amt/total)*100
+                  const color=CAT_COLORS[cat]||'var(--accent)'
+                  const count=varMes.filter(g=>(g.categoria||'Otro')===cat).length
+                  return(
+                    <div key={cat} style={{marginBottom:'14px'}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'6px'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:'7px'}}>
+                          <div style={{width:'8px',height:'8px',borderRadius:'50%',background:color,flexShrink:0}}/>
+                          <span style={{fontSize:'13px',color:'var(--text-1)',fontWeight:'500'}}>{cat}</span>
+                          <span style={{fontSize:'10px',color:'var(--text-muted)',background:'var(--inner-bg)',padding:'1px 6px',borderRadius:'5px'}}>{count} tx</span>
+                        </div>
+                        <div style={{textAlign:'right'}}>
+                          <span style={{fontSize:'13px',fontWeight:'700',color}}>{q(amt)}</span>
+                          <span style={{fontSize:'10px',color:'var(--text-muted)',marginLeft:'6px'}}>{pct.toFixed(1)}%</span>
+                        </div>
+                      </div>
+                      <div style={{height:'6px',background:'var(--inner-bg)',borderRadius:'3px'}}>
+                        <div style={{height:'6px',background:color,borderRadius:'3px',width:`${pct}%`,transition:'width 0.3s'}}/>
+                      </div>
+                    </div>
+                  )
+                })}
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',paddingTop:'12px',borderTop:'1px solid var(--border)'}}>
+                  <span style={{fontSize:'12px',color:'var(--text-muted)'}}>Total variables</span>
+                  <span style={{fontSize:'14px',fontWeight:'800',color:'var(--accent)'}}>{q(total)}</span>
+                </div>
+              </div>
+            )
+          })()}
+
         </div>
       )}
 
@@ -944,8 +1338,25 @@ export default function PresupuestoPage({ user }) {
         <Modal title={modalIng.id?'Editar ingreso':'Nuevo ingreso'} onClose={()=>setModalIng(null)}>
           <form onSubmit={saveIngreso}>
             <FormField label="Fuente / Nombre *"><input required style={inp} value={fIng.nombre} onChange={e=>setFIng(p=>({...p,nombre:e.target.value}))} placeholder="ej. Salario, Freelance..."/></FormField>
-            <FormField label="Tipo"><select style={inp} value={fIng.tipo} onChange={e=>setFIng(p=>({...p,tipo:e.target.value}))}><option value="fijo">Fijo</option><option value="variable">Variable</option></select></FormField>
+            <FormField label="Tipo">
+              <select style={inp} value={fIng.tipo} onChange={e=>setFIng(p=>({...p,tipo:e.target.value,dia:'',fecha:''}))}>
+                <option value="fijo">Fijo</option>
+                <option value="variable">Variable</option>
+              </select>
+            </FormField>
             <FormField label="Monto *"><input required type="number" step="0.01" min="0" style={inp} value={fIng.monto} onChange={e=>setFIng(p=>({...p,monto:e.target.value}))} placeholder="0.00"/></FormField>
+            {fIng.tipo==='fijo'?(
+              <FormField label="Día de cobro (opcional)">
+                <select style={inp} value={fIng.dia} onChange={e=>setFIng(p=>({...p,dia:e.target.value}))}>
+                  <option value="">Sin día específico</option>
+                  {DIAS_MES.map(d=><option key={d} value={d}>Día {d}</option>)}
+                </select>
+              </FormField>
+            ):(
+              <FormField label="Fecha de ingreso (opcional)">
+                <input type="date" style={inp} value={fIng.fecha} onChange={e=>setFIng(p=>({...p,fecha:e.target.value}))}/>
+              </FormField>
+            )}
             <ModalBtns onClose={()=>setModalIng(null)}/>
           </form>
         </Modal>
