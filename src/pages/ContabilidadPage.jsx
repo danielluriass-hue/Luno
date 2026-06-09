@@ -1,5 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
+import ContabilidadCompleta from './ContabilidadCompleta'
 import * as XLSX from 'xlsx'
+import { supabase } from '../lib/supabase'
 
 // ─── IndexedDB: almacena archivos originales para descarga ───────────────────
 
@@ -1167,7 +1169,7 @@ function NavPanel({ years, expanded, sel, onSelect, onToggleYear, onAddYear }) {
 
 // ─── Página principal ────────────────────────────────────────────────────────
 
-export default function ContabilidadPage() {
+function ContabilidadExpress() {
   const now   = new Date()
   const curY  = now.getFullYear()
   const curM  = now.getMonth()
@@ -1367,3 +1369,277 @@ const CountBadge = ({ n }) => (
     fontSize: '9px', fontWeight: '700', padding: '1px 5px', minWidth: '16px',
   }}>{n}</span>
 )
+
+const CONTA_SECTIONS = [
+  { key: 'EXPRESS',  label: 'Contabilidad Express'  },
+  { key: 'COMPLETA', label: 'Contabilidad Completa' },
+]
+
+// ─── Selector de Empresas ────────────────────────────────────────────────────
+
+function EmpresaSelector({ userId, onSelect }) {
+  const [empresas,  setEmpresas]  = useState([])
+  const [loading,   setLoading]   = useState(true)
+  const [migrating, setMigrating] = useState(false)
+  const [showModal, setShowModal] = useState(false)
+  const [form,      setForm]      = useState({ nombre: '', descripcion: '' })
+  const [saving,    setSaving]    = useState(false)
+  const [editando,  setEditando]  = useState(null)
+  const [confirmDel, setConfirmDel] = useState(null) // { empresa, paso: 1|2 }
+
+  const cargar = async () => {
+    setLoading(true)
+    // Migración automática: si hay cuentas sin empresa asignada, crear "Empresa Principal"
+    const { data: huerfanos } = await supabase.from('conta_cuentas').select('id').eq('user_id', userId).is('empresa_id', null).limit(1)
+    if (huerfanos?.length > 0) {
+      setMigrating(true)
+      const { data: emp } = await supabase.from('conta_empresas').insert({ user_id: userId, nombre: 'Empresa Principal', descripcion: '' }).select().single()
+      if (emp) {
+        await Promise.all([
+          supabase.from('conta_cuentas').update({ empresa_id: emp.id }).eq('user_id', userId).is('empresa_id', null),
+          supabase.from('conta_asientos').update({ empresa_id: emp.id }).eq('user_id', userId).is('empresa_id', null),
+          supabase.from('conta_lineas').update({ empresa_id: emp.id }).eq('user_id', userId).is('empresa_id', null),
+          supabase.from('conta_auditoria').update({ empresa_id: emp.id }).eq('user_id', userId).is('empresa_id', null),
+        ])
+      }
+      setMigrating(false)
+    }
+    const { data } = await supabase.from('conta_empresas').select('*').eq('user_id', userId).order('created_at')
+    setEmpresas(data || [])
+    setLoading(false)
+  }
+
+  useEffect(() => { cargar() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleCreate = async (e) => {
+    e.preventDefault(); setSaving(true)
+    try {
+      if (editando) {
+        await supabase.from('conta_empresas').update({ nombre: form.nombre, descripcion: form.descripcion }).eq('id', editando.id)
+      } else {
+        await supabase.from('conta_empresas').insert({ user_id: userId, nombre: form.nombre, descripcion: form.descripcion })
+      }
+      setShowModal(false); setForm({ nombre: '', descripcion: '' }); setEditando(null)
+      cargar()
+    } finally { setSaving(false) }
+  }
+
+  const handleDelete = async () => {
+    const emp = confirmDel.empresa
+    await supabase.from('conta_empresas').delete().eq('id', emp.id)
+    setConfirmDel(null)
+    cargar()
+  }
+
+  const openEdit = (emp) => { setEditando(emp); setForm({ nombre: emp.nombre, descripcion: emp.descripcion || '' }); setShowModal(true) }
+  const openNew  = () => { setEditando(null); setForm({ nombre: '', descripcion: '' }); setShowModal(true) }
+
+  const card    = { background: 'var(--card-bg)', border: '1px solid var(--border-card)', borderRadius: '16px', padding: '20px', cursor: 'pointer', transition: 'all 0.15s', display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative' }
+  const btnBase = { padding: '6px 12px', borderRadius: '8px', border: 'none', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }
+
+  if (loading || migrating) return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px', gap: '12px', color: 'var(--text-muted)' }}>
+      <div style={{ width: '32px', height: '32px', borderRadius: '50%', border: '3px solid var(--border)', borderTopColor: 'var(--accent)', animation: 'spin 0.8s linear infinite' }} />
+      <span style={{ fontSize: '14px' }}>{migrating ? 'Migrando datos existentes…' : 'Cargando empresas…'}</span>
+    </div>
+  )
+
+  return (
+    <div style={{ maxWidth: '900px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '28px' }}>
+        <div>
+          <h2 style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-1)', marginBottom: '4px' }}>Mis Empresas</h2>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Selecciona una empresa para abrir su contabilidad</p>
+        </div>
+        <button onClick={openNew} style={{ ...btnBase, background: 'var(--accent)', color: '#fff', padding: '8px 16px', fontSize: '13px' }}>+ Nueva empresa</button>
+      </div>
+
+      {empresas.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)', border: '2px dashed var(--border-card)', borderRadius: '16px' }}>
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4, marginBottom: '12px' }}>
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+          <p style={{ fontSize: '14px', marginBottom: '16px' }}>No hay empresas creadas aún</p>
+          <button onClick={openNew} style={{ ...btnBase, background: 'var(--accent)', color: '#fff', padding: '8px 18px' }}>Crear primera empresa</button>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '16px' }}>
+          {empresas.map(emp => (
+            <div key={emp.id} style={card}
+              onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 20px rgba(88,86,214,0.15)'}
+              onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
+            >
+              {/* Icono + nombre */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '2px' }} onClick={() => onSelect(emp)}>
+                <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'var(--accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+                  </svg>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{emp.nombre}</div>
+                  {emp.descripcion && <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{emp.descripcion}</div>}
+                </div>
+              </div>
+
+              {/* Fecha */}
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', paddingLeft: '48px' }} onClick={() => onSelect(emp)}>
+                Creada {new Date(emp.created_at).toLocaleDateString('es-GT', { day:'2-digit', month:'short', year:'numeric' })}
+              </div>
+
+              {/* Acciones */}
+              <div style={{ display: 'flex', gap: '6px', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)' }}>
+                <button onClick={() => onSelect(emp)} style={{ ...btnBase, flex: 1, background: 'var(--accent)', color: '#fff' }}>Abrir</button>
+                <button onClick={() => openEdit(emp)} style={{ ...btnBase, background: 'var(--inner-bg)', color: 'var(--text-muted)' }}>Editar</button>
+                <button onClick={() => setConfirmDel({ empresa: emp, paso: 1 })} style={{ ...btnBase, background: 'rgba(220,38,38,0.08)', color: '#dc2626' }}>Eliminar</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Modal confirmación doble — eliminar */}
+      {confirmDel && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: '16px' }}>
+          <div style={{ background: 'var(--card-bg)', borderRadius: '16px', border: '1px solid var(--border-card)', width: '100%', maxWidth: '400px', padding: '24px' }}>
+            {confirmDel.paso === 1 ? (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(220,38,38,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-1)' }}>¿Eliminar empresa?</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{confirmDel.empresa.nombre}</div>
+                  </div>
+                </div>
+                <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5', marginBottom: '20px' }}>
+                  Se eliminarán <strong style={{ color: 'var(--text-1)' }}>todos los datos contables</strong> de esta empresa: catálogo, asientos, libros y bitácora.
+                </p>
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                  <button onClick={() => setConfirmDel(null)} style={{ ...btnBase, background: 'var(--inner-bg)', color: 'var(--text-muted)', padding: '8px 16px' }}>Cancelar</button>
+                  <button onClick={() => setConfirmDel(d => ({ ...d, paso: 2 }))} style={{ ...btnBase, background: '#dc2626', color: '#fff', padding: '8px 16px' }}>Continuar</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(220,38,38,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '15px', fontWeight: '700', color: '#dc2626' }}>Confirmación final</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>Esta acción NO se puede deshacer</div>
+                  </div>
+                </div>
+                <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5', marginBottom: '20px' }}>
+                  ¿Estás completamente seguro de que quieres eliminar permanentemente <strong style={{ color: '#dc2626' }}>{confirmDel.empresa.nombre}</strong> y todos sus registros?
+                </p>
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                  <button onClick={() => setConfirmDel(null)} style={{ ...btnBase, background: 'var(--inner-bg)', color: 'var(--text-muted)', padding: '8px 16px' }}>No, cancelar</button>
+                  <button onClick={handleDelete} style={{ ...btnBase, background: '#dc2626', color: '#fff', padding: '8px 18px', fontWeight: '700' }}>Sí, eliminar definitivamente</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal nueva / editar empresa */}
+      {showModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: '16px' }}>
+          <div style={{ background: 'var(--card-bg)', borderRadius: '16px', border: '1px solid var(--border-card)', width: '100%', maxWidth: '420px', padding: '24px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-1)', marginBottom: '20px' }}>{editando ? 'Editar empresa' : 'Nueva empresa'}</h3>
+            <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '5px' }}>Nombre *</label>
+                <input value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Ej: Transportes GT" required
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '9px', border: '1.5px solid var(--border-card)', background: 'var(--inner-bg)', color: 'var(--text-1)', fontSize: '14px', boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '5px' }}>Descripción (opcional)</label>
+                <input value={form.descripcion} onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))} placeholder="Ej: Empresa de transporte de carga"
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '9px', border: '1.5px solid var(--border-card)', background: 'var(--inner-bg)', color: 'var(--text-1)', fontSize: '14px', boxSizing: 'border-box' }} />
+              </div>
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '6px' }}>
+                <button type="button" onClick={() => { setShowModal(false); setEditando(null) }} style={{ ...btnBase, background: 'var(--inner-bg)', color: 'var(--text-muted)', padding: '8px 16px' }}>Cancelar</button>
+                <button type="submit" disabled={saving} style={{ ...btnBase, background: 'var(--accent)', color: '#fff', padding: '8px 16px' }}>{saving ? 'Guardando…' : editando ? 'Guardar cambios' : 'Crear empresa'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default function ContabilidadPage({ user }) {
+  const [section,      setSection]      = useState(() => localStorage.getItem('conta_section') || 'EXPRESS')
+  const [empresaActual, setEmpresaActual] = useState(() => {
+    try { const s = localStorage.getItem('conta_empresa_actual'); return s ? JSON.parse(s) : null } catch { return null }
+  })
+
+  const selectEmpresa = (emp) => {
+    setEmpresaActual(emp)
+    if (emp) localStorage.setItem('conta_empresa_actual', JSON.stringify(emp))
+    else localStorage.removeItem('conta_empresa_actual')
+  }
+
+  const handleSection = (key) => {
+    setSection(key)
+    localStorage.setItem('conta_section', key)
+    if (key !== 'COMPLETA') selectEmpresa(null)
+  }
+
+  return (
+    <div>
+      {/* Tabs de sección */}
+      <div style={{ display: 'flex', gap: '4px', marginBottom: '28px', background: 'var(--inner-bg)', padding: '4px', borderRadius: '12px', width: 'fit-content' }}>
+        {CONTA_SECTIONS.map(s => (
+          <button key={s.key} onClick={() => handleSection(s.key)} style={{
+            padding: '8px 18px', borderRadius: '9px', border: 'none', fontSize: '13.5px',
+            fontWeight: section === s.key ? '600' : '400',
+            background: section === s.key ? 'var(--card-bg)' : 'transparent',
+            color: section === s.key ? 'var(--text-1)' : 'var(--text-muted)',
+            boxShadow: section === s.key ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+            transition: 'all 0.15s', cursor: 'pointer',
+          }}>
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {section === 'EXPRESS' && <ContabilidadExpress />}
+
+      {section === 'COMPLETA' && !empresaActual && (
+        <EmpresaSelector userId={user?.id} onSelect={selectEmpresa} />
+      )}
+
+      {section === 'COMPLETA' && empresaActual && (
+        <div>
+          {/* Breadcrumb */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+            <button onClick={() => selectEmpresa(null)} style={{
+              display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px',
+              borderRadius: '8px', border: '1px solid var(--border-card)', background: 'var(--inner-bg)',
+              color: 'var(--text-muted)', fontSize: '13px', fontWeight: '500', cursor: 'pointer',
+            }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6"/>
+              </svg>
+              Empresas
+            </button>
+            <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>/</span>
+            <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-1)' }}>{empresaActual.nombre}</span>
+          </div>
+
+          <ContabilidadCompleta userId={user?.id} empresaId={empresaActual.id} />
+        </div>
+      )}
+    </div>
+  )
+}
