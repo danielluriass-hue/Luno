@@ -1122,6 +1122,10 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
   const [mesesDisp, setMesesDisp] = useState([])
   const [uploading, setUploading] = useState(false)
   const [err, setErr]           = useState('')
+  const [archivoDisp, setArchivoDisp] = useState(false)
+
+  const BUCKET      = 'libros-sat'
+  const storagePath = (y, m) => `${userId}/${empresaId}/${tipo.toLowerCase()}/${y}-${m}.xlsx`
 
   const loadPeriodos = useCallback(async () => {
     const { data } = await supabase.from(TABLE).select('ano,mes').eq('empresa_id', empresaId)
@@ -1135,13 +1139,16 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
   }, [TABLE, empresaId, ano, hoyAno])
 
   const loadRows = useCallback(async () => {
-    if (!mes) { setRows([]); return }
+    if (!mes) { setRows([]); setArchivoDisp(false); return }
     setRows(null)
     const { data } = await supabase.from(TABLE).select('*')
       .eq('empresa_id', empresaId).eq('ano', ano).eq('mes', mes).order('no')
     if (data?.length) { setRows(data); setMeta({ nombre:data[0].meta_nombre, nit:data[0].meta_nit }) }
     else setRows([])
-  }, [TABLE, empresaId, ano, mes])
+    const { data: sd } = await supabase.storage.from('libros-sat')
+      .createSignedUrl(`${userId}/${empresaId}/${tipo.toLowerCase()}/${ano}-${mes}.xlsx`, 60)
+    setArchivoDisp(!!sd?.signedUrl)
+  }, [TABLE, empresaId, userId, tipo, ano, mes])
 
   useEffect(() => { loadPeriodos() }, [loadPeriodos])
   useEffect(() => { loadRows() }, [loadRows])
@@ -1166,6 +1173,12 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
       }))
       for (let i=0; i<toInsert.length; i+=200)
         await supabase.from(TABLE).insert(toInsert.slice(i,i+200))
+      await supabase.storage.from(BUCKET).upload(
+        storagePath(dAno, dMes),
+        new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+        { upsert:true }
+      )
+      setArchivoDisp(true)
       setAno(dAno); setMes(dMes)
       await loadPeriodos()
       await loadRows()
@@ -1194,6 +1207,16 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
       totIVA:   vig.reduce((s,r)=>s+(r.iva||0),0),
       totTotal: vig.reduce((s,r)=>s+(r.total||0),0),
     }
+  }
+
+  // ── Descarga archivo SAT original ────────────────────────────────────────
+  const handleDownloadArchivo = async () => {
+    const { data } = await supabase.storage.from(BUCKET).createSignedUrl(storagePath(ano, mes), 300)
+    if (!data?.signedUrl) return
+    const a = document.createElement('a')
+    a.href = data.signedUrl
+    a.download = `libro-${tipo.toLowerCase()}-${ano}-${mes}.xlsx`
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
   }
 
   // ── PDF ─────────────────────────────────────────────────────────────────
@@ -1344,6 +1367,12 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
             padding:'8px 16px', borderRadius:'8px', border:'1.5px solid var(--accent)',
             background:'transparent', color:'var(--accent)', fontWeight:'600', fontSize:'13px', cursor:'pointer',
           }}>Descargar PDF</button>
+        )}
+        {archivoDisp && (
+          <button onClick={handleDownloadArchivo} style={{
+            padding:'8px 16px', borderRadius:'8px', border:'1.5px solid #22c55e',
+            background:'transparent', color:'#22c55e', fontWeight:'600', fontSize:'13px', cursor:'pointer',
+          }}>↓ Archivo SAT</button>
         )}
         {rows?.length > 0 && (
           <span style={{ fontSize:'12px', color:'var(--text-muted)' }}>
