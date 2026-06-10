@@ -1451,7 +1451,7 @@ function ResultadosTab({ cuentas, asientos, empresaNombre = '' }) {
           { content: c.nombre, styles: { ...tblBody, fillColor: idx%2===0 ? [255,255,255] : [248,250,252] } },
           { content: Qp(getSaldo(c)), styles: { ...tblBody, halign:'right', fillColor: idx%2===0 ? [255,255,255] : [248,250,252] } },
         ]),
-        foot: [[{ content:'TOTAL ISR', colSpan:2, styles:tblTotal }, { content:Qp(totISR), styles:{...tblTotal,halign:'right'} }]],
+        foot: [[{ content:'ISR DEL PERÍODO', colSpan:2, styles:tblTotal }, { content:Qp(totISR), styles:{...tblTotal,halign:'right'} }]],
         headStyles: tblHead, bodyStyles: tblBody, footStyles: tblTotal,
         columnStyles: col, margin:{left:14,right:14}, theme:'plain',
       })
@@ -1588,7 +1588,7 @@ function ResultadosTab({ cuentas, asientos, empresaNombre = '' }) {
             <tbody>{gastosISR.map(c=><Fila key={c.id} c={c} />)}</tbody>
             <tfoot>
               <tr style={{ borderTop:'2px solid var(--border)', background:'var(--inner-bg)' }}>
-                <td colSpan={2} style={{ padding:'8px 12px', fontSize:'13px', fontWeight:'700' }}>Total ISR</td>
+                <td colSpan={2} style={{ padding:'8px 12px', fontSize:'13px', fontWeight:'700' }}>ISR del Período</td>
                 <td style={{ padding:'8px 12px', fontSize:'14px', fontWeight:'700', textAlign:'right', color:'#7c3aed', fontVariantNumeric:'tabular-nums' }}>{Q(totISR)}</td>
               </tr>
             </tfoot>
