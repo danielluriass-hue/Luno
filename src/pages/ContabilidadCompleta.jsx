@@ -1230,7 +1230,7 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
           ]),
           ['','','','','','','','TOTALES', n(totServ), n(totIVA), n(totTotal)],
         ],
-        headStyles:  { fillColor:[44,55,70], fontSize:7, cellPadding:3 },
+        headStyles:  { fillColor:[44,55,70], textColor:[255,255,255], fontSize:7, cellPadding:3 },
         bodyStyles:  { fontSize:7, cellPadding:2, textColor:[30,30,30] },
         alternateRowStyles: { fillColor:[248,250,252] },
         footStyles:  { fillColor:[226,232,240], fontStyle:'bold', fontSize:7 },
@@ -1269,7 +1269,7 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
           ]),
           ['','','','','','','','TOTALES', n(totComb), n(totComp), '0.00', n(totIVA), n(totTotal)],
         ],
-        headStyles:  { fillColor:[44,55,70], fontSize:7, cellPadding:3 },
+        headStyles:  { fillColor:[44,55,70], textColor:[255,255,255], fontSize:7, cellPadding:3 },
         bodyStyles:  { fontSize:7, cellPadding:2, textColor:[30,30,30] },
         alternateRowStyles: { fillColor:[248,250,252] },
         columnStyles: {
