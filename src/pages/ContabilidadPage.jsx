@@ -495,10 +495,12 @@ function Qx(n) {
 
 function exportVentasXLSX(rows, meta, mesLabel) {
   const wb = XLSX.utils.book_new()
+  const NCR_TIPOS_XLSX = new Set(['NCRE', 'NAB', 'NCR'])
   const vig = rows.filter(r => r.estado === 'Vigente')
-  const totS = vig.reduce((s, r) => s + r.servicios, 0)
-  const totI = vig.reduce((s, r) => s + r.iva, 0)
-  const totT = vig.reduce((s, r) => s + r.total, 0)
+  const ncrSignX = r => NCR_TIPOS_XLSX.has(r.tipoDTE) ? -1 : 1
+  const totS = vig.reduce((s, r) => s + ncrSignX(r) * r.servicios, 0)
+  const totI = vig.reduce((s, r) => s + ncrSignX(r) * r.iva, 0)
+  const totT = vig.reduce((s, r) => s + ncrSignX(r) * r.total, 0)
 
   const aoa = [
     ['LIBRO DE VENTAS Y SERVICIOS PRESTADOS'],
@@ -648,10 +650,12 @@ function ExportButtons({ onXLSX, onPrint }) {
 function LibroVentas({ rows, meta, mesLabel }) {
   if (!rows.length) return <EmptyState label="Carga el archivo de Ventas SAT" />
 
+  const NCR_TIPOS_SET = new Set(['NCRE', 'NAB', 'NCR'])
   const vigentes = rows.filter(r => r.estado === 'Vigente')
-  const totServ  = vigentes.reduce((s, r) => s + r.servicios, 0)
-  const totIVA   = vigentes.reduce((s, r) => s + r.iva, 0)
-  const totTotal = vigentes.reduce((s, r) => s + r.total, 0)
+  const ncrSign  = r => NCR_TIPOS_SET.has(r.tipoDTE) ? -1 : 1
+  const totServ  = vigentes.reduce((s, r) => s + ncrSign(r) * r.servicios, 0)
+  const totIVA   = vigentes.reduce((s, r) => s + ncrSign(r) * r.iva, 0)
+  const totTotal = vigentes.reduce((s, r) => s + ncrSign(r) * r.total, 0)
 
   const handlePrint = () => {
     const html = `
