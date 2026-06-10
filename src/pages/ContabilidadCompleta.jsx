@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, Fragment, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import * as XLSX from 'xlsx'
 
 // UID se pasa como prop desde App → ContabilidadPage → ContabilidadCompleta
 
@@ -1038,7 +1039,390 @@ function AsientoModal({ mode, asiento, prefill, cuentas, onClose, onSaved, userI
   )
 }
 
-// ── MÓDULOS 3 Y 4: LIBRO DE VENTAS / COMPRAS ────────────────────────────────
+// ── PARSERS SAT ──────────────────────────────────────────────────────────────
+
+function colMapSAT(headers) {
+  const m = {}
+  headers.forEach((h, i) => { if (h) m[String(h).trim()] = i })
+  return m
+}
+
+function fmtFechaSAT(raw) {
+  if (!raw) return ''
+  try { return new Date(raw).toLocaleDateString('es-GT', { day:'2-digit', month:'2-digit', year:'numeric' }) }
+  catch { return String(raw) }
+}
+
+function parseVentasSAT(wb) {
+  const ws = wb.Sheets[wb.SheetNames[0]]
+  const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' })
+  if (rows.length < 2) return { rows:[], meta:{} }
+  const COL = colMapSAT(rows[0])
+  const data = rows.slice(1).map((r, i) => {
+    const anulado = String(r[COL['Marca de anulado']]||'').toLowerCase() === 'si'
+    const tipoDTE = r[COL['Tipo de DTE (nombre)']] || ''
+    const total   = parseFloat(r[COL['Gran Total (Moneda Original)']]) || 0
+    const iva     = parseFloat(r[COL['IVA (monto de este impuesto)']]) || 0
+    return {
+      no: i+1, fecha: fmtFechaSAT(r[COL['Fecha de emisión']]),
+      tipo_dte: tipoDTE, serie: r[COL['Serie']]||'', numero: r[COL['Número del DTE']]||'',
+      nit: r[COL['ID del receptor']]||'', cliente: r[COL['Nombre completo del receptor']]||'',
+      estado: anulado ? 'Anulado' : 'Vigente', servicios: total-iva, iva, total,
+    }
+  })
+  return {
+    rows: data,
+    meta: { nit: rows[1]?.[COL['NIT del emisor']]||'', nombre: rows[1]?.[COL['Nombre completo del emisor']]||'' },
+  }
+}
+
+function parseComprasSAT(wb) {
+  const ws = wb.Sheets[wb.SheetNames[0]]
+  const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' })
+  if (rows.length < 2) return { rows:[], meta:{} }
+  const COL = colMapSAT(rows[0])
+  const data = rows.slice(1).map((r, i) => {
+    const anulado = String(r[COL['Marca de anulado']]||'').toLowerCase() === 'si'
+    const total   = parseFloat(r[COL['Gran Total (Moneda Original)']]) || 0
+    const iva     = parseFloat(r[COL['IVA (monto de este impuesto)']]) || 0
+    const idp     = parseFloat(r[COL['Petróleo (monto de este impuesto)']]) || 0
+    const esComb  = idp > 0
+    const neto    = esComb ? total-idp-iva : total-iva
+    return {
+      no: i+1, fecha: fmtFechaSAT(r[COL['Fecha de emisión']]),
+      tipo_dte: r[COL['Tipo de DTE (nombre)']]||'', serie: r[COL['Serie']]||'',
+      numero: r[COL['Número del DTE']]||'', nit: r[COL['NIT del emisor']]||'',
+      proveedor: r[COL['Nombre completo del emisor']]||'',
+      estado: anulado ? 'Anulado' : 'Vigente',
+      combustibles: esComb ? neto : 0, compras: esComb ? 0 : neto, iva, idp, total,
+    }
+  })
+  return {
+    rows: data,
+    meta: { nit: rows[1]?.[COL['ID del receptor']]||'', nombre: rows[1]?.[COL['Nombre completo del receptor']]||'' },
+  }
+}
+
+// ── MÓDULO SAT: LIBRO DE VENTAS / COMPRAS (desde archivos SAT, guardado en Supabase) ──
+
+const NCR_SAT = new Set(['NCRE','NAB','NCR'])
+
+function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
+  const TABLE   = tipo === 'VENTA' ? 'conta_libro_ventas' : 'conta_libro_compras'
+  const hoyAno  = new Date().getFullYear()
+  const [ano, setAno]           = useState(hoyAno)
+  const [mes, setMes]           = useState(null)
+  const [rows, setRows]         = useState(null)   // null=cargando
+  const [meta, setMeta]         = useState({})
+  const [anosDisp, setAnosDisp] = useState([hoyAno])
+  const [mesesDisp, setMesesDisp] = useState([])
+  const [uploading, setUploading] = useState(false)
+  const [err, setErr]           = useState('')
+
+  const loadPeriodos = useCallback(async () => {
+    const { data } = await supabase.from(TABLE).select('ano,mes').eq('empresa_id', empresaId)
+    if (data) {
+      const anos = [...new Set(data.map(r=>r.ano))].sort((a,b)=>b-a)
+      if (!anos.includes(hoyAno)) anos.unshift(hoyAno)
+      setAnosDisp(anos)
+      const meses = [...new Set(data.filter(r=>r.ano===ano).map(r=>r.mes))].sort((a,b)=>a-b)
+      setMesesDisp(meses)
+    }
+  }, [TABLE, empresaId, ano, hoyAno])
+
+  const loadRows = useCallback(async () => {
+    if (!mes) { setRows([]); return }
+    setRows(null)
+    const { data } = await supabase.from(TABLE).select('*')
+      .eq('empresa_id', empresaId).eq('ano', ano).eq('mes', mes).order('no')
+    if (data?.length) { setRows(data); setMeta({ nombre:data[0].meta_nombre, nit:data[0].meta_nit }) }
+    else setRows([])
+  }, [TABLE, empresaId, ano, mes])
+
+  useEffect(() => { loadPeriodos() }, [loadPeriodos])
+  useEffect(() => { loadRows() }, [loadRows])
+
+  const handleSetAno = (y) => { setAno(y); setMes(null) }
+  const handleSetMes = (m) => setMes(mes===m ? null : m)
+
+  const handleFile = async (file) => {
+    setUploading(true); setErr('')
+    try {
+      const buf  = await file.arrayBuffer()
+      const wb   = XLSX.read(buf, { type:'array' })
+      const parsed = tipo === 'VENTA' ? parseVentasSAT(wb) : parseComprasSAT(wb)
+      if (!parsed.rows.length) { setErr('Sin registros en el archivo.'); return }
+      const parts = (parsed.rows.find(r=>r.fecha)?.fecha||'').split('/')
+      const dMes  = parts.length>=3 ? parseInt(parts[1]) : (mes||new Date().getMonth()+1)
+      const dAno  = parts.length>=3 ? parseInt(parts[2]) : ano
+      await supabase.from(TABLE).delete().eq('empresa_id',empresaId).eq('ano',dAno).eq('mes',dMes)
+      const toInsert = parsed.rows.map(r => ({
+        ...r, empresa_id:empresaId, user_id:userId,
+        mes:dMes, ano:dAno, meta_nombre:parsed.meta.nombre||'', meta_nit:parsed.meta.nit||'',
+      }))
+      for (let i=0; i<toInsert.length; i+=200)
+        await supabase.from(TABLE).insert(toInsert.slice(i,i+200))
+      setAno(dAno); setMes(dMes)
+      await loadPeriodos()
+      await loadRows()
+    } catch(e) { setErr('Error: '+e.message) }
+    finally { setUploading(false) }
+  }
+
+  const periodoLabel = mes ? `${MESES[mes-1]} ${ano}` : `Año ${ano}`
+  const mesLabel     = mes ? `${MESES[mes-1]} de ${ano}` : `${ano}`
+
+  // ── Totales ─────────────────────────────────────────────────────────────
+  const totalesVenta = (rs) => {
+    const vig = rs.filter(r=>r.estado==='Vigente')
+    const sg  = r => NCR_SAT.has(r.tipo_dte) ? -1 : 1
+    return {
+      totServ:  vig.reduce((s,r)=>s+sg(r)*(r.servicios||0),0),
+      totIVA:   vig.reduce((s,r)=>s+sg(r)*(r.iva||0),0),
+      totTotal: vig.reduce((s,r)=>s+sg(r)*(r.total||0),0),
+    }
+  }
+  const totalesCompra = (rs) => {
+    const vig = rs.filter(r=>r.estado==='Vigente')
+    return {
+      totComb:  vig.reduce((s,r)=>s+(r.combustibles||0),0),
+      totComp:  vig.reduce((s,r)=>s+(r.compras||0),0),
+      totIVA:   vig.reduce((s,r)=>s+(r.iva||0),0),
+      totTotal: vig.reduce((s,r)=>s+(r.total||0),0),
+    }
+  }
+
+  // ── PDF ─────────────────────────────────────────────────────────────────
+  const handlePDF = () => {
+    if (!rows?.length) return
+    const titulo  = tipo==='VENTA' ? 'LIBRO DE VENTAS Y SERVICIOS PRESTADOS' : 'LIBRO DE COMPRAS Y SERVICIOS ADQUIRIDOS'
+    const doc = initPDF(titulo, mesLabel, empresaNombre)
+    if (tipo === 'VENTA') {
+      const { totServ, totIVA, totTotal } = totalesVenta(rows)
+      autoTable(doc, {
+        startY: 47,
+        head: [['No.','Fecha','Tipo','Serie','Número','NIT','Cliente','Estado','P.Neto Serv.','IVA Déb.','Total c/IVA']],
+        body: [
+          ...rows.map(r => [
+            r.no, r.fecha, r.tipo_dte, r.serie, r.numero, r.nit, r.cliente, r.estado,
+            r.estado==='Anulado'?'–':Qp(r.servicios),
+            r.estado==='Anulado'?'–':Qp(r.iva),
+            r.estado==='Anulado'?'–':Qp(r.total),
+          ]),
+          ['','','','','','','','TOTALES', Qp(totServ), Qp(totIVA), Qp(totTotal)],
+        ],
+        headStyles:{ fillColor:[88,86,214], fontSize:7 },
+        bodyStyles:{ fontSize:7 },
+        columnStyles:{ 8:{halign:'right'},9:{halign:'right'},10:{halign:'right'} },
+        margin:{ left:14, right:14 }, theme:'plain',
+      })
+    } else {
+      const { totComb, totComp, totIVA, totTotal } = totalesCompra(rows)
+      autoTable(doc, {
+        startY: 47,
+        head: [['No.','Fecha','Tipo','Serie','Número','NIT','Proveedor','Estado','Combustibles','Compras','IVA CF','Total']],
+        body: [
+          ...rows.map(r => [
+            r.no, r.fecha, r.tipo_dte, r.serie, r.numero, r.nit, r.proveedor, r.estado,
+            r.estado==='Anulado'?'–':Qp(r.combustibles),
+            r.estado==='Anulado'?'–':Qp(r.compras),
+            r.estado==='Anulado'?'–':Qp(r.iva),
+            r.estado==='Anulado'?'–':Qp(r.total),
+          ]),
+          ['','','','','','','','TOTALES', Qp(totComb), Qp(totComp), Qp(totIVA), Qp(totTotal)],
+        ],
+        headStyles:{ fillColor:[88,86,214], fontSize:7 },
+        bodyStyles:{ fontSize:7 },
+        columnStyles:{ 8:{halign:'right'},9:{halign:'right'},10:{halign:'right'},11:{halign:'right'} },
+        margin:{ left:14, right:14 }, theme:'plain',
+      })
+    }
+    doc.save(`libro-${tipo.toLowerCase()}-${periodoLabel.toLowerCase().replace(' ','-')}.pdf`)
+  }
+
+  // ── Render ───────────────────────────────────────────────────────────────
+  const sinDatos = rows !== null && rows.length === 0
+
+  return (
+    <div>
+      {/* Selectores año/mes */}
+      {anosDisp.length > 0 && (
+        <div style={{ display:'flex', gap:'6px', marginBottom:'8px', flexWrap:'wrap' }}>
+          {anosDisp.map(y => (
+            <button key={y} onClick={()=>handleSetAno(y)} style={{
+              padding:'5px 16px', borderRadius:'7px', border:'none', fontSize:'13px',
+              fontWeight:ano===y?'700':'400',
+              background:ano===y?'var(--accent)':'var(--inner-bg)',
+              color:ano===y?'#fff':'var(--text-muted)', cursor:'pointer',
+            }}>{y}</button>
+          ))}
+        </div>
+      )}
+      {mesesDisp.length > 0 && (
+        <div style={{ display:'flex', gap:'5px', marginBottom:'10px', flexWrap:'wrap' }}>
+          {mesesDisp.map(m => (
+            <button key={m} onClick={()=>handleSetMes(m)} style={{
+              padding:'4px 12px', borderRadius:'7px', border:'1px solid var(--border)', fontSize:'12px',
+              fontWeight:mes===m?'700':'400',
+              background:mes===m?'var(--accent-soft)':'transparent',
+              color:mes===m?'var(--accent)':'var(--text-muted)', cursor:'pointer',
+            }}>{MESES[m-1]}</button>
+          ))}
+        </div>
+      )}
+
+      {err && <div style={{ marginBottom:'12px', padding:'10px 14px', background:'#fee2e2', borderRadius:'8px', border:'1px solid #fca5a5', fontSize:'13px', color:'#dc2626' }}>{err}</div>}
+
+      {/* Zona de upload */}
+      <div style={{ marginBottom:'16px', display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap' }}>
+        <label style={{
+          display:'inline-flex', alignItems:'center', gap:'8px', padding:'8px 16px',
+          borderRadius:'8px', border:'1.5px dashed var(--accent)', cursor: uploading ? 'not-allowed':'pointer',
+          background:'var(--accent-soft)', color:'var(--accent)', fontSize:'13px', fontWeight:'600',
+          opacity: uploading ? 0.6 : 1,
+        }}>
+          <input type="file" accept=".xls,.xlsx" style={{ display:'none' }}
+            disabled={uploading}
+            onChange={e => e.target.files[0] && handleFile(e.target.files[0])} />
+          {uploading ? 'Importando…' : (rows?.length ? '↑ Reemplazar datos SAT' : '↑ Cargar archivo SAT')}
+        </label>
+        {rows?.length > 0 && (
+          <button onClick={handlePDF} style={{
+            padding:'8px 16px', borderRadius:'8px', border:'1.5px solid var(--accent)',
+            background:'transparent', color:'var(--accent)', fontWeight:'600', fontSize:'13px', cursor:'pointer',
+          }}>Descargar PDF</button>
+        )}
+        {rows?.length > 0 && (
+          <span style={{ fontSize:'12px', color:'var(--text-muted)' }}>
+            Período: <strong style={{ color:'var(--text-1)' }}>{periodoLabel}</strong> — {rows.length} registros
+          </span>
+        )}
+      </div>
+
+      {/* Estado vacío */}
+      {sinDatos && !mes && (
+        <div style={{ padding:'48px', textAlign:'center', color:'var(--text-muted)', fontSize:'13px', background:'var(--inner-bg)', borderRadius:'12px' }}>
+          Selecciona un mes o carga un archivo SAT para comenzar
+        </div>
+      )}
+      {sinDatos && mes && (
+        <div style={{ padding:'48px', textAlign:'center', color:'var(--text-muted)', fontSize:'13px', background:'var(--inner-bg)', borderRadius:'12px' }}>
+          Sin datos para {MESES[mes-1]} {ano}. Carga el archivo SAT del mes.
+        </div>
+      )}
+
+      {/* Loading */}
+      {rows === null && (
+        <div style={{ padding:'48px', textAlign:'center', color:'var(--text-muted)', fontSize:'13px' }}>Cargando…</div>
+      )}
+
+      {/* Tabla Ventas */}
+      {tipo==='VENTA' && rows?.length > 0 && (() => {
+        const { totServ, totIVA, totTotal } = totalesVenta(rows)
+        return (
+          <div>
+            {meta.nombre && (
+              <div style={{ marginBottom:'10px', fontSize:'12px', color:'var(--text-muted)' }}>
+                <strong style={{ color:'var(--text-1)' }}>{meta.nombre}</strong> · NIT: {meta.nit}
+              </div>
+            )}
+            <div style={{ overflowX:'auto' }}>
+              <table style={{ borderCollapse:'collapse', width:'100%', minWidth:'820px', background:'var(--card-bg)' }}>
+                <thead>
+                  <tr>{['No.','Fecha','Tipo','Serie','Número','NIT','Cliente','Estado','P.Neto Serv.','IVA Déb.','Total c/IVA'].map(h=>(
+                    <th key={h} style={{ padding:'8px 10px', fontSize:'11px', fontWeight:'700', color:'var(--text-muted)', borderBottom:'1px solid var(--border)', textAlign: ['P.Neto Serv.','IVA Déb.','Total c/IVA'].includes(h)?'right':'left', whiteSpace:'nowrap' }}>{h}</th>
+                  ))}</tr>
+                </thead>
+                <tbody>
+                  {rows.map((r,i) => (
+                    <tr key={r.id} style={{ background: r.estado==='Anulado'?'rgba(220,38,38,0.04)': i%2===0?'transparent':'var(--inner-bg)', borderBottom:'1px solid var(--border)' }}>
+                      <td style={{ padding:'7px 10px', fontSize:'12px', color:'var(--text-muted)' }}>{r.no}</td>
+                      <td style={{ padding:'7px 10px', fontSize:'12px', whiteSpace:'nowrap' }}>{r.fecha}</td>
+                      <td style={{ padding:'7px 10px' }}><span style={{ padding:'2px 8px', borderRadius:'5px', fontSize:'11px', fontWeight:'700', background: NCR_SAT.has(r.tipo_dte)?'rgba(234,179,8,0.15)':'rgba(88,86,214,0.12)', color: NCR_SAT.has(r.tipo_dte)?'#ca8a04':'var(--accent)' }}>{r.tipo_dte}</span></td>
+                      <td style={{ padding:'7px 10px', fontSize:'11px', color:'var(--text-muted)', fontFamily:'monospace' }}>{r.serie}</td>
+                      <td style={{ padding:'7px 10px', fontSize:'11px', fontFamily:'monospace' }}>{r.numero}</td>
+                      <td style={{ padding:'7px 10px', fontSize:'11px', color:'var(--text-muted)' }}>{r.nit}</td>
+                      <td style={{ padding:'7px 10px', fontSize:'12px', maxWidth:'200px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.cliente}</td>
+                      <td style={{ padding:'7px 10px' }}><span style={{ padding:'2px 8px', borderRadius:'5px', fontSize:'11px', fontWeight:'600', background: r.estado==='Anulado'?'rgba(220,38,38,0.1)':'rgba(22,163,74,0.1)', color: r.estado==='Anulado'?'#dc2626':'#16a34a' }}>{r.estado}</span></td>
+                      <td style={{ padding:'7px 10px', fontSize:'12px', textAlign:'right', fontFamily:'monospace' }}>{r.estado==='Anulado'?'–':Q(r.servicios)}</td>
+                      <td style={{ padding:'7px 10px', fontSize:'12px', textAlign:'right', fontFamily:'monospace' }}>{r.estado==='Anulado'?'–':Q(r.iva)}</td>
+                      <td style={{ padding:'7px 10px', fontSize:'12px', textAlign:'right', fontFamily:'monospace', fontWeight:'600' }}>{r.estado==='Anulado'?'–':Q(r.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr style={{ borderTop:'2px solid var(--border)', background:'var(--inner-bg)' }}>
+                    <td colSpan={8} style={{ padding:'8px 10px', fontSize:'12px', fontWeight:'700', color:'var(--text-muted)' }}>TOTALES</td>
+                    <td style={{ padding:'8px 10px', fontSize:'13px', fontWeight:'700', textAlign:'right', fontFamily:'monospace' }}>{Q(totServ)}</td>
+                    <td style={{ padding:'8px 10px', fontSize:'13px', fontWeight:'700', textAlign:'right', fontFamily:'monospace' }}>{Q(totIVA)}</td>
+                    <td style={{ padding:'8px 10px', fontSize:'13px', fontWeight:'700', textAlign:'right', fontFamily:'monospace' }}>{Q(totTotal)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+            <div style={{ marginTop:'10px', display:'flex', gap:'16px', flexWrap:'wrap' }}>
+              {['FACT = Factura','NCRE = Nota de crédito','NAB = Nota de abono','FCAM = Factura cambiaria'].map(l=>(
+                <span key={l} style={{ fontSize:'10px', color:'var(--text-muted)' }}>{l}</span>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Tabla Compras */}
+      {tipo==='COMPRA' && rows?.length > 0 && (() => {
+        const { totComb, totComp, totIVA, totTotal } = totalesCompra(rows)
+        return (
+          <div>
+            {meta.nombre && (
+              <div style={{ marginBottom:'10px', fontSize:'12px', color:'var(--text-muted)' }}>
+                <strong style={{ color:'var(--text-1)' }}>{meta.nombre}</strong> · NIT: {meta.nit}
+              </div>
+            )}
+            <div style={{ overflowX:'auto' }}>
+              <table style={{ borderCollapse:'collapse', width:'100%', minWidth:'900px', background:'var(--card-bg)' }}>
+                <thead>
+                  <tr>{['No.','Fecha','Tipo','Serie','Número','NIT','Proveedor','Estado','Combustibles','Compras','IVA CF','Total'].map(h=>(
+                    <th key={h} style={{ padding:'8px 10px', fontSize:'11px', fontWeight:'700', color:'var(--text-muted)', borderBottom:'1px solid var(--border)', textAlign:['Combustibles','Compras','IVA CF','Total'].includes(h)?'right':'left', whiteSpace:'nowrap' }}>{h}</th>
+                  ))}</tr>
+                </thead>
+                <tbody>
+                  {rows.map((r,i) => (
+                    <tr key={r.id} style={{ background: r.estado==='Anulado'?'rgba(220,38,38,0.04)': i%2===0?'transparent':'var(--inner-bg)', borderBottom:'1px solid var(--border)' }}>
+                      <td style={{ padding:'7px 10px', fontSize:'12px', color:'var(--text-muted)' }}>{r.no}</td>
+                      <td style={{ padding:'7px 10px', fontSize:'12px', whiteSpace:'nowrap' }}>{r.fecha}</td>
+                      <td style={{ padding:'7px 10px' }}><span style={{ padding:'2px 8px', borderRadius:'5px', fontSize:'11px', fontWeight:'700', background:'rgba(88,86,214,0.12)', color:'var(--accent)' }}>{r.tipo_dte}</span></td>
+                      <td style={{ padding:'7px 10px', fontSize:'11px', color:'var(--text-muted)', fontFamily:'monospace' }}>{r.serie}</td>
+                      <td style={{ padding:'7px 10px', fontSize:'11px', fontFamily:'monospace' }}>{r.numero}</td>
+                      <td style={{ padding:'7px 10px', fontSize:'11px', color:'var(--text-muted)' }}>{r.nit}</td>
+                      <td style={{ padding:'7px 10px', fontSize:'12px', maxWidth:'200px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.proveedor}</td>
+                      <td style={{ padding:'7px 10px' }}><span style={{ padding:'2px 8px', borderRadius:'5px', fontSize:'11px', fontWeight:'600', background: r.estado==='Anulado'?'rgba(220,38,38,0.1)':'rgba(22,163,74,0.1)', color: r.estado==='Anulado'?'#dc2626':'#16a34a' }}>{r.estado}</span></td>
+                      <td style={{ padding:'7px 10px', fontSize:'12px', textAlign:'right', fontFamily:'monospace' }}>{r.estado==='Anulado'?'–':Q(r.combustibles)}</td>
+                      <td style={{ padding:'7px 10px', fontSize:'12px', textAlign:'right', fontFamily:'monospace' }}>{r.estado==='Anulado'?'–':Q(r.compras)}</td>
+                      <td style={{ padding:'7px 10px', fontSize:'12px', textAlign:'right', fontFamily:'monospace' }}>{r.estado==='Anulado'?'–':Q(r.iva)}</td>
+                      <td style={{ padding:'7px 10px', fontSize:'12px', textAlign:'right', fontFamily:'monospace', fontWeight:'600' }}>{r.estado==='Anulado'?'–':Q(r.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr style={{ borderTop:'2px solid var(--border)', background:'var(--inner-bg)' }}>
+                    <td colSpan={8} style={{ padding:'8px 10px', fontSize:'12px', fontWeight:'700', color:'var(--text-muted)' }}>TOTALES</td>
+                    <td style={{ padding:'8px 10px', fontSize:'13px', fontWeight:'700', textAlign:'right', fontFamily:'monospace' }}>{Q(totComb)}</td>
+                    <td style={{ padding:'8px 10px', fontSize:'13px', fontWeight:'700', textAlign:'right', fontFamily:'monospace' }}>{Q(totComp)}</td>
+                    <td style={{ padding:'8px 10px', fontSize:'13px', fontWeight:'700', textAlign:'right', fontFamily:'monospace' }}>{Q(totIVA)}</td>
+                    <td style={{ padding:'8px 10px', fontSize:'13px', fontWeight:'700', textAlign:'right', fontFamily:'monospace' }}>{Q(totTotal)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        )
+      })()}
+    </div>
+  )
+}
+
+// ── MÓDULOS 3 Y 4: LIBRO DE VENTAS / COMPRAS (legacy — ya no se usan) ────────
 
 function LibroTab({ tipo, asientos }) {
   const _hoyY = new Date().getFullYear()
@@ -2192,8 +2576,8 @@ export default function ContabilidadCompleta({ userId, empresaId, empresaNombre 
 
       {tab==='CATALOGO'   && <CatalogTab  cuentas={cuentas}  onReload={load} userId={userId} empresaId={empresaId} />}
       {tab==='DIARIO'     && <DiarioTab   cuentas={cuentas}  asientos={asientos} onReload={load} userId={userId} empresaId={empresaId} />}
-      {tab==='VENTAS'     && <LibroTab    tipo="VENTA"  asientos={asientos} />}
-      {tab==='COMPRAS'    && <LibroTab    tipo="COMPRA" asientos={asientos} />}
+      {tab==='VENTAS'     && <LibroSATTab tipo="VENTA"  empresaId={empresaId} userId={userId} empresaNombre={empresaNombre} />}
+      {tab==='COMPRAS'    && <LibroSATTab tipo="COMPRA" empresaId={empresaId} userId={userId} empresaNombre={empresaNombre} />}
       {tab==='MAYOR'      && <MayorTab    cuentas={cuentas}  asientos={asientos} empresaNombre={empresaNombre} />}
       {tab==='RESULTADOS' && <ResultadosTab cuentas={cuentas} asientos={asientos} empresaNombre={empresaNombre} />}
       {tab==='BALANCE'    && <BalanceTab   cuentas={cuentas} asientos={asientos} empresaNombre={empresaNombre} />}
