@@ -1384,8 +1384,9 @@ function EmpresaSelector({ userId, onSelect }) {
   const [showModal, setShowModal] = useState(false)
   const [form,      setForm]      = useState({ nombre: '', descripcion: '' })
   const [saving,    setSaving]    = useState(false)
-  const [editando,  setEditando]  = useState(null)
+  const [editando,   setEditando]   = useState(null)
   const [confirmDel, setConfirmDel] = useState(null) // { empresa, paso: 1|2 }
+  const [duplicando, setDuplicando] = useState(null) // empresa_id en proceso
 
   const cargar = async () => {
     setLoading(true)
@@ -1433,6 +1434,68 @@ function EmpresaSelector({ userId, onSelect }) {
 
   const openEdit = (emp) => { setEditando(emp); setForm({ nombre: emp.nombre, descripcion: emp.descripcion || '' }); setShowModal(true) }
   const openNew  = () => { setEditando(null); setForm({ nombre: '', descripcion: '' }); setShowModal(true) }
+
+  const handleDuplicate = async (emp) => {
+    setDuplicando(emp.id)
+    try {
+      // 1. Nueva empresa
+      const { data: newEmp, error: empErr } = await supabase
+        .from('conta_empresas')
+        .insert({ user_id: userId, nombre: `Copia de ${emp.nombre}`, descripcion: emp.descripcion || '' })
+        .select().single()
+      if (empErr || !newEmp) throw empErr || new Error('No se pudo crear empresa')
+      const newEmpId = newEmp.id
+
+      // 2. Copiar cuentas → mapear old_id → new_id por código
+      const cuentaMap = {}
+      const { data: cuentas } = await supabase.from('conta_cuentas').select('*').eq('empresa_id', emp.id)
+      if (cuentas?.length) {
+        const rows = cuentas.map(({ id: _id, empresa_id: _e, ...rest }) => ({ ...rest, empresa_id: newEmpId }))
+        const { data: ins } = await supabase.from('conta_cuentas').insert(rows).select()
+        if (ins) cuentas.forEach(old => {
+          const n = ins.find(x => x.codigo === old.codigo)
+          if (n) cuentaMap[old.id] = n.id
+        })
+      }
+
+      // 3. Copiar asientos uno por uno → mapear old_id → new_id
+      const asientoMap = {}
+      const { data: asientos } = await supabase.from('conta_asientos').select('*').eq('empresa_id', emp.id)
+      if (asientos?.length) {
+        for (const { id: oldId, empresa_id: _e, ...rest } of asientos) {
+          const { data: newA } = await supabase.from('conta_asientos').insert({ ...rest, empresa_id: newEmpId }).select().single()
+          if (newA) asientoMap[oldId] = newA.id
+        }
+      }
+
+      // 4. Copiar líneas con IDs mapeados
+      const { data: lineas } = await supabase.from('conta_lineas').select('*').eq('empresa_id', emp.id)
+      if (lineas?.length) {
+        const rows = lineas.map(({ id: _id, empresa_id: _e, asiento_id, cuenta_id, ...rest }) => ({
+          ...rest, empresa_id: newEmpId,
+          asiento_id: asientoMap[asiento_id] ?? asiento_id,
+          cuenta_id:  cuentaMap[cuenta_id]   ?? cuenta_id,
+        }))
+        await supabase.from('conta_lineas').insert(rows)
+      }
+
+      // 5. Copiar auditoría con asiento_id mapeado
+      const { data: auditoria } = await supabase.from('conta_auditoria').select('*').eq('empresa_id', emp.id)
+      if (auditoria?.length) {
+        const rows = auditoria.map(({ id: _id, empresa_id: _e, asiento_id, ...rest }) => ({
+          ...rest, empresa_id: newEmpId,
+          asiento_id: asiento_id ? (asientoMap[asiento_id] ?? asiento_id) : null,
+        }))
+        await supabase.from('conta_auditoria').insert(rows)
+      }
+
+      cargar()
+    } catch (err) {
+      alert('Error al duplicar: ' + err.message)
+    } finally {
+      setDuplicando(null)
+    }
+  }
 
   const card    = { background: 'var(--card-bg)', border: '1px solid var(--border-card)', borderRadius: '16px', padding: '20px', cursor: 'pointer', transition: 'all 0.15s', display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative' }
   const btnBase = { padding: '6px 12px', borderRadius: '8px', border: 'none', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }
@@ -1491,6 +1554,9 @@ function EmpresaSelector({ userId, onSelect }) {
               <div style={{ display: 'flex', gap: '6px', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)' }}>
                 <button onClick={() => onSelect(emp)} style={{ ...btnBase, flex: 1, background: 'var(--accent)', color: '#fff' }}>Abrir</button>
                 <button onClick={() => openEdit(emp)} style={{ ...btnBase, background: 'var(--inner-bg)', color: 'var(--text-muted)' }}>Editar</button>
+                <button onClick={() => handleDuplicate(emp)} disabled={duplicando === emp.id} style={{ ...btnBase, background: 'var(--inner-bg)', color: 'var(--text-muted)', opacity: duplicando === emp.id ? 0.6 : 1 }}>
+                  {duplicando === emp.id ? '…' : 'Duplicar'}
+                </button>
                 <button onClick={() => setConfirmDel({ empresa: emp, paso: 1 })} style={{ ...btnBase, background: 'rgba(220,38,38,0.08)', color: '#dc2626' }}>Eliminar</button>
               </div>
             </div>
