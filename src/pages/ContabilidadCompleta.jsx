@@ -1145,13 +1145,9 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
       .eq('empresa_id', empresaId).eq('ano', ano).eq('mes', mes).order('no')
     if (data?.length) { setRows(data); setMeta({ nombre:data[0].meta_nombre, nit:data[0].meta_nit }) }
     else setRows([])
-    let foundUrl = false
-    for (const e of ['xls','xlsx']) {
-      const { data: sd } = await supabase.storage.from('libros-sat')
-        .createSignedUrl(`${userId}/${empresaId}/${tipo.toLowerCase()}/${ano}-${mes}.${e}`, 60)
-      if (sd?.signedUrl) { foundUrl = true; break }
-    }
-    setArchivoDisp(foundUrl)
+    const { data: sd } = await supabase.storage.from('libros-sat')
+      .createSignedUrl(`${userId}/${empresaId}/${tipo.toLowerCase()}/${ano}-${mes}.xlsx`, 60)
+    setArchivoDisp(!!sd?.signedUrl)
   }, [TABLE, empresaId, userId, tipo, ano, mes])
 
   useEffect(() => { loadPeriodos() }, [loadPeriodos])
@@ -1163,12 +1159,8 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
   const handleFile = async (file) => {
     setUploading(true); setErr('')
     try {
-      const ext  = file.name.split('.').pop().toLowerCase() || 'xls'
-      const mime = ext === 'xlsx'
-        ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        : 'application/vnd.ms-excel'
-      const buf  = await file.arrayBuffer()
-      const wb   = XLSX.read(buf, { type:'array' })
+      const buf    = await file.arrayBuffer()
+      const wb     = XLSX.read(buf, { type:'array' })
       const parsed = tipo === 'VENTA' ? parseVentasSAT(wb) : parseComprasSAT(wb)
       if (!parsed.rows.length) { setErr('Sin registros en el archivo.'); return }
       const parts = (parsed.rows.find(r=>r.fecha)?.fecha||'').split('/')
@@ -1181,12 +1173,13 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
       }))
       for (let i=0; i<toInsert.length; i+=200)
         await supabase.from(TABLE).insert(toInsert.slice(i,i+200))
-      // Eliminar ambas extensiones previas antes de subir
-      for (const e of ['xls','xlsx'])
-        await supabase.storage.from(BUCKET).remove([`${userId}/${empresaId}/${tipo.toLowerCase()}/${dAno}-${dMes}.${e}`])
+      // Re-escribir como xlsx válido (el SAT exporta formato xls con extensión xlsx)
+      const xlsxBuf = XLSX.write(wb, { bookType:'xlsx', type:'array' })
+      const stoPath = `${userId}/${empresaId}/${tipo.toLowerCase()}/${dAno}-${dMes}.xlsx`
+      await supabase.storage.from(BUCKET).remove([stoPath])
       await supabase.storage.from(BUCKET).upload(
-        `${userId}/${empresaId}/${tipo.toLowerCase()}/${dAno}-${dMes}.${ext}`,
-        new Blob([buf], { type: mime }),
+        stoPath,
+        new Blob([xlsxBuf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
         { upsert:true }
       )
       setArchivoDisp(true)
@@ -1222,16 +1215,12 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
 
   // ── Descarga archivo SAT original ────────────────────────────────────────
   const handleDownloadArchivo = async () => {
-    let signedUrl = null; let ext = 'xls'
-    for (const e of ['xls','xlsx']) {
-      const { data } = await supabase.storage.from(BUCKET)
-        .createSignedUrl(`${userId}/${empresaId}/${tipo.toLowerCase()}/${ano}-${mes}.${e}`, 300)
-      if (data?.signedUrl) { signedUrl = data.signedUrl; ext = e; break }
-    }
-    if (!signedUrl) return
+    const { data } = await supabase.storage.from(BUCKET)
+      .createSignedUrl(`${userId}/${empresaId}/${tipo.toLowerCase()}/${ano}-${mes}.xlsx`, 300)
+    if (!data?.signedUrl) return
     const a = document.createElement('a')
-    a.href = signedUrl
-    a.download = `libro-${tipo.toLowerCase()}-${ano}-${mes}.${ext}`
+    a.href = data.signedUrl
+    a.download = `libro-${tipo.toLowerCase()}-${ano}-${mes}.xlsx`
     document.body.appendChild(a); a.click(); document.body.removeChild(a)
   }
 
