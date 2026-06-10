@@ -1434,10 +1434,11 @@ function ResultadosTab({ cuentas, asientos, empresaNombre = '' }) {
     autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 4,
       body: [[
-        { content: 'UTILIDAD ANTES DE ISR', styles: { fontStyle:'bold', fontSize:9, fillColor:[241,245,249], textColor:[15,23,42], cellPadding:{top:4,bottom:4,left:8,right:6} } },
-        { content: Qp(utilAntesISR), styles: { fontStyle:'bold', fontSize:9, halign:'right', fillColor:[241,245,249], textColor:[15,23,42], cellPadding:{top:4,bottom:4,left:6,right:8} } },
+        { content: '', styles: { ...tblTotal, cellPadding:{top:4,bottom:4,left:6,right:6} } },
+        { content: 'UTILIDAD ANTES DE ISR', styles: { ...tblTotal, cellPadding:{top:4,bottom:4,left:6,right:6} } },
+        { content: Qp(utilAntesISR), styles: { ...tblTotal, halign:'right', cellPadding:{top:4,bottom:4,left:6,right:6} } },
       ]],
-      margin:{left:14,right:14}, theme:'plain',
+      columnStyles: col, margin:{left:14,right:14}, theme:'plain',
       tableLineWidth: 0.2, tableLineColor: [203,213,225],
     })
     // ── IMPUESTO SOBRE LA RENTA ───────────────────────────────────
@@ -1463,12 +1464,13 @@ function ResultadosTab({ cuentas, asientos, empresaNombre = '' }) {
     autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 8,
       body: [[
+        { content: '', styles: { fontStyle:'bold', fontSize:10, fillColor:resBg, textColor:[15,23,42], cellPadding:{top:5,bottom:5,left:6,right:6} } },
         { content: esUtil ? 'UTILIDAD NETA DEL PERÍODO' : 'PÉRDIDA NETA DEL PERÍODO',
-          styles: { fontStyle:'bold', fontSize:10, fillColor:resBg, textColor:[15,23,42], cellPadding:{top:5,bottom:5,left:8,right:6} } },
+          styles: { fontStyle:'bold', fontSize:10, fillColor:resBg, textColor:[15,23,42], cellPadding:{top:5,bottom:5,left:6,right:6} } },
         { content: Qp(Math.abs(utilNeta)),
-          styles: { fontStyle:'bold', fontSize:10, halign:'right', fillColor:resBg, textColor:resColor, cellPadding:{top:5,bottom:5,left:6,right:8} } },
+          styles: { fontStyle:'bold', fontSize:10, halign:'right', fillColor:resBg, textColor:resColor, cellPadding:{top:5,bottom:5,left:6,right:6} } },
       ]],
-      margin:{left:14,right:14}, theme:'plain',
+      columnStyles: col, margin:{left:14,right:14}, theme:'plain',
       tableLineWidth: 0.3, tableLineColor: resColor,
     })
 
