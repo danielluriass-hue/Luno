@@ -1197,7 +1197,7 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
     if (!rows?.length) return
     const isVenta = tipo === 'VENTA'
     const titulo  = isVenta ? 'LIBRO DE VENTAS Y SERVICIOS PRESTADOS' : 'LIBRO DE COMPRAS Y SERVICIOS ADQUIRIDOS'
-    const n = (v) => v === 0 ? '0.00' : Number(v||0).toLocaleString('es-GT', { minimumFractionDigits:2, maximumFractionDigits:2 })
+    const n = (v) => `Q. ${Number(v||0).toLocaleString('es-GT', { minimumFractionDigits:2, maximumFractionDigits:2 })}`
 
     const doc = new jsPDF({ orientation:'landscape', unit:'mm', format:'letter' })
     const W = doc.internal.pageSize.getWidth()
@@ -1226,7 +1226,7 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
           ]),
           ['','','','','','','','TOTALES', n(totServ), n(totIVA), n(totTotal)],
         ],
-        headStyles:  { fillColor:[88,86,214], fontSize:7, cellPadding:3 },
+        headStyles:  { fillColor:[44,55,70], fontSize:7, cellPadding:3 },
         bodyStyles:  { fontSize:7, cellPadding:2, textColor:[30,30,30] },
         alternateRowStyles: { fillColor:[248,250,252] },
         footStyles:  { fillColor:[226,232,240], fontStyle:'bold', fontSize:7 },
@@ -1265,7 +1265,7 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
           ]),
           ['','','','','','','','TOTALES', n(totComb), n(totComp), '0.00', n(totIVA), n(totTotal)],
         ],
-        headStyles:  { fillColor:[88,86,214], fontSize:7, cellPadding:3 },
+        headStyles:  { fillColor:[44,55,70], fontSize:7, cellPadding:3 },
         bodyStyles:  { fontSize:7, cellPadding:2, textColor:[30,30,30] },
         alternateRowStyles: { fillColor:[248,250,252] },
         columnStyles: {
