@@ -1387,7 +1387,6 @@ function EmpresaSelector({ userId, onSelect }) {
   const [editando,   setEditando]   = useState(null)
   const [confirmDel, setConfirmDel] = useState(null) // { empresa, paso: 1|2 }
   const [duplicando,  setDuplicando]  = useState(null) // empresa_id en proceso
-  const [recovering,  setRecovering]  = useState(false)
 
   const cargar = async () => {
     setLoading(true)
@@ -1498,40 +1497,6 @@ function EmpresaSelector({ userId, onSelect }) {
     }
   }
 
-  const handleRecover = async () => {
-    setRecovering(true)
-    try {
-      // Buscar empresa_ids en cuentas que ya no existen en conta_empresas
-      const [{ data: cuentas }, { data: existentes }] = await Promise.all([
-        supabase.from('conta_cuentas').select('empresa_id').eq('user_id', userId).not('empresa_id', 'is', null),
-        supabase.from('conta_empresas').select('id').eq('user_id', userId),
-      ])
-      const idsExistentes = new Set((existentes || []).map(e => e.id))
-      const huerfanos = [...new Set((cuentas || []).map(c => c.empresa_id).filter(id => !idsExistentes.has(id)))]
-
-      if (!huerfanos.length) {
-        alert('No se encontraron empresas eliminadas con datos recuperables.')
-        return
-      }
-
-      for (const empId of huerfanos) {
-        const nombre = window.prompt(
-          `Se encontró empresa eliminada con datos.\nID: ${empId}\n\n¿Nombre para recuperarla?`,
-          'Transportes Guzman'
-        )
-        if (nombre?.trim()) {
-          const { error } = await supabase.from('conta_empresas').insert({ id: empId, user_id: userId, nombre: nombre.trim(), descripcion: '' })
-          if (error) alert('Error al recuperar: ' + error.message)
-        }
-      }
-      cargar()
-    } catch (err) {
-      alert('Error: ' + err.message)
-    } finally {
-      setRecovering(false)
-    }
-  }
-
   const card    = { background: 'var(--card-bg)', border: '1px solid var(--border-card)', borderRadius: '16px', padding: '20px', cursor: 'pointer', transition: 'all 0.15s', display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative' }
   const btnBase = { padding: '6px 12px', borderRadius: '8px', border: 'none', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }
 
@@ -1598,13 +1563,6 @@ function EmpresaSelector({ userId, onSelect }) {
           ))}
         </div>
       )}
-
-      {/* Recuperar empresa eliminada */}
-      <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'center' }}>
-        <button onClick={handleRecover} disabled={recovering} style={{ ...btnBase, background: 'transparent', color: 'var(--text-muted)', fontSize: '11px', textDecoration: 'underline', padding: '4px 8px', opacity: recovering ? 0.5 : 1 }}>
-          {recovering ? 'Buscando datos…' : '¿Eliminaste una empresa por error? Recuperar datos'}
-        </button>
-      </div>
 
       {/* Modal confirmación doble — eliminar */}
       {confirmDel && (
