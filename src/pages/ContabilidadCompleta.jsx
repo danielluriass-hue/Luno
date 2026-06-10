@@ -576,7 +576,15 @@ function DiarioTab({ cuentas, asientos, onReload, userId, empresaId }) {
               body,
               headStyles: { fillColor:[88,86,214], fontSize:8 },
               bodyStyles: { fontSize:8 },
-              columnStyles: { 5:{halign:'right'}, 6:{halign:'right'} },
+              columnStyles: {
+                0: { cellWidth:8 },
+                1: { cellWidth:24 },
+                2: { cellWidth:20 },
+                3: { cellWidth:24 },
+                4: { cellWidth:18 },
+                5: { cellWidth:47, halign:'right' },
+                6: { cellWidth:47, halign:'right' },
+              },
             })
               doc.save(`libro-diario-${periodoLabel.toLowerCase().replace(' ', '-')}.pdf`)
             }} style={{ padding:'7px 14px', borderRadius:'8px', border:'1.5px solid var(--accent)', background:'transparent', color:'var(--accent)', fontWeight:'600', fontSize:'12px', cursor:'pointer' }}>Descargar PDF</button>
