@@ -46,6 +46,7 @@ const initPDF = (titulo, subtitulo = '', empresa = '') => {
 // Estilos de tabla profesionales reutilizables
 const tblHead  = { fillColor:[30,41,59],  textColor:[255,255,255], fontStyle:'bold', fontSize:9,   cellPadding:{ top:4, bottom:4, left:6, right:6 } }
 const tblGroup = { fillColor:[71,85,105], textColor:[255,255,255], fontStyle:'bold', fontSize:8,   cellPadding:{ top:3, bottom:3, left:8, right:6 } }
+const tblSec   = { fillColor:[241,245,249], textColor:[15,23,42], fontStyle:'bold', fontSize:9.5, cellPadding:{ top:5, bottom:5, left:8, right:6 } }
 const tblBody  = { fontSize:8.5, textColor:[15,23,42], cellPadding:{ top:3, bottom:3, left:6, right:6 } }
 const tblAlt   = { fillColor:[248,250,252] }
 const tblFoot  = { fillColor:[241,245,249], textColor:[15,23,42], fontStyle:'bold', fontSize:8.5 }
@@ -518,57 +519,6 @@ function DiarioTab({ cuentas, asientos, onReload, userId, empresaId }) {
     setConfirmBox(null); onReload()
   }
 
-  const handleRegularizarIVA = async () => {
-    const activos = asientos.filter(a => a.estado === 'ACTIVO')
-    const sMap = {}
-    activos.forEach(a => {
-      (a.conta_lineas||[]).forEach(l => {
-        if (!sMap[l.cuenta_id]) sMap[l.cuenta_id] = { deb:0, cre:0 }
-        sMap[l.cuenta_id].deb += parseFloat(l.debito)||0
-        sMap[l.cuenta_id].cre += parseFloat(l.credito)||0
-      })
-    })
-    const cCF  = cuentas.find(c => c.codigo === '1130') // IVA Crédito Fiscal
-    const cDF  = cuentas.find(c => c.codigo === '2110') // IVA Débito Fiscal
-    if (!cCF || !cDF) { alert('No se encontraron las cuentas de IVA en el catálogo.'); return }
-
-    const sCF = Math.max(0, (sMap[cCF.id]?.deb||0) - (sMap[cCF.id]?.cre||0)) // saldo activo
-    const sDF = Math.max(0, (sMap[cDF.id]?.cre||0) - (sMap[cDF.id]?.deb||0)) // saldo pasivo
-    if (sCF < 0.01 && sDF < 0.01) { alert('No hay saldos de IVA para regularizar.'); return }
-
-    // Determinar cuenta "IVA por Pagar" si hace falta
-    let cPagar = cuentas.find(c => c.codigo === '2120')
-    if (!cPagar && sDF > sCF + 0.01) {
-      const { data: ins } = await supabase.from('conta_cuentas')
-        .insert({ user_id:userId, empresa_id:empresaId, codigo:'2120', nombre:'IVA por Pagar', tipo:'PASIVO', subtipo:'Pasivo Corriente', activa:true })
-        .select().single()
-      cPagar = ins
-      onReload()
-    }
-
-    // Construir lineas del asiento de regularización
-    const lineas = []
-    // Debe: cancela IVA Débito Fiscal (pasivo → debe para cerrarlo)
-    if (sDF > 0.01) lineas.push({ cuenta_id: cDF.id, debito: +sDF.toFixed(2), credito: 0, orden: 0 })
-    // Haber: cancela IVA Crédito Fiscal (activo → haber para cerrarlo)
-    const creditoCF = Math.min(sCF, sDF) // solo cancela lo que alcanza
-    if (creditoCF > 0.01) lineas.push({ cuenta_id: cCF.id, debito: 0, credito: +creditoCF.toFixed(2), orden: 1 })
-    // Si Débito > Crédito: diferencia va a IVA por Pagar
-    const diff = +(sDF - sCF).toFixed(2)
-    if (diff > 0.01 && cPagar) lineas.push({ cuenta_id: cPagar.id, debito: 0, credito: diff, orden: 2 })
-    // Si Crédito > Débito: el remanente queda en 1130 (no se toca)
-
-    const mesActual = new Date().toLocaleString('es-GT', { month:'long', year:'numeric' })
-    setModal({
-      mode: 'new',
-      prefill: {
-        descripcion: `Regularización IVA — ${mesActual}`,
-        tipo: 'GENERAL',
-        lineas,
-      }
-    })
-  }
-
   return (
     <div>
       <div style={{ display:'flex', gap:'10px', alignItems:'center', marginBottom:'20px', flexWrap:'wrap' }}>
@@ -611,7 +561,6 @@ function DiarioTab({ cuentas, asientos, onReload, userId, empresaId }) {
             })
             doc.save(`libro-diario-${MESES[mes].toLowerCase()}-${year}.pdf`)
           }} style={{ padding:'7px 14px', borderRadius:'8px', border:'1.5px solid var(--accent)', background:'transparent', color:'var(--accent)', fontWeight:'600', fontSize:'12px', cursor:'pointer' }}>Descargar PDF</button>
-          <button onClick={handleRegularizarIVA} style={{ padding:'7px 14px', borderRadius:'8px', border:'1.5px solid #16a34a', background:'transparent', color:'#16a34a', fontWeight:'600', fontSize:'12px', cursor:'pointer' }}>Regularizar IVA</button>
           <button onClick={() => setModal({ mode:'new' })} style={btn()}>+ Nuevo asiento</button>
         </div>
       </div>
@@ -651,8 +600,8 @@ function DiarioTab({ cuentas, asientos, onReload, userId, empresaId }) {
                   {a.estado==='ACTIVO' && (
                     <div style={{ display:'flex', gap:'4px', justifyContent:'flex-end' }}>
                       <button onClick={() => setModal({ mode:'edit', asiento:a })} style={btnSm()}>Editar</button>
-                      <button onClick={() => setConfirmBox({ action:'anular', asiento:a })} style={btnSm('warn')}>Anular</button>
-                      <button onClick={() => setConfirmBox({ action:'delete', asiento:a })} style={btnSm('danger')}>Eliminar</button>
+                      <button onClick={() => setConfirmBox({ action:'anular', asiento:a, step:1 })} style={btnSm('warn')}>Anular</button>
+                      <button onClick={() => setConfirmBox({ action:'delete', asiento:a, step:1 })} style={btnSm('danger')}>Eliminar</button>
                     </div>
                   )}
                 </td>
@@ -682,17 +631,44 @@ function DiarioTab({ cuentas, asientos, onReload, userId, empresaId }) {
 
       {modal && <AsientoModal mode={modal.mode} asiento={modal.asiento} prefill={modal.prefill} cuentas={cuentas} onClose={()=>setModal(null)} onSaved={onReload} userId={userId} empresaId={empresaId} />}
 
-      {confirmBox && (
+      {confirmBox && confirmBox.step === 1 && (
         <Modal title={confirmBox.action==='delete' ? 'Eliminar asiento' : 'Anular asiento'} onClose={()=>setConfirmBox(null)}>
-          <p style={{ color:'var(--text-1)', fontSize:'14px', marginBottom:'20px', lineHeight:'1.5' }}>
+          <p style={{ color:'var(--text-1)', fontSize:'14px', marginBottom:'6px', lineHeight:'1.5' }}>
             {confirmBox.action==='delete'
-              ? `¿Eliminar permanentemente "${confirmBox.asiento.descripcion}"? La acción quedará en la bitácora.`
-              : `¿Anular "${confirmBox.asiento.descripcion}"? Quedará registrado pero no afectará los libros.`}
+              ? `¿Deseas eliminar el asiento "${confirmBox.asiento.descripcion}"?`
+              : `¿Deseas anular el asiento "${confirmBox.asiento.descripcion}"?`}
+          </p>
+          <p style={{ color:'var(--text-muted)', fontSize:'12px', marginBottom:'20px' }}>
+            {confirmBox.action==='delete'
+              ? 'El asiento y sus partidas serán eliminados permanentemente.'
+              : 'El asiento quedará registrado pero no afectará los libros.'}
           </p>
           <div style={{ display:'flex', gap:'8px', justifyContent:'flex-end' }}>
             <button onClick={()=>setConfirmBox(null)} style={btn('secondary')}>Cancelar</button>
+            <button onClick={()=>setConfirmBox(p=>({...p, step:2}))} style={btn('danger')}>
+              {confirmBox.action==='delete' ? 'Sí, eliminar' : 'Sí, anular'}
+            </button>
+          </div>
+        </Modal>
+      )}
+      {confirmBox && confirmBox.step === 2 && (
+        <Modal title="¿Estás completamente seguro?" onClose={()=>setConfirmBox(null)}>
+          <div style={{ textAlign:'center', padding:'8px 0 20px' }}>
+            <div style={{ fontSize:'36px', marginBottom:'12px' }}>⚠️</div>
+            <p style={{ color:'var(--text-1)', fontSize:'14px', fontWeight:'600', marginBottom:'6px' }}>
+              Esta acción {confirmBox.action==='delete' ? 'eliminará' : 'anulará'} definitivamente el asiento:
+            </p>
+            <p style={{ color:'var(--accent)', fontSize:'13px', marginBottom:'8px', fontStyle:'italic' }}>
+              "{confirmBox.asiento.descripcion}"
+            </p>
+            <p style={{ color:'#dc2626', fontSize:'12px', fontWeight:'600' }}>
+              {confirmBox.action==='delete' ? 'No se puede recuperar después de eliminar.' : 'El asiento quedará anulado y no podrá reactivarse.'}
+            </p>
+          </div>
+          <div style={{ display:'flex', gap:'8px', justifyContent:'flex-end' }}>
+            <button onClick={()=>setConfirmBox(null)} style={btn('secondary')}>Cancelar</button>
             <button onClick={()=>confirmBox.action==='delete' ? handleDelete(confirmBox.asiento) : handleAnular(confirmBox.asiento)} style={btn('danger')}>
-              {confirmBox.action==='delete' ? 'Eliminar' : 'Anular'}
+              {confirmBox.action==='delete' ? 'Eliminar definitivamente' : 'Anular definitivamente'}
             </button>
           </div>
         </Modal>
@@ -1112,59 +1088,136 @@ function LibroTab({ tipo, asientos }) {
 
 // ── MÓDULO 5: LIBRO MAYOR ────────────────────────────────────────────────────
 
+const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+
 function MayorTab({ cuentas, asientos, empresaNombre = '' }) {
   const [expanded, setExpanded] = useState(null)
-  const activos = asientos.filter(a=>a.estado==='ACTIVO')
+  const todosActivos = asientos.filter(a => a.estado==='ACTIVO')
 
+  // Selectores de período
+  const anos = [...new Set(todosActivos.map(a => new Date(a.fecha+'T00:00:00').getFullYear()))].sort((a,b)=>b-a)
+  const hoy  = new Date().getFullYear()
+  const [ano, setAno] = useState(() => anos.includes(hoy) ? hoy : (anos[0] || hoy))
+  const [mes, setMes] = useState(null) // null = todo el año
+
+  const handleSetAno = (y) => { setAno(y); setMes(null); setExpanded(null) }
+  const handleSetMes = (m) => { setMes(mes===m ? null : m); setExpanded(null) }
+
+  const mesesDisponibles = [...new Set(
+    todosActivos
+      .filter(a => new Date(a.fecha+'T00:00:00').getFullYear()===ano)
+      .map(a => new Date(a.fecha+'T00:00:00').getMonth()+1)
+  )].sort((a,b)=>a-b)
+
+  // Asientos del período seleccionado
+  const periodoActivos = todosActivos.filter(a => {
+    const d = new Date(a.fecha+'T00:00:00')
+    if (d.getFullYear() !== ano) return false
+    if (mes !== null && d.getMonth()+1 !== mes) return false
+    return true
+  })
+
+  // Asientos anteriores al período (para saldo inicial)
+  const previosActivos = todosActivos.filter(a => {
+    const d = new Date(a.fecha+'T00:00:00')
+    if (mes !== null) return d.getFullYear() < ano || (d.getFullYear()===ano && d.getMonth()+1 < mes)
+    return d.getFullYear() < ano
+  })
+
+  // Construir mapa: saldo inicial + movimientos del período
   const map = {}
-  cuentas.forEach(c => { map[c.id] = { cuenta:c, deb:0, cre:0, movs:[] } })
-  activos.forEach(a => {
-    (a.conta_lineas||[]).forEach(l => {
-      if (map[l.cuenta_id]) {
-        map[l.cuenta_id].deb += parseFloat(l.debito)||0
-        map[l.cuenta_id].cre += parseFloat(l.credito)||0
-        map[l.cuenta_id].movs.push({ fecha:a.fecha, desc:a.descripcion, deb:parseFloat(l.debito)||0, cre:parseFloat(l.credito)||0 })
-      }
+  cuentas.forEach(c => { map[c.id] = { cuenta:c, deb:0, cre:0, movs:[], saldoIni:0 } })
+
+  previosActivos.forEach(a => {
+    ;(a.conta_lineas||[]).forEach(l => {
+      if (!map[l.cuenta_id]) return
+      const factor = ['ACTIVO','GASTO'].includes(map[l.cuenta_id].cuenta.tipo) ? 1 : -1
+      map[l.cuenta_id].saldoIni += factor * ((parseFloat(l.debito)||0) - (parseFloat(l.credito)||0))
     })
   })
 
-  // Regularización IVA automática (visual, sin asiento extra)
-  const ivaCF = cuentas.find(c => c.codigo === '1130')
-  const ivaDF = cuentas.find(c => c.codigo === '2110')
-  if (ivaCF && ivaDF && map[ivaCF.id] && map[ivaDF.id]) {
-    const m1 = map[ivaCF.id], m2 = map[ivaDF.id]
-    const sCF = m1.deb - m1.cre
-    const sDF = m2.cre - m2.deb
-    const comp = +Math.min(Math.max(sCF, 0), Math.max(sDF, 0)).toFixed(2)
-    if (comp > 0.01) {
-      m1.movs.push({ fecha:'', desc:'Regularización IVA', deb:0, cre:comp, virtual:true })
-      m1.cre += comp
-      m2.movs.push({ fecha:'', desc:'Regularización IVA', deb:comp, cre:0, virtual:true })
-      m2.deb += comp
-    }
-  }
+  periodoActivos.forEach(a => {
+    const docRef = a.no_factura || (a.tipo==='VENTA' ? 'PV' : a.tipo==='COMPRA' ? 'PC' : 'PG')
+    ;(a.conta_lineas||[]).forEach(l => {
+      if (!map[l.cuenta_id]) return
+      map[l.cuenta_id].deb += parseFloat(l.debito)||0
+      map[l.cuenta_id].cre += parseFloat(l.credito)||0
+      map[l.cuenta_id].movs.push({ fecha:a.fecha, desc:a.descripcion, deb:parseFloat(l.debito)||0, cre:parseFloat(l.credito)||0, doc:docRef })
+    })
+  })
 
-  const rows = Object.values(map).filter(r=>r.deb>0||r.cre>0).sort((a,b)=>a.cuenta.codigo.localeCompare(b.cuenta.codigo))
-  const getSaldo = (r) => ['ACTIVO','GASTO'].includes(r.cuenta.tipo) ? r.deb-r.cre : r.cre-r.deb
+  const rows = Object.values(map)
+    .filter(r => r.deb>0 || r.cre>0 || r.saldoIni!==0)
+    .sort((a,b) => a.cuenta.codigo.localeCompare(b.cuenta.codigo))
+
+  const getSaldo    = (r) => r.saldoIni + (['ACTIVO','GASTO'].includes(r.cuenta.tipo) ? r.deb-r.cre : r.cre-r.deb)
+  const getSaldoRun = (cuenta, saldoIni, movsSorted, idx) => {
+    let s = saldoIni
+    const factor = ['ACTIVO','GASTO'].includes(cuenta.tipo) ? 1 : -1
+    for (let i = 0; i <= idx; i++) s += factor * (movsSorted[i].deb - movsSorted[i].cre)
+    return s
+  }
+  const lastDate = (movs) => { const fs = movs.filter(m=>m.fecha).map(m=>m.fecha).sort(); return fs[fs.length-1]||'' }
+  const fmtDate  = (d) => d ? new Date(d+'T00:00:00').toLocaleDateString('es-GT',{day:'2-digit',month:'2-digit',year:'numeric'}) : ''
+  const periodoLabel = mes !== null ? `${MESES_ES[mes-1]} ${ano}` : `Año ${ano}`
 
   return (
     <div>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px' }}>
-        <div style={{ fontSize:'13px', color:'var(--text-muted)' }}>Saldos acumulados — solo asientos activos. Haz clic en una cuenta para ver movimientos.</div>
+      {/* Selector de año */}
+      {anos.length > 0 && (
+        <div style={{ display:'flex', gap:'6px', marginBottom:'10px', flexWrap:'wrap' }}>
+          {anos.map(y => (
+            <button key={y} onClick={()=>handleSetAno(y)} style={{
+              padding:'5px 16px', borderRadius:'7px', border:'none', fontSize:'13px',
+              fontWeight: ano===y ? '700':'400',
+              background: ano===y ? 'var(--accent)' : 'var(--inner-bg)',
+              color: ano===y ? '#fff' : 'var(--text-muted)', cursor:'pointer',
+            }}>{y}</button>
+          ))}
+        </div>
+      )}
+      {/* Selector de mes */}
+      {mesesDisponibles.length > 0 && (
+        <div style={{ display:'flex', gap:'5px', marginBottom:'18px', flexWrap:'wrap' }}>
+          {mesesDisponibles.map(m => (
+            <button key={m} onClick={()=>handleSetMes(m)} style={{
+              padding:'4px 12px', borderRadius:'7px', border:'1px solid var(--border)', fontSize:'12px',
+              fontWeight: mes===m ? '700':'400',
+              background: mes===m ? 'var(--accent-soft)' : 'transparent',
+              color: mes===m ? 'var(--accent)' : 'var(--text-muted)', cursor:'pointer',
+            }}>{MESES_ES[m-1]}</button>
+          ))}
+        </div>
+      )}
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px' }}>
+        <div style={{ fontSize:'13px', color:'var(--text-muted)' }}>
+          Período: <strong style={{ color:'var(--text-1)' }}>{periodoLabel}</strong> — solo asientos activos
+        </div>
         <button onClick={() => {
-          const doc = initPDF('LIBRO MAYOR', 'Saldos acumulados — asientos activos', empresaNombre)
-          const colMov = { 0:{cellWidth:24}, 1:{cellWidth:'auto'}, 2:{cellWidth:36, halign:'right'}, 3:{cellWidth:36, halign:'right'} }
+          const doc = initPDF('LIBRO MAYOR', periodoLabel, empresaNombre)
+          const colMov = { 0:{cellWidth:22}, 1:{cellWidth:20}, 2:{cellWidth:'auto'}, 3:{cellWidth:28,halign:'right'}, 4:{cellWidth:28,halign:'right'}, 5:{cellWidth:30,halign:'right'} }
           let y = 47
           rows.forEach((r) => {
             if (y > 240) { doc.addPage(); y = 14 }
-            const saldo = getSaldo(r)
-            const movRows = r.movs.sort((a,b)=>a.fecha.localeCompare(b.fecha)).map(m=>[m.fecha||'', m.desc, m.deb>0?Qp(m.deb):'–', m.cre>0?Qp(m.cre):'–'])
+            const saldoFinal = getSaldo(r)
+            const movsSorted = [...r.movs].sort((a,b)=>a.fecha.localeCompare(b.fecha))
+            const ld = lastDate(r.movs)
+            const movRows = [
+              [{ content:`Saldo inicial: ${Qp(Math.abs(r.saldoIni))}`, colSpan:6, styles:{ ...tblBody, fontStyle:'italic', fontSize:7, textColor:[100,116,139] } }],
+              ...movsSorted.map((m,i) => {
+                const sRun = getSaldoRun(r.cuenta, r.saldoIni, movsSorted, i)
+                return [m.fecha ? fmtDate(m.fecha):'', m.doc||'', m.desc, m.deb>0?Qp(m.deb):'–', m.cre>0?Qp(m.cre):'–', Qp(Math.abs(sRun))]
+              })
+            ]
             autoTable(doc, {
               startY: y,
-              head: [[{ content: `${r.cuenta.codigo}   ${r.cuenta.nombre}`, colSpan:3, styles: tblGroup },
-                      { content: r.cuenta.tipo, styles:{ ...tblGroup, halign:'right', fontStyle:'normal', fontSize:7 } }]],
+              head: [
+                [{ content:`${r.cuenta.codigo}   ${r.cuenta.nombre}`, colSpan:6, styles:tblGroup }],
+                ['Fecha','Doc.','Descripción','Debe','Haber','Saldo'].map((h,i)=>({ content:h, styles:{ ...tblHead, halign:i>=3?'right':'left' } })),
+              ],
               body: movRows,
-              foot: [['', 'SALDO', Qp(Math.abs(saldo)) + (saldo < 0 ? ' CR' : ''), '']],
+              foot: [[{ content: ld ? `Saldo final al ${fmtDate(ld)}` : 'Saldo final', colSpan:5, styles:tblFoot },
+                      { content: Qp(Math.abs(saldoFinal)), styles:{ ...tblFoot, halign:'right' } }]],
               headStyles: tblGroup, bodyStyles: { ...tblBody, fontSize:7.5 },
               footStyles: { ...tblFoot, fontSize:7.5 },
               alternateRowStyles: tblAlt, columnStyles: colMov,
@@ -1172,7 +1225,7 @@ function MayorTab({ cuentas, asientos, empresaNombre = '' }) {
             })
             y = doc.lastAutoTable.finalY + 5
           })
-          doc.save('libro-mayor.pdf')
+          doc.save(`libro-mayor-${ano}${mes ? '-'+String(mes).padStart(2,'0') : ''}.pdf`)
         }} style={{ padding:'7px 14px', borderRadius:'8px', border:'1.5px solid var(--accent)', background:'transparent', color:'var(--accent)', fontWeight:'600', fontSize:'12px', cursor:'pointer' }}>Descargar PDF</button>
       </div>
       <table style={{ width:'100%', borderCollapse:'collapse' }}>
@@ -1182,9 +1235,11 @@ function MayorTab({ cuentas, asientos, empresaNombre = '' }) {
           </tr>
         </thead>
         <tbody>
-          {rows.length===0 && <tr><td colSpan={6} style={{ padding:'36px', textAlign:'center', color:'var(--text-muted)', fontSize:'13px' }}>Sin movimientos registrados</td></tr>}
+          {rows.length===0 && <tr><td colSpan={6} style={{ padding:'36px', textAlign:'center', color:'var(--text-muted)', fontSize:'13px' }}>Sin movimientos en este período</td></tr>}
           {rows.map(r => {
             const saldo = getSaldo(r)
+            const movsSorted = [...r.movs].sort((a,b)=>a.fecha.localeCompare(b.fecha))
+            const ld = lastDate(r.movs)
             return (
               <Fragment key={r.cuenta.id}>
                 <tr style={{ borderBottom:'1px solid var(--border)', cursor:'pointer' }} onClick={()=>setExpanded(expanded===r.cuenta.id ? null : r.cuenta.id)}>
@@ -1193,26 +1248,44 @@ function MayorTab({ cuentas, asientos, empresaNombre = '' }) {
                   <td style={{ padding:'9px 10px' }}><span style={{ fontSize:'10px', fontWeight:'600', padding:'2px 7px', borderRadius:'20px', background:'var(--accent-soft)', color:'var(--accent)' }}>{r.cuenta.tipo}</span></td>
                   <td style={{ padding:'9px 10px', fontSize:'13px', textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{Q(r.deb)}</td>
                   <td style={{ padding:'9px 10px', fontSize:'13px', textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{Q(r.cre)}</td>
-                  <td style={{ padding:'9px 10px', fontSize:'13px', fontWeight:'700', textAlign:'right', fontVariantNumeric:'tabular-nums', color: saldo>=0 ? '#16a34a':'#dc2626' }}>
-                    {Q(Math.abs(saldo))}{saldo<0 ? ' (CR)':''}
+                  <td style={{ padding:'9px 10px', fontSize:'13px', fontWeight:'700', textAlign:'right', fontVariantNumeric:'tabular-nums', color:saldo>=0?'#16a34a':'#dc2626' }}>
+                    {Q(Math.abs(saldo))}
                   </td>
                 </tr>
                 {expanded===r.cuenta.id && (
                   <tr style={{ background:'var(--inner-bg)', borderBottom:'1px solid var(--border)' }}>
-                    <td colSpan={6} style={{ padding:'10px 20px' }}>
+                    <td colSpan={6} style={{ padding:'12px 20px' }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:'10px' }}>
+                        <span style={{ fontSize:'14px', fontWeight:'700', color:'var(--text-1)' }}>{r.cuenta.codigo} {r.cuenta.nombre}</span>
+                        <span style={{ fontSize:'12px', color:'var(--text-muted)', fontStyle:'italic' }}>Saldo inicial: {Q(Math.abs(r.saldoIni))}</span>
+                      </div>
                       <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                        <thead><tr>{['Fecha','Descripción','Debe','Haber'].map(h=><th key={h} style={{...th(),padding:'4px 8px'}}>{h}</th>)}</tr></thead>
+                        <thead>
+                          <tr style={{ borderBottom:'1px solid var(--border)' }}>
+                            {['Fecha','Documento','Descripción','Debe','Haber','Saldo'].map(h=><th key={h} style={{...th(),padding:'4px 8px'}}>{h}</th>)}
+                          </tr>
+                        </thead>
                         <tbody>
-                          {r.movs.sort((a,b)=>a.fecha.localeCompare(b.fecha)).map((m,i)=>(
-                            <tr key={i} style={{ borderBottom:'1px solid var(--border)', background: m.virtual ? 'var(--accent-soft)' : 'transparent' }}>
-                              <td style={{ padding:'4px 8px', fontSize:'12px', color:'var(--text-muted)', fontStyle: m.virtual ? 'italic':'' }}>{m.fecha}</td>
-                              <td style={{ padding:'4px 8px', fontSize:'12px', color: m.virtual ? 'var(--accent)':'var(--text-1)', fontStyle: m.virtual ? 'italic':'', fontWeight: m.virtual ? '600':'' }}>{m.desc}</td>
-                              <td style={{ padding:'4px 8px', fontSize:'12px', textAlign:'right', color:'#16a34a' }}>{m.deb>0 ? Q(m.deb):'–'}</td>
-                              <td style={{ padding:'4px 8px', fontSize:'12px', textAlign:'right', color:'#dc2626' }}>{m.cre>0 ? Q(m.cre):'–'}</td>
-                            </tr>
-                          ))}
+                          {movsSorted.map((m,i) => {
+                            const sRun = getSaldoRun(r.cuenta, r.saldoIni, movsSorted, i)
+                            return (
+                              <tr key={i} style={{ borderBottom:'1px solid var(--border)', background:m.virtual?'var(--accent-soft)':'transparent' }}>
+                                <td style={{ padding:'4px 8px', fontSize:'12px', color:'var(--text-muted)', fontStyle:m.virtual?'italic':'' }}>{m.fecha ? fmtDate(m.fecha) : ''}</td>
+                                <td style={{ padding:'4px 8px', fontSize:'12px', color:'var(--text-muted)', fontFamily:'monospace' }}>{m.doc||''}</td>
+                                <td style={{ padding:'4px 8px', fontSize:'12px', color:m.virtual?'var(--accent)':'var(--text-1)', fontStyle:m.virtual?'italic':'', fontWeight:m.virtual?'600':'' }}>{m.desc}</td>
+                                <td style={{ padding:'4px 8px', fontSize:'12px', textAlign:'right', color:'#16a34a' }}>{m.deb>0 ? Q(m.deb):'–'}</td>
+                                <td style={{ padding:'4px 8px', fontSize:'12px', textAlign:'right', color:'#dc2626' }}>{m.cre>0 ? Q(m.cre):'–'}</td>
+                                <td style={{ padding:'4px 8px', fontSize:'12px', textAlign:'right', fontWeight:'600', fontVariantNumeric:'tabular-nums', color:sRun>=0?'#16a34a':'#dc2626' }}>
+                                  {Q(Math.abs(sRun))}
+                                </td>
+                              </tr>
+                            )
+                          })}
                         </tbody>
                       </table>
+                      <div style={{ marginTop:'10px', textAlign:'right', fontSize:'12px', fontWeight:'700', color:'var(--text-1)' }}>
+                        Saldo final{ld ? ` al ${fmtDate(ld)}` : ''}: <span style={{ color:saldo>=0?'#16a34a':'#dc2626' }}>{Q(Math.abs(saldo))}</span>
+                      </div>
                     </td>
                   </tr>
                 )}
@@ -1278,54 +1351,52 @@ function ResultadosTab({ cuentas, asientos, empresaNombre = '' }) {
       startY: 47,
       head: [[{ content: 'INGRESOS', colSpan:3, styles: tblHead }]],
       body: ingresos.filter(c=>getSaldo(c)!==0).map(c=>[c.codigo, c.nombre, Qp(getSaldo(c))]),
-      foot: [['', 'TOTAL INGRESOS', Qp(totIng)]],
+      foot: [[{ content:'TOTAL INGRESOS', colSpan:2, styles:tblTotal }, { content:Qp(totIng), styles:{...tblTotal,halign:'right'} }]],
       headStyles: tblHead, bodyStyles: tblBody, footStyles: tblTotal,
       alternateRowStyles: tblAlt, columnStyles: col, margin:{left:14,right:14}, theme:'plain',
     })
 
-    // ── GASTOS por grupo ──────────────────────────────────────────
-    let y = doc.lastAutoTable.finalY + 5
-    autoTable(doc, {
-      startY: y,
-      head: [[{ content: 'COSTOS Y GASTOS', colSpan:3, styles: tblHead }]],
-      body: [], headStyles: tblHead, margin:{left:14,right:14}, theme:'plain',
-      tableLineWidth: 0,
-    })
-    y = doc.lastAutoTable.finalY
-
+    // ── GASTOS por grupo (una sola tabla para alinear columnas) ──
+    const gastosBody = []
     gruposGastos.forEach(({ label, cuentas: gc }) => {
       const filas = gc.filter(c=>getSaldo(c)!==0)
       if (!filas.length) return
       const subTotal = gc.reduce((s,c)=>s+getSaldo(c),0)
-      autoTable(doc, {
-        startY: y,
-        head: [[{ content: label, colSpan:3, styles: tblGroup }]],
-        body: filas.map(c=>[c.codigo, c.nombre, Qp(getSaldo(c))]),
-        foot: [['', `Subtotal ${label}`, Qp(subTotal)]],
-        headStyles: tblGroup, bodyStyles: tblBody, footStyles: tblFoot,
-        alternateRowStyles: tblAlt, columnStyles: col, margin:{left:14,right:14}, theme:'plain',
-      })
-      y = doc.lastAutoTable.finalY + 2
+      gastosBody.push([{ content: label, colSpan:3, styles: tblGroup }])
+      filas.forEach((c, idx) => gastosBody.push([
+        { content: c.codigo, styles: { ...tblBody, fillColor: idx%2===0 ? [255,255,255] : [248,250,252] } },
+        { content: c.nombre, styles: { ...tblBody, fillColor: idx%2===0 ? [255,255,255] : [248,250,252] } },
+        { content: Qp(getSaldo(c)), styles: { ...tblBody, halign:'right', fillColor: idx%2===0 ? [255,255,255] : [248,250,252] } },
+      ]))
+      gastosBody.push([
+        { content: '', styles: tblFoot },
+        { content: `Subtotal ${label}`, styles: tblFoot },
+        { content: Qp(subTotal), styles: { ...tblFoot, halign:'right' } },
+      ])
     })
-
-    // Total Gastos
-    y += 2
-    doc.setFillColor(226,232,240); doc.rect(14, y, 182, 8, 'F')
-    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(15,23,42)
-    doc.text('TOTAL GASTOS', 18, y+5.2)
-    doc.text(Qp(totGas), 198, y+5.2, { align:'right' })
-    y += 14
-
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY + 5,
+      head: [[{ content: 'COSTOS Y GASTOS', colSpan:3, styles: tblHead }]],
+      body: gastosBody,
+      foot: [[{ content:'TOTAL GASTOS', colSpan:2, styles:tblTotal }, { content:Qp(totGas), styles:{...tblTotal,halign:'right'} }]],
+      headStyles: tblHead, bodyStyles: tblBody, footStyles: tblTotal,
+      columnStyles: col, margin:{left:14,right:14}, theme:'plain',
+    })
     // ── RESULTADO ─────────────────────────────────────────────────
-    const esUtil = utilidad >= 0
-    doc.setFillColor(esUtil ? 240:254, esUtil ? 253:242, esUtil ? 244:242)
-    doc.rect(14, y, 182, 10, 'F')
-    doc.setDrawColor(esUtil ? 21:185, esUtil ? 128:28, esUtil ? 61:28)
-    doc.setLineWidth(0.3); doc.rect(14, y, 182, 10, 'S')
-    doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(15,23,42)
-    doc.text(esUtil ? 'UTILIDAD DEL EJERCICIO' : 'PÉRDIDA DEL EJERCICIO', 18, y+6.5)
-    doc.setTextColor(esUtil ? 21:185, esUtil ? 128:28, esUtil ? 61:28)
-    doc.text(Qp(Math.abs(utilidad)), 198, y+6.5, { align:'right' })
+    const esUtil   = utilidad >= 0
+    const resColor = esUtil ? [21,128,61] : [185,28,28]
+    const resBg    = esUtil ? [240,253,244] : [254,242,242]
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY + 8,
+      body: [[
+        { content: esUtil ? 'UTILIDAD DEL EJERCICIO' : 'PÉRDIDA DEL EJERCICIO',
+          styles: { fontStyle:'bold', fontSize:10, fillColor:resBg, textColor:[15,23,42], cellPadding:{top:5,bottom:5,left:8,right:6} } },
+        { content: Qp(Math.abs(utilidad)),
+          styles: { fontStyle:'bold', fontSize:10, halign:'right', fillColor:resBg, textColor:resColor, cellPadding:{top:5,bottom:5,left:6,right:8} } },
+      ]],
+      margin:{left:14,right:14}, theme:'plain',
+      tableLineWidth: 0.3, tableLineColor: resColor,
+    })
 
     doc.save(`estado-resultados-${ano}.pdf`)
   }
@@ -1425,21 +1496,6 @@ function BalanceTab({ cuentas, asientos, empresaNombre = '' }) {
       saldoMap[l.cuenta_id].cre += parseFloat(l.credito)||0
     })
   })
-  // Regularización IVA automática (visual)
-  const ivaCF_b = cuentas.find(c => c.codigo === '1130')
-  const ivaDF_b = cuentas.find(c => c.codigo === '2110')
-  if (ivaCF_b && ivaDF_b) {
-    const s1 = saldoMap[ivaCF_b.id] || { deb:0, cre:0 }
-    const s2 = saldoMap[ivaDF_b.id] || { deb:0, cre:0 }
-    const sCF = s1.deb - s1.cre
-    const sDF = s2.cre - s2.deb
-    const comp = +Math.min(Math.max(sCF, 0), Math.max(sDF, 0)).toFixed(2)
-    if (comp > 0.01) {
-      saldoMap[ivaCF_b.id] = { deb: s1.deb, cre: s1.cre + comp }
-      saldoMap[ivaDF_b.id] = { deb: s2.deb + comp, cre: s2.cre }
-    }
-  }
-
   const getSaldo = (c) => { const s=saldoMap[c.id]||{deb:0,cre:0}; return ['ACTIVO','GASTO'].includes(c.tipo) ? s.deb-s.cre : s.cre-s.deb }
 
   const cActivos  = cuentas.filter(c=>c.tipo==='ACTIVO').sort((a,b)=>a.codigo.localeCompare(b.codigo))
@@ -1493,7 +1549,7 @@ function BalanceTab({ cuentas, asientos, empresaNombre = '' }) {
             startY: 47,
             head: [[{ content: 'ACTIVOS', colSpan:3, styles: tblHead }]],
             body: cActivos.filter(c=>getSaldo(c)!==0).map(c=>[c.codigo, c.nombre, Qp(getSaldo(c))]),
-            foot: [['', 'TOTAL ACTIVOS', Qp(totAct)]],
+            foot: [[{ content:'TOTAL ACTIVOS', colSpan:2, styles:tblTotal }, { content:Qp(totAct), styles:{...tblTotal,halign:'right'} }]],
             headStyles: tblHead, bodyStyles: tblBody, footStyles: tblTotal,
             alternateRowStyles: tblAlt, columnStyles: colB, margin:{left:14,right:14}, theme:'plain',
           })
@@ -1502,9 +1558,9 @@ function BalanceTab({ cuentas, asientos, empresaNombre = '' }) {
             startY: doc.lastAutoTable.finalY + 6,
             head: [[{ content: 'PASIVOS', colSpan:3, styles: tblHead }]],
             body: cPasivos.filter(c=>getSaldo(c)!==0).map(c=>[c.codigo, c.nombre, Qp(getSaldo(c))]),
-            foot: [['', 'TOTAL PASIVOS', Qp(totPas)]],
+            foot: [[{ content:'TOTAL PASIVOS', colSpan:2, styles:tblTotal }, { content:Qp(totPas), styles:{...tblTotal,halign:'right'} }]],
             headStyles: tblHead, bodyStyles: tblBody, footStyles: tblTotal,
-            alternateRowStyles: tblAlt, columnStyles: col, margin:{left:14,right:14}, theme:'plain',
+            alternateRowStyles: tblAlt, columnStyles: colB, margin:{left:14,right:14}, theme:'plain',
           })
           // CAPITAL
           autoTable(doc, {
@@ -1514,19 +1570,23 @@ function BalanceTab({ cuentas, asientos, empresaNombre = '' }) {
               ...cCapital.filter(c=>getSaldo(c)!==0).map(c=>[c.codigo, c.nombre, Qp(getSaldo(c))]),
               [{ content:'—', styles:{textColor:[150,150,150]} }, utilidad>=0 ? 'Utilidad del ejercicio' : 'Pérdida del ejercicio', Qp(utilidad)],
             ],
-            foot: [['', 'TOTAL CAPITAL', Qp(totCap+utilidad)]],
+            foot: [[{ content:'TOTAL CAPITAL', colSpan:2, styles:tblTotal }, { content:Qp(totCap+utilidad), styles:{...tblTotal,halign:'right'} }]],
             headStyles: tblHead, bodyStyles: tblBody, footStyles: tblTotal,
-            alternateRowStyles: tblAlt, columnStyles: col, margin:{left:14,right:14}, theme:'plain',
+            alternateRowStyles: tblAlt, columnStyles: colB, margin:{left:14,right:14}, theme:'plain',
           })
-          // Verificación cuadre
-          const yv = doc.lastAutoTable.finalY + 8
-          doc.setFillColor(cuadra ? 240:254, cuadra ? 253:242, cuadra ? 244:242)
-          doc.rect(14, yv, 182, 8, 'F')
-          doc.setFont('helvetica','bold'); doc.setFontSize(8.5)
-          doc.setTextColor(cuadra ? 21:185, cuadra ? 128:28, cuadra ? 61:28)
-          doc.text(`Activos = Pasivos + Capital: ${cuadra ? 'CUADRA ✓' : 'NO CUADRA ✗'}`, 18, yv+5)
-          doc.setTextColor(100,116,139); doc.setFont('helvetica','normal'); doc.setFontSize(7.5)
-          doc.text(`Activos: ${Qp(totAct)}   Pas + Cap: ${Qp(totPasCap)}`, 198, yv+5, { align:'right' })
+          // RESUMEN (sin fondo oscuro)
+          autoTable(doc, {
+            startY: doc.lastAutoTable.finalY + 8,
+            head: [[{ content: 'RESUMEN', colSpan:2, styles: tblHead }]],
+            body: [
+              [{ content:'TOTAL ACTIVO',     styles:{...tblBody,textColor:[100,116,139]} }, { content:Qp(totAct),           styles:{...tblBody,halign:'right',fontStyle:'bold'} }],
+              [{ content:'TOTAL PASIVO',     styles:{...tblBody,textColor:[100,116,139]} }, { content:Qp(totPas),           styles:{...tblBody,halign:'right',fontStyle:'bold'} }],
+              [{ content:'TOTAL PATRIMONIO', styles:{...tblBody,textColor:[100,116,139]} }, { content:Qp(totCap+utilidad),  styles:{...tblBody,halign:'right',fontStyle:'bold'} }],
+            ],
+            foot: [[{ content:'PASIVO + PATRIMONIO', styles:{...tblTotal,textColor:[88,86,214]} }, { content:Qp(totPasCap), styles:{...tblTotal,halign:'right',textColor:[88,86,214]} }]],
+            headStyles: tblHead, bodyStyles: tblBody, footStyles: tblTotal,
+            margin:{left:14,right:14}, theme:'plain',
+          })
 
           doc.save(`balance-general-${ano}.pdf`)
         }} style={{ padding:'7px 14px', borderRadius:'8px', border:'1.5px solid var(--accent)', background:'transparent', color:'var(--accent)', fontWeight:'600', fontSize:'12px', cursor:'pointer' }}>Descargar PDF</button>
@@ -1561,15 +1621,35 @@ function BalanceTab({ cuentas, asientos, empresaNombre = '' }) {
         }
       />
 
-      <div style={{ padding:'16px', borderRadius:'12px', background: cuadra ? '#dcfce720':'#fee2e220', border:`1.5px solid ${cuadra ? '#16a34a40':'#dc262640'}` }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px' }}>
-          <span style={{ fontSize:'14px', fontWeight:'700' }}>Activos = Pasivos + Capital</span>
-          <span style={{ fontSize:'18px', color: cuadra ? '#16a34a':'#dc2626' }}>{cuadra ? '✓':'✗'}</span>
+      <div style={{ marginTop:'8px' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px' }}>
+          <span style={{ fontSize:'11px', fontWeight:'700', color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.08em' }}>Resumen</span>
+          <button onClick={() => {
+            const txt = `TOTAL ACTIVO         ${Qp(totAct)}\n\nTOTAL PASIVO         ${Qp(totPas)}\nTOTAL PATRIMONIO     ${Qp(totCap+utilidad)}\n\nPASIVO + PATRIMONIO  ${Qp(totPasCap)}`
+            navigator.clipboard.writeText(txt)
+          }} title="Copiar al portapapeles" style={{ background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer', padding:'4px', lineHeight:1 }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+          </button>
         </div>
-        <div style={{ display:'flex', gap:'24px', fontSize:'12px', color:'var(--text-muted)' }}>
-          <span>Total Activos: <strong style={{ color:'var(--text-1)' }}>{Q(totAct)}</strong></span>
-          <span>Pas + Cap: <strong style={{ color:'var(--text-1)' }}>{Q(totPasCap)}</strong></span>
-          {!cuadra && <span style={{ color:'#dc2626' }}>Dif: {Q(Math.abs(totAct-totPasCap))}</span>}
+        <div style={{ background:'var(--inner-bg)', borderRadius:'12px', padding:'18px 20px', fontFamily:'monospace' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'14px' }}>
+            <span style={{ fontSize:'12px', fontWeight:'700', color:'var(--text-1)', letterSpacing:'0.04em' }}>TOTAL ACTIVO</span>
+            <span style={{ fontSize:'13px', fontWeight:'700', color:'var(--text-1)' }}>{Qp(totAct)}</span>
+          </div>
+          <div style={{ borderTop:'1px solid var(--border)', paddingTop:'12px', marginBottom:'6px', display:'flex', justifyContent:'space-between' }}>
+            <span style={{ fontSize:'12px', color:'var(--text-muted)', letterSpacing:'0.04em' }}>TOTAL PASIVO</span>
+            <span style={{ fontSize:'12px', color:'var(--text-1)' }}>{Qp(totPas)}</span>
+          </div>
+          <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'14px' }}>
+            <span style={{ fontSize:'12px', color:'var(--text-muted)', letterSpacing:'0.04em' }}>TOTAL PATRIMONIO</span>
+            <span style={{ fontSize:'12px', color:'var(--text-1)' }}>{Qp(totCap+utilidad)}</span>
+          </div>
+          <div style={{ borderTop:'1px solid var(--border)', paddingTop:'12px', display:'flex', justifyContent:'space-between' }}>
+            <span style={{ fontSize:'12px', fontWeight:'700', color:'var(--text-muted)', letterSpacing:'0.04em' }}>PASIVO + PATRIMONIO</span>
+            <span style={{ fontSize:'13px', fontWeight:'700', color:'var(--accent)' }}>{Qp(totPasCap)}</span>
+          </div>
         </div>
       </div>
     </div>
