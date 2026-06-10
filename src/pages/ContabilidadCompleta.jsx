@@ -497,15 +497,20 @@ function CatalogTab({ cuentas, onReload, userId, empresaId }) {
 // ── MÓDULO 2: LIBRO DIARIO ───────────────────────────────────────────────────
 
 function DiarioTab({ cuentas, asientos, onReload, userId, empresaId }) {
-  const now = new Date()
-  const [mes, setMes]   = useState(now.getMonth())
-  const [year, setYear] = useState(now.getFullYear())
+  const _hoyY = new Date().getFullYear()
+  const _anos = [...new Set(asientos.map(a => new Date(a.fecha+'T00:00:00').getFullYear()))].sort((a,b)=>b-a)
+  const [year, setYear] = useState(() => _anos.includes(_hoyY) ? _hoyY : (_anos[0] || _hoyY))
+  const [mes, setMes]   = useState(null)
+  const handleSetYear = (y) => { setYear(y); setMes(null) }
+  const handleSetMes  = (m) => setMes(mes===m ? null : m)
+  const mesesDisp = [...new Set(asientos.filter(a => new Date(a.fecha+'T00:00:00').getFullYear()===year).map(a => new Date(a.fecha+'T00:00:00').getMonth()+1))].sort((a,b)=>a-b)
+  const periodoLabel = mes !== null ? `${MESES[mes-1]} ${year}` : `Año ${year}`
   const [modal, setModal]     = useState(null)
   const [confirmBox, setConfirmBox] = useState(null)
   const [expanded, setExpanded]     = useState(null)
 
   const filtered = asientos
-    .filter(a => { const d = new Date(a.fecha+'T00:00:00'); return d.getFullYear()===year && d.getMonth()===mes })
+    .filter(a => { const d = new Date(a.fecha+'T00:00:00'); return d.getFullYear()===year && (mes===null || d.getMonth()+1===mes) })
     .sort((a,b) => a.fecha.localeCompare(b.fecha))
 
   const handleAnular = async (a) => {
@@ -521,13 +526,18 @@ function DiarioTab({ cuentas, asientos, onReload, userId, empresaId }) {
 
   return (
     <div>
-      <div style={{ display:'flex', gap:'10px', alignItems:'center', marginBottom:'20px', flexWrap:'wrap' }}>
-        <select value={mes}  onChange={e=>setMes(+e.target.value)}  style={{...inp(), width:'auto'}}>{MESES.map((m,i)=><option key={i} value={i}>{m}</option>)}</select>
-        <select value={year} onChange={e=>setYear(+e.target.value)} style={{...inp(), width:'auto'}}>{[2024,2025,2026,2027].map(y=><option key={y}>{y}</option>)}</select>
-        <span style={{ fontSize:'13px', color:'var(--text-muted)' }}>{filtered.length} asientos</span>
-        <div style={{ marginLeft:'auto', display:'flex', gap:'8px' }}>
-          <button onClick={() => {
-            const doc = initPDF(`Libro Diario — ${MESES[mes]} ${year}`, `${filtered.length} asientos`)
+      <div style={{ marginBottom:'20px' }}>
+        {_anos.length > 0 && <div style={{ display:'flex', gap:'6px', marginBottom:'8px', flexWrap:'wrap' }}>
+          {_anos.map(y => <button key={y} onClick={()=>handleSetYear(y)} style={{ padding:'5px 16px', borderRadius:'7px', border:'none', fontSize:'13px', fontWeight:year===y?'700':'400', background:year===y?'var(--accent)':'var(--inner-bg)', color:year===y?'#fff':'var(--text-muted)', cursor:'pointer' }}>{y}</button>)}
+        </div>}
+        {mesesDisp.length > 0 && <div style={{ display:'flex', gap:'5px', marginBottom:'10px', flexWrap:'wrap' }}>
+          {mesesDisp.map(m => <button key={m} onClick={()=>handleSetMes(m)} style={{ padding:'4px 12px', borderRadius:'7px', border:'1px solid var(--border)', fontSize:'12px', fontWeight:mes===m?'700':'400', background:mes===m?'var(--accent-soft)':'transparent', color:mes===m?'var(--accent)':'var(--text-muted)', cursor:'pointer' }}>{MESES[m-1]}</button>)}
+        </div>}
+        <div style={{ display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap' }}>
+          <span style={{ fontSize:'13px', color:'var(--text-muted)' }}>Período: <strong style={{ color:'var(--text-1)' }}>{periodoLabel}</strong> — {filtered.length} asientos</span>
+          <div style={{ marginLeft:'auto', display:'flex', gap:'8px' }}>
+            <button onClick={() => {
+              const doc = initPDF(`Libro Diario — ${periodoLabel}`, `${filtered.length} asientos`)
             const body = []
             filtered.forEach((a, i) => {
               const rowBg = i % 2 === 0 ? [255,255,255] : [250,250,252]
@@ -559,9 +569,10 @@ function DiarioTab({ cuentas, asientos, onReload, userId, empresaId }) {
               bodyStyles: { fontSize:8 },
               columnStyles: { 5:{halign:'right'}, 6:{halign:'right'} },
             })
-            doc.save(`libro-diario-${MESES[mes].toLowerCase()}-${year}.pdf`)
-          }} style={{ padding:'7px 14px', borderRadius:'8px', border:'1.5px solid var(--accent)', background:'transparent', color:'var(--accent)', fontWeight:'600', fontSize:'12px', cursor:'pointer' }}>Descargar PDF</button>
-          <button onClick={() => setModal({ mode:'new' })} style={btn()}>+ Nuevo asiento</button>
+              doc.save(`libro-diario-${periodoLabel.toLowerCase().replace(' ', '-')}.pdf`)
+            }} style={{ padding:'7px 14px', borderRadius:'8px', border:'1.5px solid var(--accent)', background:'transparent', color:'var(--accent)', fontWeight:'600', fontSize:'12px', cursor:'pointer' }}>Descargar PDF</button>
+            <button onClick={() => setModal({ mode:'new' })} style={btn()}>+ Nuevo asiento</button>
+          </div>
         </div>
       </div>
 
@@ -1013,12 +1024,17 @@ function AsientoModal({ mode, asiento, prefill, cuentas, onClose, onSaved, userI
 // ── MÓDULOS 3 Y 4: LIBRO DE VENTAS / COMPRAS ────────────────────────────────
 
 function LibroTab({ tipo, asientos }) {
-  const now = new Date()
-  const [mes,  setMes]  = useState(now.getMonth())
-  const [year, setYear] = useState(now.getFullYear())
+  const _hoyY = new Date().getFullYear()
+  const _anos = [...new Set(asientos.map(a => new Date(a.fecha+'T00:00:00').getFullYear()))].sort((a,b)=>b-a)
+  const [year, setYear] = useState(() => _anos.includes(_hoyY) ? _hoyY : (_anos[0] || _hoyY))
+  const [mes, setMes]   = useState(null)
+  const handleSetYear = (y) => { setYear(y); setMes(null) }
+  const handleSetMes  = (m) => setMes(mes===m ? null : m)
+  const mesesDisp = [...new Set(asientos.filter(a => a.tipo===tipo && new Date(a.fecha+'T00:00:00').getFullYear()===year).map(a => new Date(a.fecha+'T00:00:00').getMonth()+1))].sort((a,b)=>a-b)
+  const periodoLabel = mes !== null ? `${MESES[mes-1]} ${year}` : `Año ${year}`
 
   const rows = asientos
-    .filter(a => a.tipo===tipo && a.estado==='ACTIVO' && (()=>{ const d=new Date(a.fecha+'T00:00:00'); return d.getFullYear()===year && d.getMonth()===mes })())
+    .filter(a => a.tipo===tipo && a.estado==='ACTIVO' && (()=>{ const d=new Date(a.fecha+'T00:00:00'); return d.getFullYear()===year && (mes===null || d.getMonth()+1===mes) })())
     .sort((a,b)=>a.fecha.localeCompare(b.fecha))
 
   const totBase  = rows.reduce((s,a)=>s+(a.base_imponible||0),0)
@@ -1027,14 +1043,19 @@ function LibroTab({ tipo, asientos }) {
 
   return (
     <div>
-      <div style={{ display:'flex', gap:'10px', alignItems:'center', marginBottom:'20px', flexWrap:'wrap' }}>
-        <select value={mes}  onChange={e=>setMes(+e.target.value)}  style={{...inp(), width:'auto'}}>{MESES.map((m,i)=><option key={i} value={i}>{m}</option>)}</select>
-        <select value={year} onChange={e=>setYear(+e.target.value)} style={{...inp(), width:'auto'}}>{[2024,2025,2026,2027].map(y=><option key={y}>{y}</option>)}</select>
-        <span style={{ fontSize:'13px', color:'var(--text-muted)' }}>{rows.length} registros</span>
-        <div style={{ marginLeft:'auto' }}>
-          <button onClick={() => {
-            const titulo = tipo==='VENTA' ? 'Libro de Ventas' : 'Libro de Compras'
-            const doc = initPDF(`${titulo} — ${MESES[mes]} ${year}`, `${rows.length} registros`)
+      <div style={{ marginBottom:'20px' }}>
+        {_anos.length > 0 && <div style={{ display:'flex', gap:'6px', marginBottom:'8px', flexWrap:'wrap' }}>
+          {_anos.map(y => <button key={y} onClick={()=>handleSetYear(y)} style={{ padding:'5px 16px', borderRadius:'7px', border:'none', fontSize:'13px', fontWeight:year===y?'700':'400', background:year===y?'var(--accent)':'var(--inner-bg)', color:year===y?'#fff':'var(--text-muted)', cursor:'pointer' }}>{y}</button>)}
+        </div>}
+        {mesesDisp.length > 0 && <div style={{ display:'flex', gap:'5px', marginBottom:'10px', flexWrap:'wrap' }}>
+          {mesesDisp.map(m => <button key={m} onClick={()=>handleSetMes(m)} style={{ padding:'4px 12px', borderRadius:'7px', border:'1px solid var(--border)', fontSize:'12px', fontWeight:mes===m?'700':'400', background:mes===m?'var(--accent-soft)':'transparent', color:mes===m?'var(--accent)':'var(--text-muted)', cursor:'pointer' }}>{MESES[m-1]}</button>)}
+        </div>}
+        <div style={{ display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap' }}>
+          <span style={{ fontSize:'13px', color:'var(--text-muted)' }}>Período: <strong style={{ color:'var(--text-1)' }}>{periodoLabel}</strong> — {rows.length} registros</span>
+          <div style={{ marginLeft:'auto' }}>
+            <button onClick={() => {
+              const titulo = tipo==='VENTA' ? 'Libro de Ventas' : 'Libro de Compras'
+              const doc = initPDF(`${titulo} — ${periodoLabel}`, `${rows.length} registros`)
             autoTable(doc, {
               startY: 36,
               head: [['#','Fecha','Descripción','No. Factura','NIT','Base Imponible','IVA 12%','Total']],
@@ -1046,8 +1067,9 @@ function LibroTab({ tipo, asientos }) {
               bodyStyles: { fontSize:8 },
               columnStyles: { 5:{halign:'right'}, 6:{halign:'right'}, 7:{halign:'right'} },
             })
-            doc.save(`${tipo.toLowerCase()}-${MESES[mes].toLowerCase()}-${year}.pdf`)
-          }} style={{ padding:'7px 14px', borderRadius:'8px', border:'1.5px solid var(--accent)', background:'transparent', color:'var(--accent)', fontWeight:'600', fontSize:'12px', cursor:'pointer' }}>Descargar PDF</button>
+              doc.save(`${tipo.toLowerCase()}-${periodoLabel.toLowerCase().replace(' ','-')}.pdf`)
+            }} style={{ padding:'7px 14px', borderRadius:'8px', border:'1.5px solid var(--accent)', background:'transparent', color:'var(--accent)', fontWeight:'600', fontSize:'12px', cursor:'pointer' }}>Descargar PDF</button>
+          </div>
         </div>
       </div>
       <table style={{ width:'100%', borderCollapse:'collapse' }}>
@@ -1304,8 +1326,25 @@ function ResultadosTab({ cuentas, asientos, empresaNombre = '' }) {
   const anos = [...new Set(asientos.map(a => new Date(a.fecha+'T00:00:00').getFullYear()))].sort((a,b)=>b-a)
   const hoy  = new Date().getFullYear()
   const [ano, setAno] = useState(() => anos.includes(hoy) ? hoy : (anos[0] || hoy))
+  const [mes, setMes]             = useState(null)
+  const [trimestre, setTrimestre] = useState(null)
+  const TRIM_MESES  = { 1:[1,2,3], 2:[4,5,6], 3:[7,8,9], 4:[10,11,12] }
+  const TRIM_LABELS = ['1er Trimestre','2do Trimestre','3er Trimestre','4to Trimestre']
+  const handleSetAno  = (y) => { setAno(y); setMes(null); setTrimestre(null) }
+  const handleSetMes  = (m) => { setMes(mes===m ? null : m); setTrimestre(null) }
+  const handleSetTrim = (t) => { setTrimestre(trimestre===t ? null : t); setMes(null) }
+  const mesesDisp = [...new Set(asientos.filter(a => a.estado==='ACTIVO' && new Date(a.fecha+'T00:00:00').getFullYear()===ano).map(a => new Date(a.fecha+'T00:00:00').getMonth()+1))].sort((a,b)=>a-b)
+  const periodoLabel = trimestre !== null ? `${TRIM_LABELS[trimestre-1]} ${ano}` : mes !== null ? `${MESES_ES[mes-1]} ${ano}` : `Año ${ano}`
 
-  const activos = asientos.filter(a => a.estado==='ACTIVO' && new Date(a.fecha+'T00:00:00').getFullYear()===ano)
+  const activos = asientos.filter(a => {
+    if (a.estado !== 'ACTIVO') return false
+    const d = new Date(a.fecha+'T00:00:00')
+    if (d.getFullYear() !== ano) return false
+    const mv = d.getMonth()+1
+    if (trimestre !== null) return TRIM_MESES[trimestre].includes(mv)
+    if (mes !== null) return mv === mes
+    return true
+  })
   const saldoMap = {}
   activos.forEach(a => {
     (a.conta_lineas||[]).forEach(l => {
@@ -1343,7 +1382,12 @@ function ResultadosTab({ cuentas, asientos, empresaNombre = '' }) {
   )}
 
   const descargarPDF = () => {
-    const doc = initPDF('ESTADO DE RESULTADOS', `Período: 1 de enero al 31 de diciembre de ${ano}`, empresaNombre)
+    const doc = initPDF('ESTADO DE RESULTADOS',
+      trimestre !== null
+        ? `Período: ${TRIM_LABELS[trimestre-1]} ${ano} (${MESES_ES[TRIM_MESES[trimestre][0]-1]} – ${MESES_ES[TRIM_MESES[trimestre][2]-1]})`
+        : mes !== null ? `Período: ${MESES_ES[mes-1]} ${ano}`
+        : `Período: 1 de enero al 31 de diciembre de ${ano}`,
+      empresaNombre)
     const col = { 0:{cellWidth:24}, 2:{cellWidth:46, halign:'right'} }
 
     // ── INGRESOS ──────────────────────────────────────────────────
@@ -1398,16 +1442,16 @@ function ResultadosTab({ cuentas, asientos, empresaNombre = '' }) {
       tableLineWidth: 0.3, tableLineColor: resColor,
     })
 
-    doc.save(`estado-resultados-${ano}.pdf`)
+    doc.save(`estado-resultados-${periodoLabel.toLowerCase().replace(' ','-')}.pdf`)
   }
 
   return (
     <div style={{ maxWidth:'580px' }}>
       {/* Selector de año */}
       {anos.length > 0 && (
-        <div style={{ display:'flex', gap:'6px', marginBottom:'20px', flexWrap:'wrap' }}>
+        <div style={{ display:'flex', gap:'6px', marginBottom:'8px', flexWrap:'wrap' }}>
           {anos.map(y => (
-            <button key={y} onClick={() => setAno(y)} style={{
+            <button key={y} onClick={() => handleSetAno(y)} style={{
               padding:'5px 16px', borderRadius:'7px', border:'none', fontSize:'13px',
               fontWeight: ano===y ? '700':'400',
               background: ano===y ? 'var(--accent)' : 'var(--inner-bg)',
@@ -1416,12 +1460,42 @@ function ResultadosTab({ cuentas, asientos, empresaNombre = '' }) {
           ))}
         </div>
       )}
+      <div style={{ display:'flex', gap:'5px', marginBottom:'8px', flexWrap:'wrap' }}>
+        {[1,2,3,4].map(t => (
+          <button key={t} onClick={()=>handleSetTrim(t)} style={{
+            padding:'4px 14px', borderRadius:'7px', border:'1px solid var(--border)', fontSize:'12px',
+            fontWeight: trimestre===t ? '700':'400',
+            background: trimestre===t ? 'var(--accent)' : 'transparent',
+            color: trimestre===t ? '#fff' : 'var(--text-muted)', cursor:'pointer',
+          }}>{TRIM_LABELS[t-1]}</button>
+        ))}
+      </div>
+      {mesesDisp.length > 0 && (
+        <div style={{ display:'flex', gap:'5px', marginBottom:'14px', flexWrap:'wrap' }}>
+          {mesesDisp.map(m => {
+            const enTrim = trimestre !== null && TRIM_MESES[trimestre].includes(m)
+            return (
+              <button key={m} onClick={()=>handleSetMes(m)} style={{
+                padding:'4px 12px', borderRadius:'7px', border:'1px solid var(--border)', fontSize:'12px',
+                fontWeight: mes===m ? '700':'400',
+                background: mes===m ? 'var(--accent-soft)' : enTrim ? 'rgba(88,86,214,0.10)' : 'transparent',
+                color: mes===m ? 'var(--accent)' : enTrim ? 'var(--accent)' : 'var(--text-muted)', cursor:'pointer',
+              }}>{MESES_ES[m-1]}</button>
+            )
+          })}
+        </div>
+      )}
       <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:'16px' }}>
         <button onClick={descargarPDF} style={{ padding:'7px 14px', borderRadius:'8px', border:'1.5px solid var(--accent)', background:'transparent', color:'var(--accent)', fontWeight:'600', fontSize:'12px', cursor:'pointer' }}>Descargar PDF</button>
       </div>
       <div style={{ textAlign:'center', marginBottom:'24px' }}>
         <div style={{ fontSize:'15px', fontWeight:'700', color:'var(--text-1)', textTransform:'uppercase', letterSpacing:'0.04em' }}>Estado de Resultados</div>
-        <div style={{ fontSize:'12px', color:'var(--text-muted)' }}>Enero – Diciembre {ano}</div>
+        <div style={{ fontSize:'12px', color:'var(--text-muted)' }}>
+          {trimestre !== null
+            ? `${TRIM_LABELS[trimestre-1]} ${ano} · ${MESES_ES[TRIM_MESES[trimestre][0]-1]} – ${MESES_ES[TRIM_MESES[trimestre][2]-1]}`
+            : mes !== null ? `${MESES_ES[mes-1]} ${ano}`
+            : `Enero – Diciembre ${ano}`}
+        </div>
       </div>
 
       {/* INGRESOS — lista plana */}
@@ -1486,8 +1560,19 @@ function BalanceTab({ cuentas, asientos, empresaNombre = '' }) {
   const anos = [...new Set(asientos.map(a => new Date(a.fecha+'T00:00:00').getFullYear()))].sort((a,b)=>b-a)
   const hoy  = new Date().getFullYear()
   const [ano, setAno] = useState(() => anos.includes(hoy) ? hoy : (anos[0] || hoy))
+  const [mes, setMes] = useState(null)
+  const handleSetAno = (y) => { setAno(y); setMes(null) }
+  const handleSetMes = (m) => setMes(mes===m ? null : m)
+  const mesesDisp = [...new Set(asientos.filter(a => a.estado==='ACTIVO' && new Date(a.fecha+'T00:00:00').getFullYear()===ano).map(a => new Date(a.fecha+'T00:00:00').getMonth()+1))].sort((a,b)=>a-b)
+  const periodoLabel = mes !== null ? `${MESES_ES[mes-1]} ${ano}` : `Año ${ano}`
 
-  const activosAno = asientos.filter(a => a.estado==='ACTIVO' && new Date(a.fecha+'T00:00:00').getFullYear()===ano)
+  const activosAno = asientos.filter(a => {
+    if (a.estado !== 'ACTIVO') return false
+    const d = new Date(a.fecha+'T00:00:00')
+    if (d.getFullYear() !== ano) return false
+    if (mes !== null && d.getMonth()+1 > mes) return false
+    return true
+  })
   const saldoMap = {}
   activosAno.forEach(a => {
     (a.conta_lineas||[]).forEach(l => {
@@ -1541,7 +1626,7 @@ function BalanceTab({ cuentas, asientos, empresaNombre = '' }) {
     <div style={{ maxWidth:'580px' }}>
       <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:'16px' }}>
         <button onClick={() => {
-          const doc = initPDF('BALANCE GENERAL', `Al 31 de diciembre de ${ano}`, empresaNombre)
+          const doc = initPDF('BALANCE GENERAL', mes !== null ? `Al ${MESES_ES[mes-1]} de ${ano}` : `Al 31 de diciembre de ${ano}`, empresaNombre)
           const colB = { 0:{cellWidth:24}, 2:{cellWidth:46, halign:'right'} }
 
           // ACTIVOS
@@ -1588,14 +1673,14 @@ function BalanceTab({ cuentas, asientos, empresaNombre = '' }) {
             margin:{left:14,right:14}, theme:'plain',
           })
 
-          doc.save(`balance-general-${ano}.pdf`)
+          doc.save(`balance-general-${periodoLabel.toLowerCase().replace(' ','-')}.pdf`)
         }} style={{ padding:'7px 14px', borderRadius:'8px', border:'1.5px solid var(--accent)', background:'transparent', color:'var(--accent)', fontWeight:'600', fontSize:'12px', cursor:'pointer' }}>Descargar PDF</button>
       </div>
       {/* Selector de año */}
       {anos.length > 0 && (
-        <div style={{ display:'flex', gap:'6px', marginBottom:'20px', flexWrap:'wrap' }}>
+        <div style={{ display:'flex', gap:'6px', marginBottom:'8px', flexWrap:'wrap' }}>
           {anos.map(y => (
-            <button key={y} onClick={() => setAno(y)} style={{
+            <button key={y} onClick={() => handleSetAno(y)} style={{
               padding:'5px 16px', borderRadius:'7px', border:'none', fontSize:'13px',
               fontWeight: ano===y ? '700':'400',
               background: ano===y ? 'var(--accent)' : 'var(--inner-bg)',
@@ -1604,9 +1689,16 @@ function BalanceTab({ cuentas, asientos, empresaNombre = '' }) {
           ))}
         </div>
       )}
+      {mesesDisp.length > 0 && (
+        <div style={{ display:'flex', gap:'5px', marginBottom:'14px', flexWrap:'wrap' }}>
+          {mesesDisp.map(m => (
+            <button key={m} onClick={()=>handleSetMes(m)} style={{ padding:'4px 12px', borderRadius:'7px', border:'1px solid var(--border)', fontSize:'12px', fontWeight:mes===m?'700':'400', background:mes===m?'var(--accent-soft)':'transparent', color:mes===m?'var(--accent)':'var(--text-muted)', cursor:'pointer' }}>{MESES_ES[m-1]}</button>
+          ))}
+        </div>
+      )}
       <div style={{ textAlign:'center', marginBottom:'24px' }}>
         <div style={{ fontSize:'15px', fontWeight:'700', color:'var(--text-1)', textTransform:'uppercase', letterSpacing:'0.04em' }}>Balance General</div>
-        <div style={{ fontSize:'12px', color:'var(--text-muted)' }}>Enero – Diciembre {ano}</div>
+        <div style={{ fontSize:'12px', color:'var(--text-muted)' }}>{mes !== null ? `Al ${MESES_ES[mes-1]} ${ano}` : `Enero – Diciembre ${ano}`}</div>
       </div>
 
       <Seccion titulo="Activos"  rows={cActivos} tot={totAct} color="#16a34a" borderColor="#16a34a40" />
