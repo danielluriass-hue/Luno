@@ -1356,15 +1356,18 @@ function ResultadosTab({ cuentas, asientos, empresaNombre = '' }) {
   })
   const getSaldo = (c) => { const s=saldoMap[c.id]||{deb:0,cre:0}; return ['ACTIVO','GASTO'].includes(c.tipo) ? s.deb-s.cre : s.cre-s.deb }
 
-  const ingresos = cuentas.filter(c=>c.tipo==='INGRESO').sort((a,b)=>a.codigo.localeCompare(b.codigo))
-  const gastos   = cuentas.filter(c=>c.tipo==='GASTO').sort((a,b)=>a.codigo.localeCompare(b.codigo))
-  const totIng   = ingresos.reduce((s,c)=>s+getSaldo(c),0)
-  const totGas   = gastos.reduce((s,c)=>s+getSaldo(c),0)
-  const utilidad = totIng - totGas
+  const ingresos  = cuentas.filter(c=>c.tipo==='INGRESO').sort((a,b)=>a.codigo.localeCompare(b.codigo))
+  const gastosOp  = cuentas.filter(c=>c.tipo==='GASTO' && c.subtipo!=='Impuestos').sort((a,b)=>a.codigo.localeCompare(b.codigo))
+  const gastosISR = cuentas.filter(c=>c.tipo==='GASTO' && c.subtipo==='Impuestos').sort((a,b)=>a.codigo.localeCompare(b.codigo))
+  const totIng       = ingresos.reduce((s,c)=>s+getSaldo(c),0)
+  const totGasOp     = gastosOp.reduce((s,c)=>s+getSaldo(c),0)
+  const totISR       = gastosISR.reduce((s,c)=>s+getSaldo(c),0)
+  const utilAntesISR = totIng - totGasOp
+  const utilNeta     = utilAntesISR - totISR
 
-  // Agrupar gastos por subtipo, ordenando grupos por el primer código de cuenta
+  // Agrupar gastos operativos por subtipo, ordenando grupos por el primer código de cuenta
   const gruposMap = {}
-  gastos.forEach(c => {
+  gastosOp.forEach(c => {
     const g = c.subtipo || 'Otros'
     if (!gruposMap[g]) gruposMap[g] = { cuentas:[], minCodigo: c.codigo }
     gruposMap[g].cuentas.push(c)
@@ -1401,7 +1404,7 @@ function ResultadosTab({ cuentas, asientos, empresaNombre = '' }) {
       alternateRowStyles: tblAlt, columnStyles: col, margin:{left:14,right:14}, theme:'plain',
     })
 
-    // ── GASTOS por grupo (una sola tabla para alinear columnas) ──
+    // ── COSTOS Y GASTOS OPERATIVOS por grupo ─────────────────────
     const gastosBody = []
     gruposGastos.forEach(({ label, cuentas: gc }) => {
       const filas = gc.filter(c=>getSaldo(c)!==0)
@@ -1421,22 +1424,48 @@ function ResultadosTab({ cuentas, asientos, empresaNombre = '' }) {
     })
     autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 5,
-      head: [[{ content: 'COSTOS Y GASTOS', colSpan:3, styles: tblHead }]],
+      head: [[{ content: 'COSTOS Y GASTOS OPERATIVOS', colSpan:3, styles: tblHead }]],
       body: gastosBody,
-      foot: [[{ content:'TOTAL GASTOS', colSpan:2, styles:tblTotal }, { content:Qp(totGas), styles:{...tblTotal,halign:'right'} }]],
+      foot: [[{ content:'TOTAL COSTOS Y GASTOS OPERATIVOS', colSpan:2, styles:tblTotal }, { content:Qp(totGasOp), styles:{...tblTotal,halign:'right'} }]],
       headStyles: tblHead, bodyStyles: tblBody, footStyles: tblTotal,
       columnStyles: col, margin:{left:14,right:14}, theme:'plain',
     })
-    // ── RESULTADO ─────────────────────────────────────────────────
-    const esUtil   = utilidad >= 0
+    // ── UTILIDAD ANTES DE ISR ─────────────────────────────────────
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY + 4,
+      body: [[
+        { content: 'UTILIDAD ANTES DE ISR', styles: { fontStyle:'bold', fontSize:9, fillColor:[241,245,249], textColor:[15,23,42], cellPadding:{top:4,bottom:4,left:8,right:6} } },
+        { content: Qp(utilAntesISR), styles: { fontStyle:'bold', fontSize:9, halign:'right', fillColor:[241,245,249], textColor:[15,23,42], cellPadding:{top:4,bottom:4,left:6,right:8} } },
+      ]],
+      margin:{left:14,right:14}, theme:'plain',
+      tableLineWidth: 0.2, tableLineColor: [203,213,225],
+    })
+    // ── IMPUESTO SOBRE LA RENTA ───────────────────────────────────
+    const isrFilas = gastosISR.filter(c=>getSaldo(c)!==0)
+    if (isrFilas.length > 0) {
+      autoTable(doc, {
+        startY: doc.lastAutoTable.finalY + 5,
+        head: [[{ content: 'IMPUESTO SOBRE LA RENTA', colSpan:3, styles: tblHead }]],
+        body: isrFilas.map((c,idx) => [
+          { content: c.codigo, styles: { ...tblBody, fillColor: idx%2===0 ? [255,255,255] : [248,250,252] } },
+          { content: c.nombre, styles: { ...tblBody, fillColor: idx%2===0 ? [255,255,255] : [248,250,252] } },
+          { content: Qp(getSaldo(c)), styles: { ...tblBody, halign:'right', fillColor: idx%2===0 ? [255,255,255] : [248,250,252] } },
+        ]),
+        foot: [[{ content:'TOTAL ISR', colSpan:2, styles:tblTotal }, { content:Qp(totISR), styles:{...tblTotal,halign:'right'} }]],
+        headStyles: tblHead, bodyStyles: tblBody, footStyles: tblTotal,
+        columnStyles: col, margin:{left:14,right:14}, theme:'plain',
+      })
+    }
+    // ── UTILIDAD NETA DEL PERÍODO ─────────────────────────────────
+    const esUtil   = utilNeta >= 0
     const resColor = esUtil ? [21,128,61] : [185,28,28]
     const resBg    = esUtil ? [240,253,244] : [254,242,242]
     autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 8,
       body: [[
-        { content: esUtil ? 'UTILIDAD DEL EJERCICIO' : 'PÉRDIDA DEL EJERCICIO',
+        { content: esUtil ? 'UTILIDAD NETA DEL PERÍODO' : 'PÉRDIDA NETA DEL PERÍODO',
           styles: { fontStyle:'bold', fontSize:10, fillColor:resBg, textColor:[15,23,42], cellPadding:{top:5,bottom:5,left:8,right:6} } },
-        { content: Qp(Math.abs(utilidad)),
+        { content: Qp(Math.abs(utilNeta)),
           styles: { fontStyle:'bold', fontSize:10, halign:'right', fillColor:resBg, textColor:resColor, cellPadding:{top:5,bottom:5,left:6,right:8} } },
       ]],
       margin:{left:14,right:14}, theme:'plain',
@@ -1513,9 +1542,9 @@ function ResultadosTab({ cuentas, asientos, empresaNombre = '' }) {
         </table>
       </div>
 
-      {/* GASTOS — agrupados por subtipo */}
+      {/* COSTOS Y GASTOS OPERATIVOS — agrupados por subtipo */}
       <div style={{ marginBottom:'20px' }}>
-        <div style={{ fontSize:'11px', fontWeight:'700', color:'#ea580c', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:'8px', padding:'0 12px' }}>Gastos</div>
+        <div style={{ fontSize:'11px', fontWeight:'700', color:'#ea580c', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:'8px', padding:'0 12px' }}>Costos y Gastos Operativos</div>
         {gruposGastos.map(({ label, cuentas: gc }) => {
           const subTotal = gc.reduce((s,c)=>s+getSaldo(c),0)
           const filas = gc.filter(c=>getSaldo(c)!==0)
@@ -1538,17 +1567,40 @@ function ResultadosTab({ cuentas, asientos, empresaNombre = '' }) {
         <table style={{ width:'100%', borderCollapse:'collapse' }}>
           <tfoot>
             <tr style={{ borderTop:'2px solid var(--border)', background:'var(--inner-bg)' }}>
-              <td colSpan={2} style={{ padding:'8px 12px', fontSize:'13px', fontWeight:'700' }}>Total Gastos</td>
-              <td style={{ padding:'8px 12px', fontSize:'14px', fontWeight:'700', textAlign:'right', color:'#ea580c' }}>{Q(totGas)}</td>
+              <td colSpan={2} style={{ padding:'8px 12px', fontSize:'13px', fontWeight:'700' }}>Total Costos y Gastos Operativos</td>
+              <td style={{ padding:'8px 12px', fontSize:'14px', fontWeight:'700', textAlign:'right', color:'#ea580c' }}>{Q(totGasOp)}</td>
             </tr>
           </tfoot>
         </table>
       </div>
 
-      <div style={{ padding:'18px', borderRadius:'12px', background: utilidad>=0 ? '#dcfce720':'#fee2e220', border:`1.5px solid ${utilidad>=0 ? '#16a34a40':'#dc262640'}` }}>
+      {/* UTILIDAD ANTES DE ISR */}
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 12px', background:'var(--inner-bg)', borderRadius:'8px', marginBottom:'20px' }}>
+        <span style={{ fontSize:'13px', fontWeight:'700', color:'var(--text-1)' }}>UTILIDAD ANTES DE ISR</span>
+        <span style={{ fontSize:'14px', fontWeight:'700', color: utilAntesISR>=0 ? '#16a34a':'#dc2626', fontVariantNumeric:'tabular-nums' }}>{Q(utilAntesISR)}</span>
+      </div>
+
+      {/* IMPUESTO SOBRE LA RENTA */}
+      {gastosISR.some(c=>getSaldo(c)!==0) && (
+        <div style={{ marginBottom:'20px' }}>
+          <div style={{ fontSize:'11px', fontWeight:'700', color:'#7c3aed', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:'8px', padding:'0 12px' }}>Impuesto Sobre la Renta</div>
+          <table style={{ width:'100%', borderCollapse:'collapse' }}>
+            <tbody>{gastosISR.map(c=><Fila key={c.id} c={c} />)}</tbody>
+            <tfoot>
+              <tr style={{ borderTop:'2px solid var(--border)', background:'var(--inner-bg)' }}>
+                <td colSpan={2} style={{ padding:'8px 12px', fontSize:'13px', fontWeight:'700' }}>Total ISR</td>
+                <td style={{ padding:'8px 12px', fontSize:'14px', fontWeight:'700', textAlign:'right', color:'#7c3aed', fontVariantNumeric:'tabular-nums' }}>{Q(totISR)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+
+      {/* UTILIDAD NETA DEL PERÍODO */}
+      <div style={{ padding:'18px', borderRadius:'12px', background: utilNeta>=0 ? '#dcfce720':'#fee2e220', border:`1.5px solid ${utilNeta>=0 ? '#16a34a40':'#dc262640'}` }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <span style={{ fontSize:'15px', fontWeight:'700' }}>{utilidad>=0 ? 'UTILIDAD DEL EJERCICIO':'PÉRDIDA DEL EJERCICIO'}</span>
-          <span style={{ fontSize:'20px', fontWeight:'700', color: utilidad>=0 ? '#16a34a':'#dc2626' }}>{Q(Math.abs(utilidad))}</span>
+          <span style={{ fontSize:'15px', fontWeight:'700' }}>{utilNeta>=0 ? 'UTILIDAD NETA DEL PERÍODO':'PÉRDIDA NETA DEL PERÍODO'}</span>
+          <span style={{ fontSize:'20px', fontWeight:'700', color: utilNeta>=0 ? '#16a34a':'#dc2626' }}>{Q(Math.abs(utilNeta))}</span>
         </div>
       </div>
     </div>
