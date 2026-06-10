@@ -542,29 +542,35 @@ function DiarioTab({ cuentas, asientos, onReload, userId, empresaId }) {
             const body = []
             filtered.forEach((a, i) => {
               const rowBg = i % 2 === 0 ? [255,255,255] : [250,250,252]
+              const lineas = (a.conta_lineas||[]).sort((x,y)=>x.orden-y.orden)
+              const sumaD = lineas.reduce((s,l)=>s+(l.debito||0),0)
+              const sumaH = lineas.reduce((s,l)=>s+(l.credito||0),0)
               body.push([
                 { content: i+1, styles: { fontStyle:'bold', fillColor:rowBg } },
                 { content: a.fecha, styles: { fontStyle:'bold', fillColor:rowBg } },
                 { content: a.tipo, styles: { fontStyle:'bold', fillColor:rowBg } },
-                { content: a.descripcion, styles: { fontStyle:'bold', fillColor:rowBg } },
                 { content: a.no_factura||'–', styles: { fontStyle:'bold', fillColor:rowBg } },
                 { content: a.nit||'–', styles: { fontStyle:'bold', fillColor:rowBg } },
-                { content: a.total ? Qp(a.total):'–', styles: { fontStyle:'bold', halign:'right', fillColor:rowBg } },
+                { content: sumaD>0 ? Qp(sumaD):'–', styles:{ fontStyle:'bold', halign:'right', fillColor:rowBg, textColor:[15,23,42] } },
+                { content: sumaH>0 ? Qp(sumaH):'–', styles:{ fontStyle:'bold', halign:'right', fillColor:rowBg, textColor:[15,23,42] } },
               ])
-              const lineas = (a.conta_lineas||[]).sort((x,y)=>x.orden-y.orden)
               lineas.forEach(l => {
                 const nombre = l.conta_cuentas ? `${l.conta_cuentas.codigo} — ${l.conta_cuentas.nombre}` : '–'
                 body.push([
                   { content:'', styles:{ fillColor:[245,245,250] } },
                   { content: nombre, colSpan:4, styles:{ fillColor:[245,245,250], fontSize:7, textColor:[90,90,110], fontStyle:'italic' } },
-                  { content: l.debito>0 ? Qp(l.debito):'–', styles:{ fillColor:[245,245,250], fontSize:7, halign:'right', textColor: l.debito>0 ? [22,163,74]:[180,180,180] } },
-                  { content: l.credito>0 ? Qp(l.credito):'–', styles:{ fillColor:[245,245,250], fontSize:7, halign:'right', textColor: l.credito>0 ? [220,38,38]:[180,180,180] } },
+                  { content: l.debito>0 ? Qp(l.debito):'–', styles:{ fillColor:[245,245,250], fontSize:7, halign:'right', textColor:[15,23,42] } },
+                  { content: l.credito>0 ? Qp(l.credito):'–', styles:{ fillColor:[245,245,250], fontSize:7, halign:'right', textColor:[15,23,42] } },
                 ])
               })
+              body.push([
+                { content:'', styles:{ fillColor:[245,245,250] } },
+                { content: a.descripcion, colSpan:6, styles:{ fillColor:[245,245,250], fontSize:7.5, textColor:[60,60,80], fontStyle:'italic', cellPadding:{top:2,bottom:5,left:6,right:6} } },
+              ])
             })
             autoTable(doc, {
               startY: 36,
-              head: [['#','Fecha','Tipo','Descripción','Factura','NIT/Debe','Total/Haber']],
+              head: [['#','Fecha','Tipo','Factura','NIT','Debe','Haber']],
               body,
               headStyles: { fillColor:[88,86,214], fontSize:8 },
               bodyStyles: { fontSize:8 },
