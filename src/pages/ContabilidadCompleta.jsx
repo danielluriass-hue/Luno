@@ -91,6 +91,7 @@ const CATALOGO_BASE = [
   // 22XX — Pasivo Largo Plazo
   { codigo:'2200', nombre:'Préstamos Bancarios Largo Plazo',                  tipo:'PASIVO',  subtipo:'Pasivo No Corriente' },
   { codigo:'2210', nombre:'Obligaciones Financieras Largo Plazo',             tipo:'PASIVO',  subtipo:'Pasivo No Corriente' },
+  { codigo:'2230', nombre:'ISR Trimestral por Pagar',                        tipo:'PASIVO',  subtipo:'Pasivo No Corriente' },
   // 3XXX — Capital
   { codigo:'3100', nombre:'Capital Social',                                   tipo:'CAPITAL', subtipo:'' },
   { codigo:'3200', nombre:'Utilidades Retenidas',                             tipo:'CAPITAL', subtipo:'' },
