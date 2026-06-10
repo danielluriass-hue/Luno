@@ -1208,6 +1208,7 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
     return {
       totComb:  vig.reduce((s,r)=>s+(r.combustibles||0),0),
       totComp:  vig.reduce((s,r)=>s+(r.compras||0),0),
+      totIDP:   vig.reduce((s,r)=>s+(r.idp||0),0),
       totIVA:   vig.reduce((s,r)=>s+(r.iva||0),0),
       totTotal: vig.reduce((s,r)=>s+(r.total||0),0),
     }
@@ -1230,17 +1231,18 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
     const isVenta = tipo === 'VENTA'
     const titulo  = isVenta ? 'LIBRO DE VENTAS Y SERVICIOS PRESTADOS' : 'LIBRO DE COMPRAS Y SERVICIOS ADQUIRIDOS'
     const n = (v) => `Q. ${Number(v||0).toLocaleString('es-GT', { minimumFractionDigits:2, maximumFractionDigits:2 })}`
+    const AMBER = [255,243,205]
+    const TOTAL_BG = [226,232,240]
+    const ANULADO  = [170,170,170]
+    const HEADER   = [44,55,70]
 
     const doc = new jsPDF({ orientation:'landscape', unit:'mm', format:'letter' })
     const W = doc.internal.pageSize.getWidth()
 
-    // Título
     doc.setFontSize(13); doc.setFont('helvetica','bold'); doc.setTextColor(15,23,42)
     doc.text(titulo, W/2, 16, { align:'center' })
-
-    // Meta
     doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(40,40,40)
-    doc.text(`OPERACIÓN DEL MES: ${mesLabel.toUpperCase()}`,  14, 24)
+    doc.text(`OPERACIÓN DEL MES: ${mesLabel.toUpperCase()}`, 14, 24)
     doc.text(`NOMBRE O RAZÓN SOCIAL: ${meta.nombre || ''}`,  14, 29)
     doc.text(`NIT: ${meta.nit || ''}`,                        14, 34)
 
@@ -1258,65 +1260,80 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
           ]),
           ['','','','','','','','TOTALES', n(totServ), n(totIVA), n(totTotal)],
         ],
-        headStyles:  { fillColor:[44,55,70], textColor:[255,255,255], fontSize:7, cellPadding:3 },
+        headStyles:  { fillColor:HEADER, textColor:[255,255,255], fontSize:7, cellPadding:3, fontStyle:'bold' },
         bodyStyles:  { fontSize:7, cellPadding:2, textColor:[30,30,30] },
-        alternateRowStyles: { fillColor:[248,250,252] },
-        footStyles:  { fillColor:[226,232,240], fontStyle:'bold', fontSize:7 },
         columnStyles: {
           0:{ cellWidth:8 }, 1:{ cellWidth:22 }, 2:{ cellWidth:16 },
           3:{ cellWidth:22 }, 4:{ cellWidth:26 }, 5:{ cellWidth:22 },
           6:{ cellWidth:'auto' }, 7:{ cellWidth:18 },
           8:{ cellWidth:28, halign:'right' }, 9:{ cellWidth:24, halign:'right' }, 10:{ cellWidth:28, halign:'right' },
         },
-        margin:{ left:14, right:14 }, theme:'plain',
+        margin:{ left:14, right:14 }, theme:'grid',
         didParseCell: (data) => {
-          if (data.row.index >= 0 && data.section === 'body') {
+          if (data.section === 'body' && data.row.index < rows.length) {
             const row = rows[data.row.index]
-            if (row?.estado === 'Anulado') data.cell.styles.textColor = [160,160,160]
+            if (row?.estado === 'Anulado') {
+              data.cell.styles.textColor = ANULADO
+            } else if (NCR_SAT.has(row?.tipo_dte)) {
+              data.cell.styles.fillColor = AMBER
+            }
           }
-          const isTotal = data.row.index === rows.length && data.section === 'body'
-          if (isTotal) { data.cell.styles.fillColor = [226,232,240]; data.cell.styles.fontStyle = 'bold' }
+          if (data.section === 'body' && data.row.index === rows.length) {
+            data.cell.styles.fillColor = TOTAL_BG
+            data.cell.styles.fontStyle = 'bold'
+          }
         },
       })
       const finalY = doc.lastAutoTable.finalY + 6
-      doc.setFontSize(7); doc.setTextColor(120,120,120); doc.setFont('helvetica','normal')
+      doc.setFontSize(7); doc.setTextColor(100,100,100); doc.setFont('helvetica','normal')
       doc.text('FACT = Factura  |  NCRE = Nota de crédito  |  NAB = Nota de abono  |  FCAM = Factura cambiaria', 14, finalY)
     } else {
-      const { totComb, totComp, totIVA, totTotal } = totalesCompra(rows)
+      const { totComb, totComp, totIDP, totIVA, totTotal } = totalesCompra(rows)
       autoTable(doc, {
         startY: 38,
-        head: [['No.','Fecha','Tip. Doc.','Serie','Número','NIT','Nombre del Proveedor','Estado','Combustibles','Compras','Servicios','IVA CF','Total']],
+        head: [['No.','Fecha','Tipo','Serie','Número','NIT','Proveedor','Combustibles','Compras','Servicios','IDP','Tasa Mun.','IVA','Total']],
         body: [
           ...rows.map(r => [
-            r.no, r.fecha, r.tipo_dte, r.serie, r.numero, r.nit, r.proveedor, r.estado,
+            r.no, r.fecha, r.tipo_dte, r.serie, r.numero, r.nit, r.proveedor,
             r.estado==='Anulado' ? '–' : n(r.combustibles),
             r.estado==='Anulado' ? '–' : n(r.compras),
+            '–',
+            r.estado==='Anulado' ? '–' : n(r.idp),
             '0.00',
             r.estado==='Anulado' ? '–' : n(r.iva),
             r.estado==='Anulado' ? '–' : n(r.total),
           ]),
-          ['','','','','','','','TOTALES', n(totComb), n(totComp), '0.00', n(totIVA), n(totTotal)],
+          ['','','','','','','TOTALES', n(totComb), n(totComp), '–', n(totIDP), '0.00', n(totIVA), n(totTotal)],
         ],
-        headStyles:  { fillColor:[44,55,70], textColor:[255,255,255], fontSize:7, cellPadding:3 },
-        bodyStyles:  { fontSize:7, cellPadding:2, textColor:[30,30,30] },
-        alternateRowStyles: { fillColor:[248,250,252] },
+        headStyles:  { fillColor:HEADER, textColor:[255,255,255], fontSize:6.5, cellPadding:2.5, fontStyle:'bold' },
+        bodyStyles:  { fontSize:6.5, cellPadding:2, textColor:[30,30,30] },
         columnStyles: {
-          0:{ cellWidth:8 }, 1:{ cellWidth:22 }, 2:{ cellWidth:16 },
-          3:{ cellWidth:20 }, 4:{ cellWidth:24 }, 5:{ cellWidth:20 },
-          6:{ cellWidth:'auto' }, 7:{ cellWidth:18 },
-          8:{ cellWidth:24, halign:'right' }, 9:{ cellWidth:22, halign:'right' },
-          10:{ cellWidth:18, halign:'right' }, 11:{ cellWidth:20, halign:'right' }, 12:{ cellWidth:24, halign:'right' },
+          0:{ cellWidth:7 }, 1:{ cellWidth:19 }, 2:{ cellWidth:13 },
+          3:{ cellWidth:17 }, 4:{ cellWidth:21 }, 5:{ cellWidth:18 },
+          6:{ cellWidth:'auto' },
+          7:{ cellWidth:22, halign:'right' }, 8:{ cellWidth:22, halign:'right' },
+          9:{ cellWidth:16, halign:'right' }, 10:{ cellWidth:16, halign:'right' },
+          11:{ cellWidth:18, halign:'right' }, 12:{ cellWidth:20, halign:'right' }, 13:{ cellWidth:22, halign:'right' },
         },
-        margin:{ left:14, right:14 }, theme:'plain',
+        margin:{ left:14, right:14 }, theme:'grid',
         didParseCell: (data) => {
-          if (data.row.index >= 0 && data.section === 'body') {
+          if (data.section === 'body' && data.row.index < rows.length) {
             const row = rows[data.row.index]
-            if (row?.estado === 'Anulado') data.cell.styles.textColor = [160,160,160]
+            if (row?.estado === 'Anulado') {
+              data.cell.styles.textColor = ANULADO
+            } else if (NCR_SAT.has(row?.tipo_dte)) {
+              data.cell.styles.fillColor = AMBER
+            }
           }
-          const isTotal = data.row.index === rows.length && data.section === 'body'
-          if (isTotal) { data.cell.styles.fillColor = [226,232,240]; data.cell.styles.fontStyle = 'bold' }
+          if (data.section === 'body' && data.row.index === rows.length) {
+            data.cell.styles.fillColor = TOTAL_BG
+            data.cell.styles.fontStyle = 'bold'
+          }
         },
       })
+      const finalY = doc.lastAutoTable.finalY + 6
+      doc.setFontSize(7); doc.setTextColor(100,100,100); doc.setFont('helvetica','normal')
+      doc.text('FACT = Factura  |  FES = Factura especial  |  NCRE = Nota de crédito  |  FCAM = Factura cambiaria', 14, finalY)
     }
     doc.save(`libro-${tipo.toLowerCase()}-${periodoLabel.toLowerCase().replace(' ','-')}.pdf`)
   }
