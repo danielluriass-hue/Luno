@@ -270,8 +270,8 @@ function ResumenFiscal({ ventas, compras, retenciones }) {
   const totalDeducciones = totalAnuladas + totalNCR
   const ventasNetas   = ventasBrutas - totalDeducciones
 
-  // IVA débito = solo las FACTURAS vigentes (las NCR reducen el débito)
-  const ivaDebito  = factVig.reduce((s, v) => s + v.iva, 0)
+  // IVA débito = FACT vigentes menos IVA de NCR vigentes
+  const ivaDebito  = factVig.reduce((s, v) => s + v.iva, 0) - ncrVig.reduce((s, v) => s + v.iva, 0)
   const ivaRet     = retenciones.reduce((s, r) => s + r.totalRetencion, 0)
   const ivaAPagar  = ivaDebito - ivaRet
 
