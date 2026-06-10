@@ -1058,7 +1058,9 @@ function parseVentasSAT(wb) {
   const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' })
   if (rows.length < 2) return { rows:[], meta:{} }
   const COL = colMapSAT(rows[0])
-  const data = rows.slice(1).map((r, i) => {
+  const data = rows.slice(1)
+    .filter(r => String(r[COL['Número del DTE']]||'').trim() !== '')
+    .map((r, i) => {
     const anulado = String(r[COL['Marca de anulado']]||'').toLowerCase() === 'si'
     const tipoDTE = r[COL['Tipo de DTE (nombre)']] || ''
     const total   = parseFloat(r[COL['Gran Total (Moneda Original)']]) || 0
@@ -1081,7 +1083,9 @@ function parseComprasSAT(wb) {
   const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' })
   if (rows.length < 2) return { rows:[], meta:{} }
   const COL = colMapSAT(rows[0])
-  const data = rows.slice(1).map((r, i) => {
+  const data = rows.slice(1)
+    .filter(r => String(r[COL['Número del DTE']]||'').trim() !== '')
+    .map((r, i) => {
     const anulado = String(r[COL['Marca de anulado']]||'').toLowerCase() === 'si'
     const total   = parseFloat(r[COL['Gran Total (Moneda Original)']]) || 0
     const iva     = parseFloat(r[COL['IVA (monto de este impuesto)']]) || 0
