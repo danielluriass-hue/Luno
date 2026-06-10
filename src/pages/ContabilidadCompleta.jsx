@@ -551,8 +551,8 @@ function DiarioTab({ cuentas, asientos, onReload, userId, empresaId }) {
                 { content: a.tipo, styles: { fontStyle:'bold', fillColor:rowBg } },
                 { content: a.no_factura||'–', styles: { fontStyle:'bold', fillColor:rowBg } },
                 { content: a.nit||'–', styles: { fontStyle:'bold', fillColor:rowBg } },
-                { content: sumaD>0 ? Qp(sumaD):'–', styles:{ fontStyle:'bold', halign:'right', fillColor:rowBg, textColor:[15,23,42] } },
-                { content: sumaH>0 ? Qp(sumaH):'–', styles:{ fontStyle:'bold', halign:'right', fillColor:rowBg, textColor:[15,23,42] } },
+                { content: '–', styles:{ halign:'right', fillColor:rowBg, textColor:[180,180,180] } },
+                { content: '–', styles:{ halign:'right', fillColor:rowBg, textColor:[180,180,180] } },
               ])
               lineas.forEach(l => {
                 const nombre = l.conta_cuentas ? `${l.conta_cuentas.codigo} — ${l.conta_cuentas.nombre}` : '–'
@@ -564,8 +564,10 @@ function DiarioTab({ cuentas, asientos, onReload, userId, empresaId }) {
                 ])
               })
               body.push([
-                { content:'', styles:{ fillColor:[245,245,250] } },
-                { content: a.descripcion, colSpan:6, styles:{ fillColor:[245,245,250], fontSize:7.5, textColor:[60,60,80], fontStyle:'italic', cellPadding:{top:2,bottom:5,left:6,right:6} } },
+                { content:'', styles:{ fillColor:[235,238,245] } },
+                { content: a.descripcion, colSpan:4, styles:{ fillColor:[235,238,245], fontSize:7.5, textColor:[60,60,80], fontStyle:'italic', cellPadding:{top:3,bottom:5,left:6,right:6} } },
+                { content: sumaD>0 ? Qp(sumaD):'–', styles:{ fillColor:[235,238,245], fontSize:7.5, fontStyle:'bold', halign:'right', textColor:[15,23,42], cellPadding:{top:3,bottom:5,left:4,right:6} } },
+                { content: sumaH>0 ? Qp(sumaH):'–', styles:{ fillColor:[235,238,245], fontSize:7.5, fontStyle:'bold', halign:'right', textColor:[15,23,42], cellPadding:{top:3,bottom:5,left:4,right:6} } },
               ])
             })
             autoTable(doc, {
