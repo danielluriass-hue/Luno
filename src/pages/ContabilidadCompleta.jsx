@@ -1107,6 +1107,43 @@ function parseComprasSAT(wb) {
   }
 }
 
+function parseRetencionesSAT(wb) {
+  const ws = wb.Sheets[wb.SheetNames[0]]
+  const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' })
+  if (rows.length < 2) return { rows:[], meta:{} }
+  const COL = colMapSAT(rows[0])
+  const data = rows.slice(1)
+    .filter(r => String(r[COL['Número del DTE']]||'').trim() !== '')
+    .map((r, i) => {
+    const anulado = String(r[COL['Marca de anulado']]||'').toLowerCase() === 'si'
+    const total   = parseFloat(r[COL['Gran Total (Moneda Original)']]||0) || 0
+    const base    = parseFloat(r[COL['Base de retención']] || r[COL['Base imponible']] || 0) || 0
+    const tasa    = parseFloat(r[COL['Tasa de retención']]||0) || 0
+    const monto   = parseFloat(r[COL['Monto retenido']] || r[COL['Total retenido']] || 0) || 0
+    return {
+      no: i+1,
+      fecha: fmtFechaSAT(r[COL['Fecha de emisión']]),
+      tipo_dte: r[COL['Tipo de DTE (nombre)']] || '',
+      serie: r[COL['Serie']] || '',
+      numero: r[COL['Número del DTE']] || '',
+      nit: r[COL['ID del retenido']] || r[COL['NIT del retenido']] || '',
+      nombre: r[COL['Nombre completo del retenido']] || '',
+      estado: anulado ? 'Anulado' : 'Vigente',
+      base_retencion: base,
+      tasa,
+      monto_retenido: monto,
+      total,
+    }
+  })
+  return {
+    rows: data,
+    meta: {
+      nit: rows[1]?.[COL['NIT del emisor']] || rows[1]?.[COL['ID del retenedor']] || '',
+      nombre: rows[1]?.[COL['Nombre completo del emisor']] || rows[1]?.[COL['Nombre completo del retenedor']] || '',
+    },
+  }
+}
+
 // ── MÓDULO SAT: LIBRO DE VENTAS / COMPRAS (desde archivos SAT, guardado en Supabase) ──
 
 const NCR_SAT = new Set(['NCRE','NAB','NCR'])
@@ -1546,6 +1583,297 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
                     <td style={{ padding:'8px 10px', fontSize:'13px', fontWeight:'700', textAlign:'right', fontFamily:'monospace' }}>{Q(totComb)}</td>
                     <td style={{ padding:'8px 10px', fontSize:'13px', fontWeight:'700', textAlign:'right', fontFamily:'monospace' }}>{Q(totComp)}</td>
                     <td style={{ padding:'8px 10px', fontSize:'13px', fontWeight:'700', textAlign:'right', fontFamily:'monospace' }}>{Q(totIVA)}</td>
+                    <td style={{ padding:'8px 10px', fontSize:'13px', fontWeight:'700', textAlign:'right', fontFamily:'monospace' }}>{Q(totTotal)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        )
+      })()}
+    </div>
+  )
+}
+
+// ── MÓDULO SAT: LIBRO DE RETENCIONES ────────────────────────────────────────
+
+function LibroRetencionesTab({ empresaId, userId, empresaNombre }) {
+  const TABLE = 'conta_retenciones'
+  const hoyAno = new Date().getFullYear()
+  const [ano, setAno]             = useState(hoyAno)
+  const [mes, setMes]             = useState(null)
+  const [rows, setRows]           = useState(null)
+  const [meta, setMeta]           = useState({})
+  const [anosDisp, setAnosDisp]   = useState([hoyAno])
+  const [mesesDisp, setMesesDisp] = useState([])
+  const [uploading, setUploading] = useState(false)
+  const [err, setErr]             = useState('')
+  const [archivoDisp, setArchivoDisp] = useState(false)
+
+  const BUCKET      = 'libros-sat'
+  const storagePath = (y, m) => `${userId}/${empresaId}/retenciones/${y}-${m}.xlsx`
+
+  const loadPeriodos = useCallback(async () => {
+    const { data } = await supabase.from(TABLE).select('ano,mes').eq('empresa_id', empresaId)
+    if (data) {
+      const anos = [...new Set(data.map(r=>r.ano))].sort((a,b)=>b-a)
+      if (!anos.includes(hoyAno)) anos.unshift(hoyAno)
+      setAnosDisp(anos)
+      const meses = [...new Set(data.filter(r=>r.ano===ano).map(r=>r.mes))].sort((a,b)=>a-b)
+      setMesesDisp(meses)
+    }
+  }, [TABLE, empresaId, ano, hoyAno])
+
+  const loadRows = useCallback(async () => {
+    if (!mes) { setRows([]); setArchivoDisp(false); return }
+    setRows(null)
+    const { data } = await supabase.from(TABLE).select('*')
+      .eq('empresa_id', empresaId).eq('ano', ano).eq('mes', mes).order('no')
+    if (data?.length) { setRows(data); setMeta({ nombre:data[0].meta_nombre, nit:data[0].meta_nit }) }
+    else setRows([])
+    const { data: sd } = await supabase.storage.from('libros-sat')
+      .createSignedUrl(storagePath(ano, mes), 60)
+    setArchivoDisp(!!sd?.signedUrl)
+  }, [TABLE, empresaId, userId, ano, mes])
+
+  useEffect(() => { loadPeriodos() }, [loadPeriodos])
+  useEffect(() => { loadRows() }, [loadRows])
+
+  const handleSetAno = (y) => { setAno(y); setMes(null) }
+  const handleSetMes = (m) => setMes(mes===m ? null : m)
+
+  const handleFile = async (file) => {
+    setUploading(true); setErr('')
+    try {
+      const buf    = await file.arrayBuffer()
+      const wb     = XLSX.read(buf, { type:'array' })
+      const parsed = parseRetencionesSAT(wb)
+      if (!parsed.rows.length) { setErr('Sin registros en el archivo.'); return }
+      const parts = (parsed.rows.find(r=>r.fecha)?.fecha||'').split('/')
+      const dMes  = parts.length>=3 ? parseInt(parts[1]) : (mes||new Date().getMonth()+1)
+      const dAno  = parts.length>=3 ? parseInt(parts[2]) : ano
+      await supabase.from(TABLE).delete().eq('empresa_id',empresaId).eq('ano',dAno).eq('mes',dMes)
+      const toInsert = parsed.rows.map(r => ({
+        ...r, empresa_id:empresaId, user_id:userId,
+        mes:dMes, ano:dAno, meta_nombre:parsed.meta.nombre||'', meta_nit:parsed.meta.nit||'',
+      }))
+      for (let i=0; i<toInsert.length; i+=200)
+        await supabase.from(TABLE).insert(toInsert.slice(i,i+200))
+      const xlsxBuf = XLSX.write(wb, { bookType:'xlsx', type:'array' })
+      const stoPath = storagePath(dAno, dMes)
+      await supabase.storage.from(BUCKET).remove([stoPath])
+      await supabase.storage.from(BUCKET).upload(
+        stoPath,
+        new Blob([xlsxBuf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+        { upsert:true }
+      )
+      setArchivoDisp(true)
+      setAno(dAno); setMes(dMes)
+      await loadPeriodos()
+      await loadRows()
+    } catch(e) { setErr('Error: '+e.message) }
+    finally { setUploading(false) }
+  }
+
+  const periodoLabel = mes ? `${MESES[mes-1]} ${ano}` : `Año ${ano}`
+  const mesLabel     = mes ? `${MESES[mes-1]} de ${ano}` : `${ano}`
+
+  const totales = (rs) => {
+    const vig = rs.filter(r => r.estado === 'Vigente')
+    return {
+      totBase:  vig.reduce((s,r)=>s+(r.base_retencion||0),0),
+      totMonto: vig.reduce((s,r)=>s+(r.monto_retenido||0),0),
+      totTotal: vig.reduce((s,r)=>s+(r.total||0),0),
+    }
+  }
+
+  const handleDownloadArchivo = async () => {
+    const { data } = await supabase.storage.from(BUCKET)
+      .createSignedUrl(storagePath(ano, mes), 300)
+    if (!data?.signedUrl) return
+    const a = document.createElement('a')
+    a.href = data.signedUrl
+    a.download = `retenciones-${ano}-${mes}.xlsx`
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
+  }
+
+  const handlePDF = () => {
+    if (!rows?.length) return
+    const { totBase, totMonto, totTotal } = totales(rows)
+    const fmt = v => Number(v||0).toLocaleString('es-GT', { minimumFractionDigits:2, maximumFractionDigits:2 })
+    const w = window.open('', '_blank')
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>Libro de Retenciones — ${periodoLabel}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Arial,sans-serif;font-size:8pt;color:#000;padding:12mm}
+  .toolbar{position:fixed;top:10px;right:10px;display:flex;gap:8px;z-index:999}
+  .toolbar button{padding:7px 14px;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer}
+  .btn-print{background:#1a56db;color:#fff}
+  .btn-close{background:#e5e7eb;color:#333}
+  h1{text-align:center;font-size:11pt;font-weight:bold;margin-bottom:6px;text-transform:uppercase}
+  .meta{margin-bottom:10px;font-size:8.5pt}
+  .meta p{margin-bottom:2px}
+  table{border-collapse:collapse;width:100%}
+  th{background:#e8e8e8;font-weight:bold;font-size:7.5pt;padding:3px 5px;border:1px solid #666;text-align:center}
+  td{font-size:7.5pt;padding:2px 5px;border:1px solid #ccc}
+  td.r{text-align:right}
+  tr.anulado td{color:#999}
+  tfoot td{font-weight:bold;background:#f0f0f0;border:1px solid #666}
+  .leyenda{margin-top:8px;font-size:7pt;color:#555}
+  @media print{.toolbar{display:none}@page{size:landscape;margin:10mm}}
+</style></head><body>
+<div class="toolbar">
+  <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+  <button class="btn-close" onclick="window.close()">✕ Cerrar</button>
+</div>
+<h1>LIBRO DE RETENCIONES</h1>
+<div class="meta">
+  <p><b>OPERACIÓN DEL MES:</b> ${mesLabel.toUpperCase()}</p>
+  <p><b>NOMBRE O RAZÓN SOCIAL:</b> ${meta.nombre || ''}</p>
+  <p><b>NIT:</b> ${meta.nit || ''}</p>
+</div>
+<table>
+  <thead><tr>
+    <th>No.</th><th>Fecha</th><th>Tipo Doc.</th><th>Serie</th><th>Número</th>
+    <th>NIT Retenido</th><th>Nombre del Retenido</th><th>Estado</th>
+    <th>Base Retención</th><th>Monto Retenido</th><th>Total Factura</th>
+  </tr></thead>
+  <tbody>
+    ${rows.map(r => `<tr class="${r.estado==='Anulado'?'anulado':''}">
+      <td>${r.no}</td><td>${r.fecha}</td><td>${r.tipo_dte}</td><td>${r.serie}</td>
+      <td>${r.numero}</td><td>${r.nit}</td><td>${r.nombre}</td><td>${r.estado}</td>
+      <td class="r">${r.estado==='Anulado'?'–':fmt(r.base_retencion)}</td>
+      <td class="r">${r.estado==='Anulado'?'–':fmt(r.monto_retenido)}</td>
+      <td class="r">${fmt(r.total)}</td>
+    </tr>`).join('')}
+  </tbody>
+  <tfoot><tr>
+    <td colspan="8">TOTALES</td>
+    <td class="r">${fmt(totBase)}</td>
+    <td class="r">${fmt(totMonto)}</td>
+    <td class="r">${fmt(totTotal)}</td>
+  </tr></tfoot>
+</table>
+<div class="leyenda">FCAM = Factura cambiaria &nbsp;|&nbsp; FES = Factura especial</div>
+</body></html>`)
+    w.document.close()
+  }
+
+  const sinDatos = rows !== null && rows.length === 0
+
+  return (
+    <div>
+      {anosDisp.length > 0 && (
+        <div style={{ display:'flex', gap:'6px', marginBottom:'8px', flexWrap:'wrap' }}>
+          {anosDisp.map(y => (
+            <button key={y} onClick={()=>handleSetAno(y)} style={{
+              padding:'5px 16px', borderRadius:'7px', border:'none', fontSize:'13px',
+              fontWeight:ano===y?'700':'400',
+              background:ano===y?'var(--accent)':'var(--inner-bg)',
+              color:ano===y?'#fff':'var(--text-muted)', cursor:'pointer',
+            }}>{y}</button>
+          ))}
+        </div>
+      )}
+      {mesesDisp.length > 0 && (
+        <div style={{ display:'flex', gap:'5px', marginBottom:'10px', flexWrap:'wrap' }}>
+          {mesesDisp.map(m => (
+            <button key={m} onClick={()=>handleSetMes(m)} style={{
+              padding:'4px 12px', borderRadius:'7px', border:'1px solid var(--border)', fontSize:'12px',
+              fontWeight:mes===m?'700':'400',
+              background:mes===m?'var(--accent-soft)':'transparent',
+              color:mes===m?'var(--accent)':'var(--text-muted)', cursor:'pointer',
+            }}>{MESES[m-1]}</button>
+          ))}
+        </div>
+      )}
+
+      {err && <div style={{ marginBottom:'12px', padding:'10px 14px', background:'#fee2e2', borderRadius:'8px', border:'1px solid #fca5a5', fontSize:'13px', color:'#dc2626' }}>{err}</div>}
+
+      <div style={{ marginBottom:'16px', display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap' }}>
+        <label style={{
+          display:'inline-flex', alignItems:'center', gap:'8px', padding:'8px 16px',
+          borderRadius:'8px', border:'1.5px dashed var(--accent)', cursor: uploading ? 'not-allowed':'pointer',
+          background:'var(--accent-soft)', color:'var(--accent)', fontSize:'13px', fontWeight:'600',
+          opacity: uploading ? 0.6 : 1,
+        }}>
+          <input type="file" accept=".xls,.xlsx" style={{ display:'none' }}
+            disabled={uploading}
+            onChange={e => e.target.files[0] && handleFile(e.target.files[0])} />
+          {uploading ? 'Importando…' : (rows?.length ? '↑ Reemplazar datos SAT' : '↑ Cargar archivo SAT')}
+        </label>
+        {rows?.length > 0 && (
+          <button onClick={handlePDF} style={{
+            padding:'8px 16px', borderRadius:'8px', border:'1.5px solid var(--accent)',
+            background:'transparent', color:'var(--accent)', fontWeight:'600', fontSize:'13px', cursor:'pointer',
+          }}>Descargar PDF</button>
+        )}
+        {archivoDisp && (
+          <button onClick={handleDownloadArchivo} style={{
+            padding:'8px 16px', borderRadius:'8px', border:'1.5px solid #22c55e',
+            background:'transparent', color:'#22c55e', fontWeight:'600', fontSize:'13px', cursor:'pointer',
+          }}>↓ Archivo SAT</button>
+        )}
+        {rows?.length > 0 && (
+          <span style={{ fontSize:'12px', color:'var(--text-muted)' }}>
+            Período: <strong style={{ color:'var(--text-1)' }}>{periodoLabel}</strong> — {rows.length} registros
+          </span>
+        )}
+      </div>
+
+      {sinDatos && !mes && (
+        <div style={{ padding:'48px', textAlign:'center', color:'var(--text-muted)', fontSize:'13px', background:'var(--inner-bg)', borderRadius:'12px' }}>
+          Selecciona un mes o carga un archivo SAT para comenzar
+        </div>
+      )}
+      {sinDatos && mes && (
+        <div style={{ padding:'48px', textAlign:'center', color:'var(--text-muted)', fontSize:'13px', background:'var(--inner-bg)', borderRadius:'12px' }}>
+          Sin datos para {MESES[mes-1]} {ano}. Carga el archivo SAT del mes.
+        </div>
+      )}
+      {rows === null && (
+        <div style={{ padding:'48px', textAlign:'center', color:'var(--text-muted)', fontSize:'13px' }}>Cargando…</div>
+      )}
+
+      {rows?.length > 0 && (() => {
+        const { totBase, totMonto, totTotal } = totales(rows)
+        return (
+          <div>
+            {meta.nombre && (
+              <div style={{ marginBottom:'10px', fontSize:'12px', color:'var(--text-muted)' }}>
+                <strong style={{ color:'var(--text-1)' }}>{meta.nombre}</strong> · NIT: {meta.nit}
+              </div>
+            )}
+            <div style={{ overflowX:'auto' }}>
+              <table style={{ borderCollapse:'collapse', width:'100%', minWidth:'900px', background:'var(--card-bg)' }}>
+                <thead>
+                  <tr>{['No.','Fecha','Tipo','Serie','Número','NIT','Nombre Retenido','Estado','Base Retención','Monto Retenido','Total Factura'].map(h=>(
+                    <th key={h} style={{ padding:'8px 10px', fontSize:'11px', fontWeight:'700', color:'var(--text-muted)', borderBottom:'1px solid var(--border)', textAlign:['Base Retención','Monto Retenido','Total Factura'].includes(h)?'right':'left', whiteSpace:'nowrap' }}>{h}</th>
+                  ))}</tr>
+                </thead>
+                <tbody>
+                  {rows.map((r,i) => (
+                    <tr key={r.id} style={{ background: r.estado==='Anulado'?'rgba(220,38,38,0.04)': i%2===0?'transparent':'var(--inner-bg)', borderBottom:'1px solid var(--border)' }}>
+                      <td style={{ padding:'7px 10px', fontSize:'12px', color:'var(--text-muted)' }}>{r.no}</td>
+                      <td style={{ padding:'7px 10px', fontSize:'12px', whiteSpace:'nowrap' }}>{r.fecha}</td>
+                      <td style={{ padding:'7px 10px' }}><span style={{ padding:'2px 8px', borderRadius:'5px', fontSize:'11px', fontWeight:'700', background:'rgba(88,86,214,0.12)', color:'var(--accent)' }}>{r.tipo_dte}</span></td>
+                      <td style={{ padding:'7px 10px', fontSize:'11px', color:'var(--text-muted)', fontFamily:'monospace' }}>{r.serie}</td>
+                      <td style={{ padding:'7px 10px', fontSize:'11px', fontFamily:'monospace' }}>{r.numero}</td>
+                      <td style={{ padding:'7px 10px', fontSize:'11px', color:'var(--text-muted)' }}>{r.nit}</td>
+                      <td style={{ padding:'7px 10px', fontSize:'12px', maxWidth:'200px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.nombre}</td>
+                      <td style={{ padding:'7px 10px' }}><span style={{ padding:'2px 8px', borderRadius:'5px', fontSize:'11px', fontWeight:'600', background: r.estado==='Anulado'?'rgba(220,38,38,0.1)':'rgba(22,163,74,0.1)', color: r.estado==='Anulado'?'#dc2626':'#16a34a' }}>{r.estado}</span></td>
+                      <td style={{ padding:'7px 10px', fontSize:'12px', textAlign:'right', fontFamily:'monospace' }}>{r.estado==='Anulado'?'–':Q(r.base_retencion)}</td>
+                      <td style={{ padding:'7px 10px', fontSize:'12px', textAlign:'right', fontFamily:'monospace' }}>{r.estado==='Anulado'?'–':Q(r.monto_retenido)}</td>
+                      <td style={{ padding:'7px 10px', fontSize:'12px', textAlign:'right', fontFamily:'monospace', fontWeight:'600' }}>{r.estado==='Anulado'?'–':Q(r.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr style={{ borderTop:'2px solid var(--border)', background:'var(--inner-bg)' }}>
+                    <td colSpan={8} style={{ padding:'8px 10px', fontSize:'12px', fontWeight:'700', color:'var(--text-muted)' }}>TOTALES</td>
+                    <td style={{ padding:'8px 10px', fontSize:'13px', fontWeight:'700', textAlign:'right', fontFamily:'monospace' }}>{Q(totBase)}</td>
+                    <td style={{ padding:'8px 10px', fontSize:'13px', fontWeight:'700', textAlign:'right', fontFamily:'monospace' }}>{Q(totMonto)}</td>
                     <td style={{ padding:'8px 10px', fontSize:'13px', fontWeight:'700', textAlign:'right', fontFamily:'monospace' }}>{Q(totTotal)}</td>
                   </tr>
                 </tfoot>
@@ -2548,10 +2876,11 @@ function BitacoraTab({ auditoria, cuentas }) {
 // ── COMPONENTE PRINCIPAL ─────────────────────────────────────────────────────
 
 const TABS_LIST = [
-  { key:'CATALOGO',   label:'Catálogo' },
-  { key:'DIARIO',     label:'Libro Diario' },
-  { key:'VENTAS',     label:'L. Ventas' },
-  { key:'COMPRAS',    label:'L. Compras' },
+  { key:'CATALOGO',    label:'Catálogo' },
+  { key:'DIARIO',      label:'Libro Diario' },
+  { key:'RETENCIONES', label:'Retenciones' },
+  { key:'VENTAS',      label:'L. Ventas' },
+  { key:'COMPRAS',     label:'L. Compras' },
   { key:'MAYOR',      label:'Libro Mayor' },
   { key:'RESULTADOS', label:'Est. Resultados' },
   { key:'BALANCE',    label:'Balance Gral.' },
@@ -2712,8 +3041,9 @@ export default function ContabilidadCompleta({ userId, empresaId, empresaNombre 
 
       {tab==='CATALOGO'   && <CatalogTab  cuentas={cuentas}  onReload={load} userId={userId} empresaId={empresaId} />}
       {tab==='DIARIO'     && <DiarioTab   cuentas={cuentas}  asientos={asientos} onReload={load} userId={userId} empresaId={empresaId} />}
-      {tab==='VENTAS'     && <LibroSATTab tipo="VENTA"  empresaId={empresaId} userId={userId} empresaNombre={empresaNombre} />}
-      {tab==='COMPRAS'    && <LibroSATTab tipo="COMPRA" empresaId={empresaId} userId={userId} empresaNombre={empresaNombre} />}
+      {tab==='RETENCIONES' && <LibroRetencionesTab empresaId={empresaId} userId={userId} empresaNombre={empresaNombre} />}
+      {tab==='VENTAS'      && <LibroSATTab tipo="VENTA"  empresaId={empresaId} userId={userId} empresaNombre={empresaNombre} />}
+      {tab==='COMPRAS'     && <LibroSATTab tipo="COMPRA" empresaId={empresaId} userId={userId} empresaNombre={empresaNombre} />}
       {tab==='MAYOR'      && <MayorTab    cuentas={cuentas}  asientos={asientos} empresaNombre={empresaNombre} />}
       {tab==='RESULTADOS' && <ResultadosTab cuentas={cuentas} asientos={asientos} empresaNombre={empresaNombre} />}
       {tab==='BALANCE'    && <BalanceTab   cuentas={cuentas} asientos={asientos} empresaNombre={empresaNombre} />}
