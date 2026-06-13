@@ -1298,70 +1298,76 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
       return
     }
 
-    // COMPRA: jsPDF
-    const n = (v) => `Q. ${Number(v||0).toLocaleString('es-GT', { minimumFractionDigits:2, maximumFractionDigits:2 })}`
-    const AMBER = [255,243,205]
-    const TOTAL_BG = [226,232,240]
-    const ANULADO  = [170,170,170]
-    const HEADER   = [44,55,70]
-
-    const doc = new jsPDF({ orientation:'landscape', unit:'mm', format:'letter' })
-    const W = doc.internal.pageSize.getWidth()
-
-    doc.setFontSize(13); doc.setFont('helvetica','bold'); doc.setTextColor(15,23,42)
-    doc.text('LIBRO DE COMPRAS Y SERVICIOS ADQUIRIDOS', W/2, 16, { align:'center' })
-    doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(40,40,40)
-    doc.text(`OPERACIÓN DEL MES: ${mesLabel.toUpperCase()}`, 14, 24)
-    doc.text(`NOMBRE O RAZÓN SOCIAL: ${meta.nombre || ''}`,  14, 29)
-    doc.text(`NIT: ${meta.nit || ''}`,                        14, 34)
-
+    // COMPRA: window.print()
     const { totComb, totComp, totIDP, totIVA, totTotal } = totalesCompra(rows)
-    autoTable(doc, {
-      startY: 38,
-      head: [['No.','Fecha','Tipo','Serie','Número','NIT','Proveedor','Combustibles','Compras','Servicios','IDP','Tasa Mun.','IVA','Total']],
-      body: [
-        ...rows.map(r => [
-          r.no, r.fecha, r.tipo_dte, r.serie, r.numero, r.nit, r.proveedor,
-          r.estado==='Anulado' ? '–' : n(r.combustibles),
-          r.estado==='Anulado' ? '–' : n(r.compras),
-          '–',
-          r.estado==='Anulado' ? '–' : n(r.idp),
-          '0.00',
-          r.estado==='Anulado' ? '–' : n(r.iva),
-          r.estado==='Anulado' ? '–' : n(r.total),
-        ]),
-        ['','','','','','','TOTALES', n(totComb), n(totComp), '–', n(totIDP), '0.00', n(totIVA), n(totTotal)],
-      ],
-      headStyles:  { fillColor:HEADER, textColor:[255,255,255], fontSize:6.5, cellPadding:2.5, fontStyle:'bold' },
-      bodyStyles:  { fontSize:6.5, cellPadding:2, textColor:[30,30,30] },
-      columnStyles: {
-        0:{ cellWidth:7 }, 1:{ cellWidth:19 }, 2:{ cellWidth:13 },
-        3:{ cellWidth:17 }, 4:{ cellWidth:21 }, 5:{ cellWidth:18 },
-        6:{ cellWidth:'auto' },
-        7:{ cellWidth:22, halign:'right' }, 8:{ cellWidth:22, halign:'right' },
-        9:{ cellWidth:16, halign:'right' }, 10:{ cellWidth:16, halign:'right' },
-        11:{ cellWidth:18, halign:'right' }, 12:{ cellWidth:20, halign:'right' }, 13:{ cellWidth:22, halign:'right' },
-      },
-      margin:{ left:14, right:14 }, theme:'grid',
-      didParseCell: (data) => {
-        if (data.section === 'body' && data.row.index < rows.length) {
-          const row = rows[data.row.index]
-          if (row?.estado === 'Anulado') {
-            data.cell.styles.textColor = ANULADO
-          } else if (NCR_SAT.has(row?.tipo_dte)) {
-            data.cell.styles.fillColor = AMBER
-          }
-        }
-        if (data.section === 'body' && data.row.index === rows.length) {
-          data.cell.styles.fillColor = TOTAL_BG
-          data.cell.styles.fontStyle = 'bold'
-        }
-      },
-    })
-    const finalY = doc.lastAutoTable.finalY + 6
-    doc.setFontSize(7); doc.setTextColor(100,100,100); doc.setFont('helvetica','normal')
-    doc.text('FACT = Factura  |  FES = Factura especial  |  NCRE = Nota de crédito  |  FCAM = Factura cambiaria', 14, finalY)
-    doc.save(`libro-compra-${periodoLabel.toLowerCase().replace(' ','-')}.pdf`)
+    const fmt = v => Number(v||0).toLocaleString('es-GT', { minimumFractionDigits:2, maximumFractionDigits:2 })
+
+    const w = window.open('', '_blank')
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>Libro de Compras — ${periodoLabel}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Arial,sans-serif;font-size:8pt;color:#000;padding:12mm}
+  .toolbar{position:fixed;top:10px;right:10px;display:flex;gap:8px;z-index:999}
+  .toolbar button{padding:7px 14px;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer}
+  .btn-print{background:#1a56db;color:#fff}
+  .btn-close{background:#e5e7eb;color:#333}
+  h1{text-align:center;font-size:11pt;font-weight:bold;margin-bottom:6px;text-transform:uppercase}
+  .meta{margin-bottom:10px;font-size:8.5pt}
+  .meta p{margin-bottom:2px}
+  table{border-collapse:collapse;width:100%}
+  th{background:#e8e8e8;font-weight:bold;font-size:7.5pt;padding:3px 5px;border:1px solid #666;text-align:center}
+  td{font-size:7.5pt;padding:2px 5px;border:1px solid #ccc}
+  td.r{text-align:right}
+  tr.anulado td{color:#999}
+  tr.ncre{background:#fffbeb}
+  tfoot td{font-weight:bold;background:#f0f0f0;border:1px solid #666}
+  .leyenda{margin-top:8px;font-size:7pt;color:#555}
+  @media print{.toolbar{display:none}@page{size:landscape;margin:10mm}}
+</style></head><body>
+<div class="toolbar">
+  <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+  <button class="btn-close" onclick="window.close()">✕ Cerrar</button>
+</div>
+<h1>LIBRO DE COMPRAS Y SERVICIOS ADQUIRIDOS</h1>
+<div class="meta">
+  <p><b>OPERACIÓN DEL MES:</b> ${mesLabel.toUpperCase()}</p>
+  <p><b>NOMBRE O RAZÓN SOCIAL:</b> ${meta.nombre || ''}</p>
+  <p><b>NIT:</b> ${meta.nit || ''}</p>
+</div>
+<table>
+  <thead><tr>
+    <th>No.</th><th>Fecha</th><th>Tipo</th><th>Serie</th><th>Número</th>
+    <th>NIT</th><th>Proveedor</th><th>Combustibles</th><th>Compras</th>
+    <th>Servicios</th><th>IDP</th><th>Tasa Mun.</th><th>IVA</th><th>Total</th>
+  </tr></thead>
+  <tbody>
+    ${rows.map(r => `<tr class="${r.estado==='Anulado'?'anulado':NCR_SAT.has(r.tipo_dte)?'ncre':''}">
+      <td>${r.no}</td><td>${r.fecha}</td><td>${r.tipo_dte}</td><td>${r.serie}</td>
+      <td>${r.numero}</td><td>${r.nit}</td><td>${r.proveedor}</td>
+      <td class="r">${r.estado==='Anulado'?'–':fmt(r.combustibles)}</td>
+      <td class="r">${r.estado==='Anulado'?'–':fmt(r.compras)}</td>
+      <td class="r">–</td>
+      <td class="r">${fmt(r.idp)}</td>
+      <td class="r">0.00</td>
+      <td class="r">${r.estado==='Anulado'?'–':fmt(r.iva)}</td>
+      <td class="r">${fmt(r.total)}</td>
+    </tr>`).join('')}
+  </tbody>
+  <tfoot><tr>
+    <td colspan="7">TOTALES</td>
+    <td class="r">${fmt(totComb)}</td>
+    <td class="r">${fmt(totComp)}</td>
+    <td>–</td>
+    <td class="r">${fmt(totIDP)}</td>
+    <td class="r">0.00</td>
+    <td class="r">${fmt(totIVA)}</td>
+    <td class="r">${fmt(totTotal)}</td>
+  </tr></tfoot>
+</table>
+<div class="leyenda">FACT = Factura &nbsp;|&nbsp; FES = Factura Especial &nbsp;|&nbsp; NCRE = Nota de crédito &nbsp;|&nbsp; FCAM = Factura cambiaria</div>
+</body></html>`)
+    w.document.close()
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
