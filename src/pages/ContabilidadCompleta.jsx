@@ -1108,39 +1108,38 @@ function parseComprasSAT(wb) {
 }
 
 function parseRetencionesSAT(wb) {
+  // Formato SAT "Sistema Retenciones Web":
+  // Fila 0: título, Fila 1: separador, Fila 2: período, Fila 3: NIT/Nombre retenido
+  // Fila 4: total constancias, Fila 5: vacía, Fila 6: encabezados, Fila 7+: datos
   const ws = wb.Sheets[wb.SheetNames[0]]
   const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' })
-  if (rows.length < 2) return { rows:[], meta:{} }
-  const COL = colMapSAT(rows[0])
-  const data = rows.slice(1)
-    .filter(r => String(r[COL['Número del DTE']]||'').trim() !== '')
-    .map((r, i) => {
-    const anulado = String(r[COL['Marca de anulado']]||'').toLowerCase() === 'si'
-    const total   = parseFloat(r[COL['Gran Total (Moneda Original)']]||0) || 0
-    const base    = parseFloat(r[COL['Base de retención']] || r[COL['Base imponible']] || 0) || 0
-    const tasa    = parseFloat(r[COL['Tasa de retención']]||0) || 0
-    const monto   = parseFloat(r[COL['Monto retenido']] || r[COL['Total retenido']] || 0) || 0
-    return {
-      no: i+1,
-      fecha: fmtFechaSAT(r[COL['Fecha de emisión']]),
-      tipo_dte: r[COL['Tipo de DTE (nombre)']] || '',
-      serie: r[COL['Serie']] || '',
-      numero: r[COL['Número del DTE']] || '',
-      nit: r[COL['ID del retenido']] || r[COL['NIT del retenido']] || '',
-      nombre: r[COL['Nombre completo del retenido']] || '',
-      estado: anulado ? 'Anulado' : 'Vigente',
-      base_retencion: base,
-      tasa,
-      monto_retenido: monto,
-      total,
-    }
-  })
+  if (rows.length < 8) return { rows:[], meta:{} }
+
+  // Metadata del retenido (la empresa)
+  const nitRetenido    = String(rows[3]?.[1]||'').trim()
+  const nombreRetenido = String(rows[3]?.[3]||'').trim()
+
+  // Datos: columnas fijas (fila 6 = headers, fila 7+ = datos)
+  // [0] NIT RETENEDOR  [1] NOMBRE RETENEDOR  [2] ESTADO CONSTANCIA
+  // [3] CONSTANCIA     [4] FECHA EMISION      [5] TOTAL FACTURA
+  // [6] IMPORTE NETO   [7] AFECTO RETENCIÓN   [8] TOTAL RETENCIÓN
+  const data = rows.slice(7)
+    .filter(r => String(r[3]||'').trim() !== '')
+    .map((r, i) => ({
+      no: i + 1,
+      fecha: String(r[4]||'').trim(),
+      numero: String(r[3]||'').trim(),
+      nit: String(r[0]||'').trim(),
+      nombre: String(r[1]||'').trim(),
+      estado: String(r[2]||'').toUpperCase() === 'ANULADA' ? 'Anulado' : 'Vigente',
+      base_retencion: parseFloat(r[7]||0) || 0,
+      monto_retenido: parseFloat(r[8]||0) || 0,
+      total: parseFloat(r[5]||0) || 0,
+    }))
+
   return {
     rows: data,
-    meta: {
-      nit: rows[1]?.[COL['NIT del emisor']] || rows[1]?.[COL['ID del retenedor']] || '',
-      nombre: rows[1]?.[COL['Nombre completo del emisor']] || rows[1]?.[COL['Nombre completo del retenedor']] || '',
-    },
+    meta: { nit: nitRetenido, nombre: nombreRetenido },
   }
 }
 
@@ -1649,6 +1648,7 @@ function LibroRetencionesTab({ empresaId, userId, empresaNombre }) {
       const wb     = XLSX.read(buf, { type:'array' })
       const parsed = parseRetencionesSAT(wb)
       if (!parsed.rows.length) { setErr('Sin registros en el archivo.'); return }
+      // Fecha de datos: DD/MM/YYYY → parts[1]=mes, parts[2]=año
       const parts = (parsed.rows.find(r=>r.fecha)?.fecha||'').split('/')
       const dMes  = parts.length>=3 ? parseInt(parts[1]) : (mes||new Date().getMonth()+1)
       const dAno  = parts.length>=3 ? parseInt(parts[2]) : ano
@@ -1703,7 +1703,7 @@ function LibroRetencionesTab({ empresaId, userId, empresaNombre }) {
     const fmt = v => Number(v||0).toLocaleString('es-GT', { minimumFractionDigits:2, maximumFractionDigits:2 })
     const w = window.open('', '_blank')
     w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
-<title>Libro de Retenciones — ${periodoLabel}</title>
+<title>Libro de Retenciones IVA — ${periodoLabel}</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:Arial,sans-serif;font-size:8pt;color:#000;padding:12mm}
@@ -1720,42 +1720,40 @@ function LibroRetencionesTab({ empresaId, userId, empresaNombre }) {
   td.r{text-align:right}
   tr.anulado td{color:#999}
   tfoot td{font-weight:bold;background:#f0f0f0;border:1px solid #666}
-  .leyenda{margin-top:8px;font-size:7pt;color:#555}
   @media print{.toolbar{display:none}@page{size:landscape;margin:10mm}}
 </style></head><body>
 <div class="toolbar">
   <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
   <button class="btn-close" onclick="window.close()">✕ Cerrar</button>
 </div>
-<h1>LIBRO DE RETENCIONES</h1>
+<h1>CONSTANCIAS DE RETENCIÓN DE IVA — CONTRIBUYENTE RETENIDO</h1>
 <div class="meta">
-  <p><b>OPERACIÓN DEL MES:</b> ${mesLabel.toUpperCase()}</p>
-  <p><b>NOMBRE O RAZÓN SOCIAL:</b> ${meta.nombre || ''}</p>
-  <p><b>NIT:</b> ${meta.nit || ''}</p>
+  <p><b>PERÍODO:</b> ${mesLabel.toUpperCase()}</p>
+  <p><b>NOMBRE DEL RETENIDO:</b> ${meta.nombre || ''}</p>
+  <p><b>NIT RETENIDO:</b> ${meta.nit || ''}</p>
 </div>
 <table>
   <thead><tr>
-    <th>No.</th><th>Fecha</th><th>Tipo Doc.</th><th>Serie</th><th>Número</th>
-    <th>NIT Retenido</th><th>Nombre del Retenido</th><th>Estado</th>
-    <th>Base Retención</th><th>Monto Retenido</th><th>Total Factura</th>
+    <th>No.</th><th>Fecha Emisión</th><th>Constancia</th>
+    <th>NIT Retenedor</th><th>Nombre Retenedor</th><th>Estado</th>
+    <th>Afecto Retención</th><th>Total Retención</th><th>Total Factura</th>
   </tr></thead>
   <tbody>
     ${rows.map(r => `<tr class="${r.estado==='Anulado'?'anulado':''}">
-      <td>${r.no}</td><td>${r.fecha}</td><td>${r.tipo_dte}</td><td>${r.serie}</td>
-      <td>${r.numero}</td><td>${r.nit}</td><td>${r.nombre}</td><td>${r.estado}</td>
+      <td>${r.no}</td><td>${r.fecha}</td><td>${r.numero}</td>
+      <td>${r.nit}</td><td>${r.nombre}</td><td>${r.estado}</td>
       <td class="r">${r.estado==='Anulado'?'–':fmt(r.base_retencion)}</td>
       <td class="r">${r.estado==='Anulado'?'–':fmt(r.monto_retenido)}</td>
       <td class="r">${fmt(r.total)}</td>
     </tr>`).join('')}
   </tbody>
   <tfoot><tr>
-    <td colspan="8">TOTALES</td>
+    <td colspan="6">TOTALES</td>
     <td class="r">${fmt(totBase)}</td>
     <td class="r">${fmt(totMonto)}</td>
     <td class="r">${fmt(totTotal)}</td>
   </tr></tfoot>
 </table>
-<div class="leyenda">FCAM = Factura cambiaria &nbsp;|&nbsp; FES = Factura especial</div>
 </body></html>`)
     w.document.close()
   }
@@ -1846,10 +1844,10 @@ function LibroRetencionesTab({ empresaId, userId, empresaNombre }) {
               </div>
             )}
             <div style={{ overflowX:'auto' }}>
-              <table style={{ borderCollapse:'collapse', width:'100%', minWidth:'900px', background:'var(--card-bg)' }}>
+              <table style={{ borderCollapse:'collapse', width:'100%', minWidth:'820px', background:'var(--card-bg)' }}>
                 <thead>
-                  <tr>{['No.','Fecha','Tipo','Serie','Número','NIT','Nombre Retenido','Estado','Base Retención','Monto Retenido','Total Factura'].map(h=>(
-                    <th key={h} style={{ padding:'8px 10px', fontSize:'11px', fontWeight:'700', color:'var(--text-muted)', borderBottom:'1px solid var(--border)', textAlign:['Base Retención','Monto Retenido','Total Factura'].includes(h)?'right':'left', whiteSpace:'nowrap' }}>{h}</th>
+                  <tr>{['No.','Fecha','Constancia','NIT Retenedor','Nombre Retenedor','Estado','Afecto Retención','Total Retención','Total Factura'].map(h=>(
+                    <th key={h} style={{ padding:'8px 10px', fontSize:'11px', fontWeight:'700', color:'var(--text-muted)', borderBottom:'1px solid var(--border)', textAlign:['Afecto Retención','Total Retención','Total Factura'].includes(h)?'right':'left', whiteSpace:'nowrap' }}>{h}</th>
                   ))}</tr>
                 </thead>
                 <tbody>
@@ -1857,23 +1855,21 @@ function LibroRetencionesTab({ empresaId, userId, empresaNombre }) {
                     <tr key={r.id} style={{ background: r.estado==='Anulado'?'rgba(220,38,38,0.04)': i%2===0?'transparent':'var(--inner-bg)', borderBottom:'1px solid var(--border)' }}>
                       <td style={{ padding:'7px 10px', fontSize:'12px', color:'var(--text-muted)' }}>{r.no}</td>
                       <td style={{ padding:'7px 10px', fontSize:'12px', whiteSpace:'nowrap' }}>{r.fecha}</td>
-                      <td style={{ padding:'7px 10px' }}><span style={{ padding:'2px 8px', borderRadius:'5px', fontSize:'11px', fontWeight:'700', background:'rgba(88,86,214,0.12)', color:'var(--accent)' }}>{r.tipo_dte}</span></td>
-                      <td style={{ padding:'7px 10px', fontSize:'11px', color:'var(--text-muted)', fontFamily:'monospace' }}>{r.serie}</td>
-                      <td style={{ padding:'7px 10px', fontSize:'11px', fontFamily:'monospace' }}>{r.numero}</td>
+                      <td style={{ padding:'7px 10px', fontSize:'11px', fontFamily:'monospace', color:'var(--text-muted)' }}>{r.numero}</td>
                       <td style={{ padding:'7px 10px', fontSize:'11px', color:'var(--text-muted)' }}>{r.nit}</td>
-                      <td style={{ padding:'7px 10px', fontSize:'12px', maxWidth:'200px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.nombre}</td>
+                      <td style={{ padding:'7px 10px', fontSize:'12px', maxWidth:'220px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.nombre}</td>
                       <td style={{ padding:'7px 10px' }}><span style={{ padding:'2px 8px', borderRadius:'5px', fontSize:'11px', fontWeight:'600', background: r.estado==='Anulado'?'rgba(220,38,38,0.1)':'rgba(22,163,74,0.1)', color: r.estado==='Anulado'?'#dc2626':'#16a34a' }}>{r.estado}</span></td>
                       <td style={{ padding:'7px 10px', fontSize:'12px', textAlign:'right', fontFamily:'monospace' }}>{r.estado==='Anulado'?'–':Q(r.base_retencion)}</td>
-                      <td style={{ padding:'7px 10px', fontSize:'12px', textAlign:'right', fontFamily:'monospace' }}>{r.estado==='Anulado'?'–':Q(r.monto_retenido)}</td>
-                      <td style={{ padding:'7px 10px', fontSize:'12px', textAlign:'right', fontFamily:'monospace', fontWeight:'600' }}>{r.estado==='Anulado'?'–':Q(r.total)}</td>
+                      <td style={{ padding:'7px 10px', fontSize:'12px', textAlign:'right', fontFamily:'monospace', fontWeight:'600', color:'var(--accent)' }}>{r.estado==='Anulado'?'–':Q(r.monto_retenido)}</td>
+                      <td style={{ padding:'7px 10px', fontSize:'12px', textAlign:'right', fontFamily:'monospace' }}>{r.estado==='Anulado'?'–':Q(r.total)}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr style={{ borderTop:'2px solid var(--border)', background:'var(--inner-bg)' }}>
-                    <td colSpan={8} style={{ padding:'8px 10px', fontSize:'12px', fontWeight:'700', color:'var(--text-muted)' }}>TOTALES</td>
+                    <td colSpan={6} style={{ padding:'8px 10px', fontSize:'12px', fontWeight:'700', color:'var(--text-muted)' }}>TOTALES</td>
                     <td style={{ padding:'8px 10px', fontSize:'13px', fontWeight:'700', textAlign:'right', fontFamily:'monospace' }}>{Q(totBase)}</td>
-                    <td style={{ padding:'8px 10px', fontSize:'13px', fontWeight:'700', textAlign:'right', fontFamily:'monospace' }}>{Q(totMonto)}</td>
+                    <td style={{ padding:'8px 10px', fontSize:'13px', fontWeight:'700', textAlign:'right', fontFamily:'monospace', color:'var(--accent)' }}>{Q(totMonto)}</td>
                     <td style={{ padding:'8px 10px', fontSize:'13px', fontWeight:'700', textAlign:'right', fontFamily:'monospace' }}>{Q(totTotal)}</td>
                   </tr>
                 </tfoot>
