@@ -3138,8 +3138,8 @@ function ISOTab({ empresaId, userId, cuentas = [], asientos = [] }) {
               <thead>
                 <tr style={{ borderBottom:'1px solid var(--border)' }}>
                   <th style={{ textAlign:'left',  fontSize:'10px', fontWeight:'700', color:'var(--text-muted)', padding:'0 0 8px 0', textTransform:'uppercase' }}>Año</th>
-                  <th style={{ textAlign:'right', fontSize:'10px', fontWeight:'700', color:'var(--text-muted)', padding:'0 0 8px 0', textTransform:'uppercase' }}>Ingresos</th>
-                  <th style={{ textAlign:'right', fontSize:'10px', fontWeight:'700', color:'var(--text-muted)', padding:'0 0 8px 4px', textTransform:'uppercase' }}>Activos</th>
+                  <th style={{ textAlign:'right', fontSize:'10px', fontWeight:'700', color:'var(--text-muted)', padding:'0 0 8px 0 24px', textTransform:'uppercase' }}>Ingresos</th>
+                  <th style={{ textAlign:'right', fontSize:'10px', fontWeight:'700', color:'var(--text-muted)', padding:'0 0 8px 0 20px', textTransform:'uppercase' }}>Activos</th>
                 </tr>
               </thead>
               <tbody>
@@ -3159,8 +3159,8 @@ function ISOTab({ empresaId, userId, cuentas = [], asientos = [] }) {
                         {year}
                         {esCandidato && <span style={{ fontSize:'10px', marginLeft:'7px', color:'var(--accent)', fontWeight:'600', background:'var(--accent-soft)', padding:'1px 6px', borderRadius:'4px' }}>base</span>}
                       </td>
-                      <td style={{ padding:'10px 0', fontSize:'12px', textAlign:'right', color:'var(--text-1)', fontFamily:'monospace', whiteSpace:'nowrap' }}>{Qp(ingresos)}</td>
-                      <td style={{ padding:'10px 0 10px 4px', fontSize:'12px', textAlign:'right', color:'var(--text-1)', fontFamily:'monospace', whiteSpace:'nowrap' }}>{Qp(activos)}</td>
+                      <td style={{ padding:'10px 0 10px 24px', fontSize:'12px', textAlign:'right', color:'var(--text-1)', fontFamily:'monospace', whiteSpace:'nowrap' }}>{Qp(ingresos)}</td>
+                      <td style={{ padding:'10px 0 10px 20px', fontSize:'12px', textAlign:'right', color:'var(--text-1)', fontFamily:'monospace', whiteSpace:'nowrap' }}>{Qp(activos)}</td>
                     </tr>
                   )
                 })}
