@@ -3156,8 +3156,8 @@ function ISOTab({ empresaId, userId, cuentas = [], asientos = [] }) {
                       <td style={{ padding:'10px 0', fontSize:'13px', fontWeight: esCandidato ? '700' : '500', color: esCandidato ? 'var(--accent)' : 'var(--text-1)' }}>
                         {year}{esCandidato && <span style={{ fontSize:'10px', marginLeft:'6px', color:'var(--accent)', fontWeight:'600' }}>← base ISO {ano}</span>}
                       </td>
-                      <td style={{ padding:'10px 0', fontSize:'12px', textAlign:'right', color:'var(--text-1)', fontFamily:'monospace' }}>{Qp(ingresos)}</td>
-                      <td style={{ padding:'10px 0 10px 4px', fontSize:'12px', textAlign:'right', color:'var(--text-1)', fontFamily:'monospace' }}>{Qp(activos)}</td>
+                      <td style={{ padding:'10px 0', fontSize:'12px', textAlign:'right', color:'var(--text-1)', fontFamily:'monospace', whiteSpace:'nowrap' }}>{Qp(ingresos)}</td>
+                      <td style={{ padding:'10px 0 10px 4px', fontSize:'12px', textAlign:'right', color:'var(--text-1)', fontFamily:'monospace', whiteSpace:'nowrap' }}>{Qp(activos)}</td>
                     </tr>
                   )
                 })}
