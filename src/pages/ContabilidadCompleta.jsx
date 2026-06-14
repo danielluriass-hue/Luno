@@ -3128,7 +3128,7 @@ function ISOTab({ empresaId, userId, cuentas = [], asientos = [] }) {
 
       {/* ── Columna derecha: referencia histórica ─────────────────────── */}
       {resumenAnos.length > 0 && (
-        <div style={{ width:'300px', flexShrink:0, position:'sticky', top:'16px' }}>
+        <div style={{ width:'340px', flexShrink:0, position:'sticky', top:'16px' }}>
           <div style={{ background:'var(--card-bg)', borderRadius:'12px', border:'1px solid var(--border)', padding:'20px' }}>
             <div style={labelStyle}>Referencia histórica</div>
             <div style={{ fontSize:'11px', color:'var(--text-muted)', marginBottom:'14px' }}>
