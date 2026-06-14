@@ -3176,6 +3176,261 @@ function ISOTab({ empresaId, userId, cuentas = [], asientos = [] }) {
   )
 }
 
+function ISRTab({ empresaId, userId, cuentas = [], asientos = [], empresaNombre = '' }) {
+  const hoyAno = new Date().getFullYear()
+  const ANOS   = [hoyAno - 1, hoyAno, hoyAno + 1]
+
+  const [ano, setAnoRaw]  = useState(() => parseInt(localStorage.getItem('isr_ano')) || hoyAno)
+  const setAno = (y) => { setAnoRaw(y); localStorage.setItem('isr_ano', y) }
+
+  const [datos,   setDatos]   = useState(null)
+  const [bases,   setBases]   = useState({ q1:'', q2:'', q3:'', q4:'' })
+  const [saving,  setSaving]  = useState({ q1:false, q2:false, q3:false, q4:false })
+  const [loading, setLoading] = useState(true)
+  const [mesesSel, setMesesSel] = useState([])
+
+  const TRIMS = [
+    { q:'q1', label:'1er Trimestre', periodo:'Enero – Marzo',        vence:`30/04/${ano}`,     meses:[1,2,3]  },
+    { q:'q2', label:'2do Trimestre', periodo:'Abril – Junio',        vence:`31/07/${ano}`,     meses:[4,5,6]  },
+    { q:'q3', label:'3er Trimestre', periodo:'Julio – Septiembre',   vence:`31/10/${ano}`,     meses:[7,8,9]  },
+    { q:'q4', label:'4to Trimestre', periodo:'Octubre – Diciembre',  vence:`31/01/${ano+1}`,   meses:[10,11,12] },
+  ]
+
+  const loadDatos = useCallback(async () => {
+    setLoading(true)
+    const { data } = await supabase.from('conta_isr')
+      .select('*').eq('empresa_id', empresaId).eq('ano', ano).maybeSingle()
+    setDatos(data || null)
+    setBases({ q1: data?.base_q1??'', q2: data?.base_q2??'', q3: data?.base_q3??'', q4: data?.base_q4??'' })
+    setLoading(false)
+  }, [empresaId, ano])
+
+  useEffect(() => { loadDatos() }, [loadDatos])
+
+  const handleSaveQ = async (q) => {
+    setSaving(p => ({ ...p, [q]:true }))
+    const base = parseFloat(bases[q]) || 0
+    let newDatos
+    if (datos) {
+      await supabase.from('conta_isr').update({ [`base_${q}`]:base }).eq('id', datos.id)
+      newDatos = { ...datos, [`base_${q}`]:base }
+    } else {
+      const { data } = await supabase.from('conta_isr')
+        .insert({ empresa_id:empresaId, user_id:userId, ano, base_q1:0, base_q2:0, base_q3:0, base_q4:0, [`base_${q}`]:base })
+        .select().single()
+      newDatos = data
+    }
+    setDatos(newDatos)
+    setSaving(p => ({ ...p, [q]:false }))
+  }
+
+  const handlePago = async (q, pagado) => {
+    if (!datos) return
+    const fecha = pagado ? new Date().toLocaleDateString('es-GT', { day:'2-digit', month:'2-digit', year:'numeric' }) : null
+    const upd = { [`pagado_${q}`]:pagado, [`fecha_pago_${q}`]:fecha }
+    await supabase.from('conta_isr').update(upd).eq('id', datos.id)
+    setDatos(prev => ({ ...prev, ...upd }))
+  }
+
+  const toggleMes = (m) => setMesesSel(prev => prev.includes(m) ? prev.filter(x=>x!==m) : [...prev, m])
+
+  // ── Referencia — Estado de Resultados filtrado por meses ─────────────────
+  const asentosRef = asientos.filter(a => {
+    if (a.estado !== 'ACTIVO') return false
+    const d = new Date(a.fecha+'T00:00:00')
+    if (d.getFullYear() !== ano) return false
+    if (mesesSel.length > 0 && !mesesSel.includes(d.getMonth()+1)) return false
+    return true
+  })
+  const smRef = {}
+  asentosRef.forEach(a => (a.conta_lineas||[]).forEach(l => {
+    if (!smRef[l.cuenta_id]) smRef[l.cuenta_id] = { deb:0, cre:0 }
+    smRef[l.cuenta_id].deb += parseFloat(l.debito)||0
+    smRef[l.cuenta_id].cre += parseFloat(l.credito)||0
+  }))
+  const getSRef = (c) => { const s=smRef[c.id]||{deb:0,cre:0}; return ['ACTIVO','GASTO'].includes(c.tipo)?s.deb-s.cre:s.cre-s.deb }
+  const refIng  = cuentas.filter(c=>c.tipo==='INGRESO').reduce((s,c)=>s+getSRef(c),0)
+  const refGas  = cuentas.filter(c=>c.tipo==='GASTO'&&c.subtipo!=='Impuestos').reduce((s,c)=>s+getSRef(c),0)
+  const refUtil = refIng - refGas
+  const refISR  = Math.max(refUtil,0) * 0.25
+  const hayRef  = mesesSel.length > 0
+
+  const totalISR = TRIMS.reduce((s,{q}) => s + (parseFloat(bases[q])||0)*0.25, 0)
+
+  // ── PDF ──────────────────────────────────────────────────────────────────
+  const handlePDF = () => {
+    const doc = initPDF('DECLARACIÓN ISR TRIMESTRAL', `Año ${ano}`, empresaNombre)
+    autoTable(doc, {
+      startY: 50,
+      head: [['Trimestre','Período','Vence','Renta Imponible','ISR (25%)','Estado']],
+      body: TRIMS.map(({ q, label, periodo, vence }) => {
+        const base    = parseFloat(datos?.[`base_${q}`])||0
+        const pagado  = datos?.[`pagado_${q}`]
+        const fpago   = datos?.[`fecha_pago_${q}`]
+        return [label, periodo, vence, Qp(base), Qp(base*0.25), pagado ? `Pagado ${fpago||''}` : 'Pendiente']
+      }),
+      foot: [['','','','Total ISR Anual', Qp(totalISR), '']],
+      headStyles: tblHead, bodyStyles: tblBody, alternateRowStyles: tblAlt, footStyles: tblTotal,
+      didParseCell: (d) => {
+        if (d.section==='body' && d.column.index===5 && d.cell.raw?.startsWith('Pagado'))
+          d.cell.styles.textColor = [22,163,74]
+      },
+    })
+    doc.save(`isr-trimestral-${ano}.pdf`)
+  }
+
+  const cardStyle  = { background:'var(--card-bg)', borderRadius:'12px', border:'1px solid var(--border)', padding:'20px', marginBottom:'16px' }
+  const labelStyle = { fontSize:'12px', fontWeight:'700', color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'14px' }
+
+  return (
+    <div style={{ display:'flex', gap:'24px', alignItems:'flex-start', maxWidth:'900px' }}>
+      {/* ── Columna izquierda ────────────────────────────────────────────── */}
+      <div style={{ flex:1, minWidth:0 }}>
+        {/* Año + PDF */}
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'24px' }}>
+          <div style={{ display:'flex', gap:'6px' }}>
+            {ANOS.map(y => (
+              <button key={y} onClick={() => setAno(y)} style={{
+                padding:'6px 18px', borderRadius:'8px', border:'none', fontSize:'13px',
+                fontWeight: ano===y?'600':'400',
+                background: ano===y?'var(--accent)':'var(--inner-bg)',
+                color: ano===y?'#fff':'var(--text-muted)', cursor:'pointer',
+              }}>{y}</button>
+            ))}
+          </div>
+          <button onClick={handlePDF} style={{
+            display:'flex', alignItems:'center', gap:'6px',
+            padding:'7px 16px', borderRadius:'8px', border:'1px solid var(--border)',
+            fontSize:'13px', fontWeight:'500', background:'var(--inner-bg)', color:'var(--text-1)', cursor:'pointer',
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Descargar PDF
+          </button>
+        </div>
+
+        {loading ? (
+          <div style={{ color:'var(--text-muted)', fontSize:'13px' }}>Cargando…</div>
+        ) : (
+          <>
+            {TRIMS.map(({ q, label, periodo, vence }) => {
+              const base     = parseFloat(bases[q]) || 0
+              const isr      = base * 0.25
+              const pagado   = datos?.[`pagado_${q}`]
+              const fechaPago= datos?.[`fecha_pago_${q}`]
+              return (
+                <div key={q} style={{ ...cardStyle, border: pagado ? '1px solid #16a34a' : '1px solid var(--border)', background: pagado ? 'rgba(22,163,74,0.04)' : 'var(--card-bg)' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'14px' }}>
+                    <div>
+                      <div style={{ fontSize:'13px', fontWeight:'700', color: pagado?'#16a34a':'var(--text-1)', marginBottom:'2px' }}>{label}</div>
+                      <div style={{ fontSize:'11px', color:'var(--text-muted)' }}>{periodo}  ·  Vence: {vence}</div>
+                    </div>
+                    {pagado && <span style={{ fontSize:'11px', color:'#16a34a', fontWeight:'600', background:'rgba(22,163,74,0.1)', padding:'3px 10px', borderRadius:'20px' }}>Pagado {fechaPago||''}</span>}
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:'12px', alignItems:'end' }}>
+                    <div>
+                      <div style={{ fontSize:'11px', color:'var(--text-muted)', marginBottom:'5px' }}>Renta Imponible</div>
+                      <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
+                        <span style={{ fontSize:'13px', color:'var(--text-muted)' }}>Q</span>
+                        <input type="number" min="0" step="0.01" value={bases[q]}
+                          onChange={e => setBases(p => ({ ...p, [q]:e.target.value }))}
+                          style={{ flex:1, padding:'7px 10px', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--inner-bg)', color:'var(--text-1)', fontSize:'14px' }}
+                        />
+                      </div>
+                    </div>
+                    <button onClick={() => handleSaveQ(q)} disabled={saving[q]} style={{
+                      padding:'7px 16px', borderRadius:'8px', border:'none', fontSize:'12px',
+                      fontWeight:'600', background:'var(--accent)', color:'#fff', cursor:'pointer',
+                      opacity: saving[q]?0.7:1,
+                    }}>
+                      {saving[q] ? '…' : 'Guardar'}
+                    </button>
+                  </div>
+                  {base > 0 && (
+                    <div style={{ marginTop:'14px', paddingTop:'14px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                      <div>
+                        <span style={{ fontSize:'12px', color:'var(--text-muted)' }}>ISR (25%) = </span>
+                        <span style={{ fontSize:'16px', fontWeight:'800', color:'var(--accent)' }}>{Qp(isr)}</span>
+                      </div>
+                      <button onClick={() => handlePago(q, !pagado)} style={{
+                        padding:'6px 14px', borderRadius:'7px', border:'none', fontSize:'12px',
+                        fontWeight:'600', cursor:'pointer',
+                        background: pagado?'rgba(22,163,74,0.15)':'var(--accent)',
+                        color: pagado?'#16a34a':'#fff',
+                      }}>
+                        {pagado ? 'Pagado' : 'Marcar pagado'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+            {totalISR > 0 && (
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'16px 20px', background:'var(--inner-bg)', borderRadius:'12px', border:'1px solid var(--border)' }}>
+                <span style={{ fontSize:'13px', color:'var(--text-muted)' }}>Total ISR Anual {ano}</span>
+                <span style={{ fontSize:'17px', fontWeight:'800', color:'var(--text-1)' }}>{Qp(totalISR)}</span>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* ── Columna derecha — Referencia ─────────────────────────────────── */}
+      <div style={{ width:'300px', flexShrink:0, position:'sticky', top:'16px' }}>
+        <div style={{ background:'var(--card-bg)', borderRadius:'12px', border:'1px solid var(--border)', padding:'20px' }}>
+          <div style={labelStyle}>Referencia — {ano}</div>
+          <div style={{ fontSize:'11px', color:'var(--text-muted)', marginBottom:'12px' }}>Selecciona los meses a consultar</div>
+          {/* Chips de meses */}
+          <div style={{ display:'flex', flexWrap:'wrap', gap:'5px', marginBottom:'16px' }}>
+            {MESES_ES.map((m, i) => {
+              const num = i + 1
+              const sel = mesesSel.includes(num)
+              return (
+                <button key={num} onClick={() => toggleMes(num)} style={{
+                  padding:'3px 9px', borderRadius:'6px', border:'1px solid var(--border)', fontSize:'11px',
+                  fontWeight: sel?'700':'400',
+                  background: sel?'var(--accent-soft)':'transparent',
+                  color: sel?'var(--accent)':'var(--text-muted)', cursor:'pointer',
+                }}>{m.slice(0,3)}</button>
+              )
+            })}
+            {mesesSel.length > 0 && (
+              <button onClick={() => setMesesSel([])} style={{ padding:'3px 8px', borderRadius:'6px', border:'1px solid var(--border)', fontSize:'11px', background:'transparent', color:'var(--text-muted)', cursor:'pointer' }}>✕</button>
+            )}
+          </div>
+          {/* Resumen */}
+          {hayRef ? (
+            <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
+              {[
+                { label:'Ingresos',          valor:refIng,  color:'#16a34a' },
+                { label:'Gastos Operativos', valor:refGas,  color:'var(--text-1)' },
+              ].map(({ label, valor, color }) => (
+                <div key={label} style={{ display:'flex', justifyContent:'space-between', fontSize:'12px' }}>
+                  <span style={{ color:'var(--text-muted)' }}>{label}</span>
+                  <span style={{ color, fontWeight:'600', fontFamily:'monospace', whiteSpace:'nowrap' }}>{Qp(valor)}</span>
+                </div>
+              ))}
+              <div style={{ borderTop:'1px solid var(--border)', paddingTop:'8px', display:'flex', justifyContent:'space-between', fontSize:'12px' }}>
+                <span style={{ color:'var(--text-muted)' }}>Utilidad Antes de ISR</span>
+                <span style={{ color: refUtil>=0?'var(--text-1)':'#dc2626', fontWeight:'700', fontFamily:'monospace', whiteSpace:'nowrap' }}>{Qp(refUtil)}</span>
+              </div>
+              <div style={{ marginTop:'4px', padding:'10px 12px', borderRadius:'8px', background:'var(--accent-soft)', border:'1px solid var(--accent)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <span style={{ fontSize:'12px', fontWeight:'700', color:'var(--accent)' }}>ISR estimado (25%)</span>
+                <span style={{ fontSize:'14px', fontWeight:'800', color:'var(--accent)', fontFamily:'monospace', whiteSpace:'nowrap' }}>{Qp(refISR)}</span>
+              </div>
+            </div>
+          ) : (
+            <div style={{ fontSize:'12px', color:'var(--text-muted)', textAlign:'center', padding:'20px 0', lineHeight:'1.6' }}>
+              Selecciona los meses<br/>para ver el resumen
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const TABS_LIST = [
   { key:'CATALOGO',    label:'Catálogo' },
   { key:'DIARIO',      label:'Libro Diario' },
@@ -3186,6 +3441,7 @@ const TABS_LIST = [
   { key:'RESULTADOS', label:'Est. Resultados' },
   { key:'BALANCE',    label:'Balance Gral.' },
   { key:'ISO',         label:'ISO' },
+  { key:'ISR',         label:'ISR' },
   { key:'BITACORA',   label:'Bitácora' },
 ]
 
@@ -3350,6 +3606,7 @@ export default function ContabilidadCompleta({ userId, empresaId, empresaNombre 
       {tab==='RESULTADOS' && <ResultadosTab cuentas={cuentas} asientos={asientos} empresaNombre={empresaNombre} />}
       {tab==='BALANCE'    && <BalanceTab   cuentas={cuentas} asientos={asientos} empresaNombre={empresaNombre} />}
       {tab==='ISO'        && <ISOTab       empresaId={empresaId} userId={userId} cuentas={cuentas} asientos={asientos} />}
+      {tab==='ISR'        && <ISRTab       empresaId={empresaId} userId={userId} cuentas={cuentas} asientos={asientos} empresaNombre={empresaNombre} />}
       {tab==='BITACORA'   && <BitacoraTab  auditoria={auditoria} cuentas={cuentas} />}
     </div>
   )
