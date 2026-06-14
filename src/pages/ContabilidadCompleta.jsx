@@ -2905,11 +2905,13 @@ function ISOTab({ empresaId, userId, cuentas = [], asientos = [] }) {
   const hoyAno = new Date().getFullYear()
   const ANOS = [hoyAno - 1, hoyAno, hoyAno + 1]
 
-  const [ano, setAno]         = useState(hoyAno)
+  const [ano, setAnoRaw]      = useState(() => parseInt(localStorage.getItem('iso_ano')) || hoyAno)
   const [datos, setDatos]     = useState(null)
   const [form, setForm]       = useState({ ingresos_brutos: '', activo_neto: '' })
   const [saving, setSaving]   = useState(false)
   const [loading, setLoading] = useState(true)
+
+  const setAno = (y) => { setAnoRaw(y); localStorage.setItem('iso_ano', y) }
 
   const TRIMESTRES = [
     { q:1, label:'1er Trimestre', periodo:'Enero – Marzo',        vence:`31/01/${ano}` },
