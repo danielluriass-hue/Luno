@@ -2996,7 +2996,7 @@ function ISOTab({ empresaId, userId, cuentas = [], asientos = [] }) {
   const labelStyle = { fontSize:'12px', fontWeight:'700', color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'16px' }
 
   return (
-    <div style={{ display:'flex', gap:'24px', alignItems:'flex-start' }}>
+    <div style={{ display:'flex', gap:'24px', alignItems:'flex-start', maxWidth:'900px' }}>
       {/* ── Columna izquierda: formulario ISO ─────────────────────────── */}
       <div style={{ flex:1, minWidth:0 }}>
         {/* Selector año */}
