@@ -1156,6 +1156,7 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
   const [meta, setMeta]         = useState({})
   const [anosDisp, setAnosDisp] = useState([hoyAno])
   const [mesesDisp, setMesesDisp] = useState([])
+  const [fechaFiltro, setFechaFiltro] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [err, setErr]           = useState('')
   const [archivoDisp, setArchivoDisp] = useState(false)
@@ -1189,8 +1190,9 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
   useEffect(() => { loadPeriodos() }, [loadPeriodos])
   useEffect(() => { loadRows() }, [loadRows])
 
-  const handleSetAno = (y) => { setAno(y); setMes(null) }
-  const handleSetMes = (m) => setMes(mes===m ? null : m)
+  const handleSetAno = (y) => { setAno(y); setMes(null); setFechaFiltro(null) }
+  const handleSetMes = (m) => { setMes(mes===m ? null : m); setFechaFiltro(null) }
+  const handleSetFecha = (f) => setFechaFiltro(fechaFiltro===f ? null : f)
 
   const handleFile = async (file) => {
     setUploading(true); setErr('')
@@ -1407,6 +1409,13 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
+  const fechasDisp = rows?.length
+    ? [...new Set(rows.map(r => r.fecha).filter(Boolean))].sort((a, b) => {
+        const [da,ma,ya] = a.split('/'); const [db,mb,yb] = b.split('/')
+        return `${ya}${ma}${da}` < `${yb}${mb}${db}` ? -1 : 1
+      })
+    : []
+  const rowsVis  = fechaFiltro && rows?.length ? rows.filter(r => r.fecha === fechaFiltro) : (rows || [])
   const sinDatos = rows !== null && rows.length === 0
 
   return (
@@ -1425,7 +1434,7 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
         </div>
       )}
       {mesesDisp.length > 0 && (
-        <div style={{ display:'flex', gap:'5px', marginBottom:'10px', flexWrap:'wrap' }}>
+        <div style={{ display:'flex', gap:'5px', marginBottom:'8px', flexWrap:'wrap' }}>
           {mesesDisp.map(m => (
             <button key={m} onClick={()=>handleSetMes(m)} style={{
               padding:'4px 12px', borderRadius:'7px', border:'1px solid var(--border)', fontSize:'12px',
@@ -1434,6 +1443,25 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
               color:mes===m?'var(--accent)':'var(--text-muted)', cursor:'pointer',
             }}>{MESES[m-1]}</button>
           ))}
+        </div>
+      )}
+      {fechasDisp.length > 0 && (
+        <div style={{ display:'flex', gap:'5px', marginBottom:'10px', flexWrap:'wrap', alignItems:'center' }}>
+          <span style={{ fontSize:'11px', color:'var(--text-muted)', marginRight:'4px' }}>Fecha:</span>
+          {fechasDisp.map(f => (
+            <button key={f} onClick={()=>handleSetFecha(f)} style={{
+              padding:'3px 10px', borderRadius:'6px', border:'1px solid var(--border)', fontSize:'11px',
+              fontWeight:fechaFiltro===f?'700':'400',
+              background:fechaFiltro===f?'var(--accent-soft)':'transparent',
+              color:fechaFiltro===f?'var(--accent)':'var(--text-muted)', cursor:'pointer',
+            }}>{f}</button>
+          ))}
+          {fechaFiltro && (
+            <button onClick={()=>setFechaFiltro(null)} style={{
+              padding:'3px 8px', borderRadius:'6px', border:'1px solid var(--border)', fontSize:'11px',
+              background:'transparent', color:'var(--text-muted)', cursor:'pointer',
+            }}>✕ Todas</button>
+          )}
         </div>
       )}
 
@@ -1466,7 +1494,9 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
         )}
         {rows?.length > 0 && (
           <span style={{ fontSize:'12px', color:'var(--text-muted)' }}>
-            Período: <strong style={{ color:'var(--text-1)' }}>{periodoLabel}</strong> — {rows.length} registros
+            Período: <strong style={{ color:'var(--text-1)' }}>{periodoLabel}</strong>
+            {fechaFiltro ? <> · <strong style={{ color:'var(--accent)' }}>{fechaFiltro}</strong></> : ''}
+            {' '}— {rowsVis.length}{fechaFiltro ? ` de ${rows.length}` : ''} registros
           </span>
         )}
       </div>
@@ -1490,7 +1520,7 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
 
       {/* Tabla Ventas */}
       {tipo==='VENTA' && rows?.length > 0 && (() => {
-        const { totServ, totIVA, totTotal } = totalesVenta(rows)
+        const { totServ, totIVA, totTotal } = totalesVenta(rowsVis)
         return (
           <div>
             {meta.nombre && (
@@ -1506,7 +1536,7 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
                   ))}</tr>
                 </thead>
                 <tbody>
-                  {rows.map((r,i) => (
+                  {rowsVis.map((r,i) => (
                     <tr key={r.id} style={{ background: r.estado==='Anulado'?'rgba(220,38,38,0.04)': i%2===0?'transparent':'var(--inner-bg)', borderBottom:'1px solid var(--border)' }}>
                       <td style={{ padding:'7px 10px', fontSize:'12px', color:'var(--text-muted)' }}>{r.no}</td>
                       <td style={{ padding:'7px 10px', fontSize:'12px', whiteSpace:'nowrap' }}>{r.fecha}</td>
@@ -1543,7 +1573,7 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
 
       {/* Tabla Compras */}
       {tipo==='COMPRA' && rows?.length > 0 && (() => {
-        const { totComb, totComp, totIVA, totTotal } = totalesCompra(rows)
+        const { totComb, totComp, totIVA, totTotal } = totalesCompra(rowsVis)
         return (
           <div>
             {meta.nombre && (
@@ -1559,7 +1589,7 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
                   ))}</tr>
                 </thead>
                 <tbody>
-                  {rows.map((r,i) => (
+                  {rowsVis.map((r,i) => (
                     <tr key={r.id} style={{ background: r.estado==='Anulado'?'rgba(220,38,38,0.04)': i%2===0?'transparent':'var(--inner-bg)', borderBottom:'1px solid var(--border)' }}>
                       <td style={{ padding:'7px 10px', fontSize:'12px', color:'var(--text-muted)' }}>{r.no}</td>
                       <td style={{ padding:'7px 10px', fontSize:'12px', whiteSpace:'nowrap' }}>{r.fecha}</td>
@@ -2871,6 +2901,201 @@ function BitacoraTab({ auditoria, cuentas }) {
 
 // ── COMPONENTE PRINCIPAL ─────────────────────────────────────────────────────
 
+function ISOTab({ empresaId, userId }) {
+  const hoyAno = new Date().getFullYear()
+  const ANOS = [hoyAno - 1, hoyAno, hoyAno + 1]
+
+  const [ano, setAno]       = useState(hoyAno)
+  const [datos, setDatos]   = useState(null)
+  const [form, setForm]     = useState({ ingresos_brutos: '', activo_neto: '' })
+  const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  const TRIMESTRES = [
+    { q:1, label:'1er Trimestre', periodo:'Enero – Marzo',           vence:`31/01/${ano}` },
+    { q:2, label:'2do Trimestre', periodo:'Abril – Junio',           vence:`30/04/${ano}` },
+    { q:3, label:'3er Trimestre', periodo:'Julio – Septiembre',      vence:`31/07/${ano}` },
+    { q:4, label:'4to Trimestre', periodo:'Octubre – Diciembre',     vence:`31/10/${ano}` },
+  ]
+
+  const loadDatos = useCallback(async () => {
+    setLoading(true)
+    const { data } = await supabase.from('conta_iso')
+      .select('*').eq('empresa_id', empresaId).eq('ano', ano).maybeSingle()
+    setDatos(data || null)
+    setForm({ ingresos_brutos: data?.ingresos_brutos ?? '', activo_neto: data?.activo_neto ?? '' })
+    setLoading(false)
+  }, [empresaId, ano])
+
+  useEffect(() => { loadDatos() }, [loadDatos])
+
+  const handleSave = async () => {
+    setSaving(true)
+    const payload = {
+      empresa_id: empresaId, user_id: userId, ano,
+      ingresos_brutos: parseFloat(form.ingresos_brutos) || 0,
+      activo_neto:     parseFloat(form.activo_neto)     || 0,
+    }
+    if (datos) {
+      await supabase.from('conta_iso').update(payload).eq('id', datos.id)
+    } else {
+      const { data } = await supabase.from('conta_iso').insert(payload).select().single()
+      setDatos(data)
+    }
+    setSaving(false)
+    loadDatos()
+  }
+
+  const handlePago = async (q, pagado) => {
+    if (!datos) return
+    const fecha = pagado
+      ? new Date().toLocaleDateString('es-GT', { day:'2-digit', month:'2-digit', year:'numeric' })
+      : null
+    const upd = { [`pagado_q${q}`]: pagado, [`fecha_pago_q${q}`]: fecha }
+    await supabase.from('conta_iso').update(upd).eq('id', datos.id)
+    setDatos(prev => ({ ...prev, ...upd }))
+  }
+
+  const ingBrutos     = parseFloat(form.ingresos_brutos) || 0
+  const actNeto       = parseFloat(form.activo_neto)     || 0
+  const baseIngresos  = ingBrutos / 4
+  const baseActivo    = actNeto   / 4
+  const baseImponible = Math.max(baseIngresos, baseActivo)
+  const isoTrimestral = baseImponible * 0.01
+  const tieneBase     = ingBrutos > 0 || actNeto > 0
+
+  const cardStyle = { background:'var(--card-bg)', borderRadius:'12px', border:'1px solid var(--border)', padding:'20px', marginBottom:'20px' }
+  const labelStyle = { fontSize:'12px', fontWeight:'700', color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'16px' }
+
+  return (
+    <div style={{ maxWidth:'680px' }}>
+      {/* Selector año */}
+      <div style={{ display:'flex', gap:'6px', marginBottom:'24px', flexWrap:'wrap' }}>
+        {ANOS.map(y => (
+          <button key={y} onClick={() => setAno(y)} style={{
+            padding:'6px 18px', borderRadius:'8px', border:'none', fontSize:'13px',
+            fontWeight: ano===y ? '600' : '400',
+            background: ano===y ? 'var(--accent)' : 'var(--inner-bg)',
+            color: ano===y ? '#fff' : 'var(--text-muted)', cursor:'pointer',
+          }}>{y}</button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div style={{ color:'var(--text-muted)', fontSize:'13px' }}>Cargando…</div>
+      ) : (
+        <>
+          {/* Bloque 1: Datos base */}
+          <div style={cardStyle}>
+            <div style={labelStyle}>Datos base — ISR {ano - 1}</div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'14px', marginBottom:'16px' }}>
+              {[
+                { label:'Ingresos Brutos Anuales', key:'ingresos_brutos' },
+                { label:'Activo Neto',              key:'activo_neto' },
+              ].map(({ label, key }) => (
+                <div key={key}>
+                  <div style={{ fontSize:'12px', color:'var(--text-muted)', marginBottom:'6px' }}>{label}</div>
+                  <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
+                    <span style={{ fontSize:'13px', color:'var(--text-muted)' }}>Q</span>
+                    <input type="number" min="0" step="0.01" value={form[key]}
+                      onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
+                      style={{ flex:1, padding:'8px 10px', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--inner-bg)', color:'var(--text-1)', fontSize:'14px' }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button onClick={handleSave} disabled={saving} style={{
+              padding:'8px 20px', borderRadius:'8px', border:'none', fontSize:'13px',
+              fontWeight:'600', background:'var(--accent)', color:'#fff', cursor:'pointer',
+              opacity: saving ? 0.7 : 1,
+            }}>
+              {saving ? 'Guardando…' : 'Guardar'}
+            </button>
+          </div>
+
+          {/* Bloque 2: Cálculo */}
+          {tieneBase && (
+            <div style={cardStyle}>
+              <div style={labelStyle}>Cálculo ISO {ano}</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:'10px' }}>
+                {[
+                  { label:'Base Ingresos  =  Ingresos Brutos ÷ 4', valor:baseIngresos, resalt: baseIngresos >= baseActivo && ingBrutos > 0 },
+                  { label:'Base Activo    =  Activo Neto ÷ 4',      valor:baseActivo,   resalt: baseActivo > baseIngresos },
+                ].map(({ label, valor, resalt }) => (
+                  <div key={label} style={{
+                    display:'flex', justifyContent:'space-between', alignItems:'center',
+                    padding:'10px 14px', borderRadius:'8px',
+                    background: resalt ? 'var(--accent-soft)' : 'var(--inner-bg)',
+                    border: resalt ? '1px solid var(--accent)' : '1px solid transparent',
+                  }}>
+                    <span style={{ fontSize:'13px', color: resalt ? 'var(--accent)' : 'var(--text-muted)', fontFamily:'monospace' }}>{label}</span>
+                    <span style={{ fontSize:'14px', fontWeight: resalt ? '700' : '500', color: resalt ? 'var(--accent)' : 'var(--text-1)' }}>{Qp(valor)}</span>
+                  </div>
+                ))}
+                <div style={{ borderTop:'1px solid var(--border)', marginTop:'4px', paddingTop:'12px', display:'flex', flexDirection:'column', gap:'8px' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 14px', borderRadius:'10px', background:'var(--accent-soft)', border:'2px solid var(--accent)' }}>
+                    <span style={{ fontSize:'13px', fontWeight:'700', color:'var(--accent)' }}>Base Imponible (la mayor)</span>
+                    <span style={{ fontSize:'17px', fontWeight:'800', color:'var(--accent)' }}>{Qp(baseImponible)}</span>
+                  </div>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 14px', borderRadius:'10px', background:'var(--inner-bg)', border:'1px solid var(--border)' }}>
+                    <span style={{ fontSize:'13px', color:'var(--text-muted)' }}>ISO Trimestral  =  Base Imponible × 1%</span>
+                    <span style={{ fontSize:'15px', fontWeight:'700', color:'var(--text-1)' }}>{Qp(isoTrimestral)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Bloque 3: Control de pagos */}
+          {datos && tieneBase && (
+            <div style={cardStyle}>
+              <div style={labelStyle}>Control de Pagos {ano}</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:'10px' }}>
+                {TRIMESTRES.map(({ q, label, periodo, vence }) => {
+                  const pagado    = datos?.[`pagado_q${q}`]
+                  const fechaPago = datos?.[`fecha_pago_q${q}`]
+                  return (
+                    <div key={q} style={{
+                      display:'flex', alignItems:'center', justifyContent:'space-between',
+                      padding:'14px 16px', borderRadius:'10px', gap:'12px',
+                      border: pagado ? '1px solid #16a34a' : '1px solid var(--border)',
+                      background: pagado ? 'rgba(22,163,74,0.06)' : 'var(--inner-bg)',
+                    }}>
+                      <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
+                        <span style={{ fontSize:'13px', fontWeight:'600', color: pagado ? '#16a34a' : 'var(--text-1)' }}>{label}</span>
+                        <span style={{ fontSize:'11px', color:'var(--text-muted)' }}>{periodo}  ·  Vence: {vence}</span>
+                        {pagado && fechaPago && (
+                          <span style={{ fontSize:'11px', color:'#16a34a' }}>Pagado el {fechaPago}</span>
+                        )}
+                      </div>
+                      <div style={{ display:'flex', alignItems:'center', gap:'12px', flexShrink:0 }}>
+                        <span style={{ fontSize:'14px', fontWeight:'700', color:'var(--text-1)' }}>{Qp(isoTrimestral)}</span>
+                        <button onClick={() => handlePago(q, !pagado)} style={{
+                          padding:'6px 14px', borderRadius:'7px', border:'none', fontSize:'12px',
+                          fontWeight:'600', cursor:'pointer', whiteSpace:'nowrap',
+                          background: pagado ? 'rgba(22,163,74,0.15)' : 'var(--accent)',
+                          color: pagado ? '#16a34a' : '#fff',
+                        }}>
+                          {pagado ? 'Pagado' : 'Marcar pagado'}
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              <div style={{ marginTop:'14px', paddingTop:'14px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <span style={{ fontSize:'13px', color:'var(--text-muted)' }}>Total ISO Anual {ano}</span>
+                <span style={{ fontSize:'16px', fontWeight:'800', color:'var(--text-1)' }}>{Qp(isoTrimestral * 4)}</span>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 const TABS_LIST = [
   { key:'CATALOGO',    label:'Catálogo' },
   { key:'DIARIO',      label:'Libro Diario' },
@@ -2880,6 +3105,7 @@ const TABS_LIST = [
   { key:'MAYOR',      label:'Libro Mayor' },
   { key:'RESULTADOS', label:'Est. Resultados' },
   { key:'BALANCE',    label:'Balance Gral.' },
+  { key:'ISO',         label:'ISO' },
   { key:'BITACORA',   label:'Bitácora' },
 ]
 
@@ -3043,6 +3269,7 @@ export default function ContabilidadCompleta({ userId, empresaId, empresaNombre 
       {tab==='MAYOR'      && <MayorTab    cuentas={cuentas}  asientos={asientos} empresaNombre={empresaNombre} />}
       {tab==='RESULTADOS' && <ResultadosTab cuentas={cuentas} asientos={asientos} empresaNombre={empresaNombre} />}
       {tab==='BALANCE'    && <BalanceTab   cuentas={cuentas} asientos={asientos} empresaNombre={empresaNombre} />}
+      {tab==='ISO'        && <ISOTab       empresaId={empresaId} userId={userId} />}
       {tab==='BITACORA'   && <BitacoraTab  auditoria={auditoria} cuentas={cuentas} />}
     </div>
   )
