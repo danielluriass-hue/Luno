@@ -64,9 +64,9 @@ export default function RutinasPage({ user }) {
   return (
     <div style={{ maxWidth: '700px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: '800', letterSpacing: '-0.03em' }}>Rutinas</h1>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '30px', fontWeight: '500', letterSpacing: '-0.01em' }}>Rutinas</h1>
         <button onClick={() => { setForm({ name: '', type: 'manana', items: [] }); setEditing(null); setShowForm(true) }}
-          style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '12px', padding: '10px 18px', fontWeight: '600', fontSize: '13px' }}>
+          style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '12px', padding: '10px 18px', fontWeight: '600', fontSize: '13px', boxShadow: '0 4px 14px -4px var(--accent-glow)' }}>
           + Nueva rutina
         </button>
       </div>
@@ -89,8 +89,8 @@ export default function RutinasPage({ user }) {
           <div key={r.id} style={card}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <div>
-                <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-1)' }}>{r.name}</div>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{typeLabel} · {pct}% completado hoy</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px', fontWeight: '500', color: 'var(--text-1)' }}>{r.name}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{typeLabel} · <span style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>{pct}%</span> completado hoy</div>
               </div>
               <div style={{ display: 'flex', gap: '4px' }}>
                 <button onClick={() => { setForm({ name: r.name, type: r.type, items: r.items || [] }); setEditing(r.id); setShowForm(true) }}
@@ -101,7 +101,7 @@ export default function RutinasPage({ user }) {
 
             {/* Progress bar */}
             <div style={{ height: '4px', background: 'var(--inner-bg)', borderRadius: '2px', marginBottom: '14px', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${pct}%`, background: pct === 100 ? '#10b981' : 'var(--accent)', transition: 'width 0.3s' }} />
+              <div style={{ height: '100%', width: `${pct}%`, background: pct === 100 ? 'var(--green)' : 'var(--accent)', transition: 'width 0.3s' }} />
             </div>
 
             {items.map((item, idx) => {
@@ -109,7 +109,7 @@ export default function RutinasPage({ user }) {
               return (
                 <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '7px 0', borderBottom: '1px solid var(--border)' }}>
                   <button onClick={() => toggleItem(r, idx)}
-                    style={{ width: '20px', height: '20px', borderRadius: '6px', border: `2px solid ${done ? 'var(--accent)' : 'var(--border)'}`, background: done ? 'var(--accent)' : 'transparent', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '11px' }}>
+                    style={{ width: '20px', height: '20px', borderRadius: '6px', border: `2px solid ${done ? 'var(--accent)' : 'var(--border)'}`, background: done ? 'var(--accent)' : 'transparent', boxShadow: done ? '0 0 8px 1px var(--accent-glow)' : 'none', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '11px' }}>
                     {done ? '✓' : ''}
                   </button>
                   <span style={{ fontSize: '13px', color: done ? 'var(--text-muted)' : 'var(--text-1)', textDecoration: done ? 'line-through' : 'none' }}>{item}</span>

@@ -115,9 +115,9 @@ function SessionModal({ onClose, onSave, initial }) {
                 return (
                   <button key={r} type="button" onClick={() => toggleRoutine(r)} style={{
                     padding: '6px 14px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer',
-                    border: `1.5px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                    border: `1.5px solid ${active ? 'var(--accent-bright)' : 'var(--border)'}`,
                     background: active ? 'var(--accent-soft)' : 'transparent',
-                    color: active ? 'var(--accent)' : 'var(--text-muted)',
+                    color: active ? 'var(--accent-bright)' : 'var(--text-muted)',
                     fontWeight: active ? '700' : '400', transition: 'all 0.12s',
                   }}>{active ? '✓ ' : ''}{r}</button>
                 )
@@ -133,7 +133,7 @@ function SessionModal({ onClose, onSave, initial }) {
               </div>
               {exercisesByGroup.map(({ group, exercises: exList }) => (
                 <div key={group} style={{ marginBottom: '12px' }}>
-                  <div style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--accent-bright)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>
                     {group}
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -142,9 +142,9 @@ function SessionModal({ onClose, onSave, initial }) {
                       return (
                         <button key={name} type="button" onClick={() => toggleExercise(name)} style={{
                           padding: '5px 12px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer',
-                          border: `1.5px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                          border: `1.5px solid ${active ? 'var(--accent-bright)' : 'var(--border)'}`,
                           background: active ? 'var(--accent-soft)' : 'var(--card-bg)',
-                          color: active ? 'var(--accent)' : 'var(--text-muted)',
+                          color: active ? 'var(--accent-bright)' : 'var(--text-muted)',
                           fontWeight: active ? '700' : '400', transition: 'all 0.12s',
                         }}>{active ? '✓ ' : ''}{name}</button>
                       )
@@ -199,7 +199,7 @@ function SessionModal({ onClose, onSave, initial }) {
                     {/* Filas de series */}
                     {ex.series.map((s, si) => (
                       <div key={si} style={{ display: 'grid', gridTemplateColumns: '26px 1fr 1fr 1fr 18px', gap: '4px', marginBottom: '4px', alignItems: 'center' }}>
-                        <div style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: '700', textAlign: 'center' }}>S{si + 1}</div>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--accent-bright)', fontWeight: '700', textAlign: 'center' }}>S{si + 1}</div>
                         <input type="number" min="0" value={s.reps}
                           onChange={e => setSeriesField(i, si, 'reps', e.target.value)}
                           style={{ ...inp, textAlign: 'center', padding: '7px 4px' }} />
@@ -217,8 +217,8 @@ function SessionModal({ onClose, onSave, initial }) {
                     ))}
 
                     <button type="button" onClick={() => addSeries(i)} style={{
-                      marginTop: '8px', fontSize: '11px', color: 'var(--accent)', background: 'transparent',
-                      border: '1px dashed var(--accent)', borderRadius: '6px', padding: '5px', cursor: 'pointer',
+                      marginTop: '8px', fontSize: '11px', color: 'var(--accent-bright)', background: 'transparent',
+                      border: '1px dashed var(--accent-bright)', borderRadius: '6px', padding: '5px', cursor: 'pointer',
                       width: '100%', fontWeight: '600',
                     }}>+ Serie</button>
                   </div>
@@ -326,7 +326,7 @@ export default function GymSection({ user }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Registro de entrenamientos</p>
         <button onClick={() => { setEditing(null); setShowModal(true) }}
-          style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '12px', padding: '9px 16px', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>
+          style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '12px', padding: '9px 16px', fontWeight: '600', fontSize: '13px', cursor: 'pointer', boxShadow: '0 4px 14px -4px var(--accent-glow)' }}>
           + Nueva sesión
         </button>
       </div>
@@ -400,10 +400,10 @@ export default function GymSection({ user }) {
                                   borderRadius: '6px', background: si % 2 === 0 ? 'var(--inner-bg)' : 'transparent',
                                   alignItems: 'center', flexWrap: 'wrap',
                                 }}>
-                                  <span style={{ color: 'var(--accent)', fontSize: '10px', fontWeight: '700', width: '18px', flexShrink: 0 }}>S{si + 1}</span>
-                                  {s.reps != null && <span><strong>{s.reps}</strong> reps</span>}
-                                  {s.weight_kg != null && <span style={{ color: 'var(--accent)', fontWeight: '600' }}>{s.weight_kg} lbs</span>}
-                                  {s.rest_seconds != null && <span style={{ color: 'var(--text-muted)' }}>{s.rest_seconds} min desc.</span>}
+                                  <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-bright)', fontSize: '10px', fontWeight: '700', width: '18px', flexShrink: 0 }}>S{si + 1}</span>
+                                  {s.reps != null && <span style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}><strong>{s.reps}</strong> reps</span>}
+                                  {s.weight_kg != null && <span style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', color: 'var(--accent-bright)', fontWeight: '600' }}>{s.weight_kg} lbs</span>}
+                                  {s.rest_seconds != null && <span style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', color: 'var(--text-muted)' }}>{s.rest_seconds} min desc.</span>}
                                 </div>
                               ))}
                             </div>

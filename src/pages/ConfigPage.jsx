@@ -61,7 +61,7 @@ export default function ConfigPage({ user }) {
 
   return (
     <div style={{ maxWidth: '520px' }}>
-      <h1 style={{ fontSize: '28px', fontWeight: '800', letterSpacing: '-0.03em', marginBottom: '28px' }}>Configuración</h1>
+      <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '30px', fontWeight: '500', letterSpacing: '-0.01em', marginBottom: '28px' }}>Configuración</h1>
 
       {error && (
         <div style={{ background: '#fff0f0', border: '1px solid #ffd0d0', borderRadius: '10px', padding: '10px 14px', fontSize: '13px', color: '#cc0000', marginBottom: '16px' }}>
@@ -95,6 +95,7 @@ export default function ConfigPage({ user }) {
             padding: '10px', borderRadius: '10px', border: 'none',
             background: 'var(--accent)', color: '#fff', fontWeight: '600', fontSize: '13px',
             opacity: loading ? 0.6 : 1, alignSelf: 'flex-start', minWidth: '120px',
+            boxShadow: '0 4px 14px -4px var(--accent-glow)',
           }}>
             {loading ? 'Guardando...' : 'Guardar cambios'}
           </button>
@@ -117,6 +118,7 @@ export default function ConfigPage({ user }) {
             padding: '10px', borderRadius: '10px', border: 'none',
             background: 'var(--accent)', color: '#fff', fontWeight: '600', fontSize: '13px',
             opacity: loading ? 0.6 : 1, alignSelf: 'flex-start', minWidth: '120px',
+            boxShadow: '0 4px 14px -4px var(--accent-glow)',
           }}>
             {loading ? 'Actualizando...' : 'Actualizar contraseña'}
           </button>

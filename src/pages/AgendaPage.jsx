@@ -52,9 +52,9 @@ export default function AgendaPage({ user }) {
   return (
     <div style={{ maxWidth: '900px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: '800', letterSpacing: '-0.03em' }}>Agenda</h1>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '30px', fontWeight: '500', letterSpacing: '-0.01em' }}>Agenda</h1>
         <button onClick={() => { setForm(emptyForm); setEditing(null); setShowForm(true) }}
-          style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '12px', padding: '10px 18px', fontWeight: '600', fontSize: '13px' }}>
+          style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '12px', padding: '10px 18px', fontWeight: '600', fontSize: '13px', boxShadow: '0 4px 14px -4px var(--accent-glow)' }}>
           + Nuevo evento
         </button>
       </div>
@@ -87,8 +87,9 @@ export default function AgendaPage({ user }) {
                   style={{
                     borderRadius: '10px', border: 'none', padding: '8px 4px', position: 'relative',
                     background: isSel ? 'var(--accent)' : isToday ? 'var(--accent-soft)' : 'transparent',
-                    color: isSel ? '#fff' : isToday ? 'var(--accent)' : 'var(--text-1)',
+                    color: isSel ? '#fff' : isToday ? 'var(--accent-bright)' : 'var(--text-1)',
                     fontWeight: isSel || isToday ? '700' : '400', fontSize: '13px', cursor: 'pointer',
+                    fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums',
                   }}>
                   {d}
                   {hasEvent && <div style={{ position: 'absolute', bottom: '3px', left: '50%', transform: 'translateX(-50%)', width: '4px', height: '4px', borderRadius: '50%', background: isSel ? '#fff' : 'var(--accent)' }} />}
@@ -110,7 +111,7 @@ export default function AgendaPage({ user }) {
                 <div style={{ width: '3px', borderRadius: '2px', background: ev.color, alignSelf: 'stretch', flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-1)' }}>{ev.title}</div>
-                  {ev.start_time && <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{ev.start_time.slice(0,5)}{ev.end_time ? ` – ${ev.end_time.slice(0,5)}` : ''}</div>}
+                  {ev.start_time && <div style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: '11px', color: 'var(--text-muted)' }}>{ev.start_time.slice(0,5)}{ev.end_time ? ` – ${ev.end_time.slice(0,5)}` : ''}</div>}
                   {ev.description && <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{ev.description}</div>}
                 </div>
                 <div style={{ display: 'flex', gap: '6px' }}>

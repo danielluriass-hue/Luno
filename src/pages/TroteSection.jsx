@@ -110,11 +110,11 @@ function CardioModal({ onClose, onSave, initial }) {
                     flex: isMobile ? '1 1 calc(33% - 8px)' : '1',
                     minWidth: isMobile ? '80px' : undefined,
                     padding: isMobile ? '10px 4px' : '12px 8px', borderRadius: '12px', cursor: 'pointer',
-                    border: `2px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                    border: `2px solid ${active ? 'var(--accent-bright)' : 'var(--border)'}`,
                     background: active ? 'var(--accent-soft)' : 'var(--inner-bg)',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
                     transition: 'all 0.12s',
-                    color: active ? 'var(--accent)' : 'var(--text-muted)',
+                    color: active ? 'var(--accent-bright)' : 'var(--text-muted)',
                   }}>
                     <ActivityIcon actKey={a.key} size={isMobile ? 20 : 22} />
                     <span style={{ fontSize: '11px', fontWeight: active ? '700' : '500', textAlign: 'center' }}>{a.label}</span>
@@ -223,7 +223,7 @@ export default function TroteSection({ user }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Registro de cardio</p>
         <button onClick={() => { setEditing(null); setShowModal(true) }}
-          style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '12px', padding: '9px 16px', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>
+          style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '12px', padding: '9px 16px', fontWeight: '600', fontSize: '13px', cursor: 'pointer', boxShadow: '0 4px 14px -4px var(--accent-glow)' }}>
           + Nueva sesión
         </button>
       </div>
@@ -231,13 +231,13 @@ export default function TroteSection({ user }) {
       {sessions.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '16px' }}>
           {[
-            { label: 'Sesiones totales', value: sessions.length, color: 'var(--accent)' },
-            { label: 'Kilómetros totales', value: `${totalKm} km`, color: '#10b981' },
-            { label: 'Tiempo total', value: totalMin >= 60 ? `${Math.floor(totalMin/60)}h ${totalMin%60}m` : `${totalMin} min`, color: '#fbbf24' },
+            { label: 'Sesiones totales', value: sessions.length, color: 'var(--accent-bright)', glow: 'var(--accent-glow)' },
+            { label: 'Kilómetros totales', value: `${totalKm} km`, color: 'var(--green)', glow: 'var(--green-glow)' },
+            { label: 'Tiempo total', value: totalMin >= 60 ? `${Math.floor(totalMin/60)}h ${totalMin%60}m` : `${totalMin} min`, color: 'var(--yellow)', glow: 'var(--yellow-glow)' },
           ].map(s => (
-            <div key={s.label} style={{ ...card, padding: '16px 18px' }}>
+            <div key={s.label} className="glow-tile" style={{ ...card, padding: '16px 18px', '--tile-glow': s.glow }}>
               <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>{s.label}</div>
-              <div style={{ fontSize: '22px', fontWeight: '700', color: s.color, letterSpacing: '-0.02em' }}>{s.value}</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: '22px', fontWeight: '600', color: s.color, letterSpacing: '-0.02em' }}>{s.value}</div>
             </div>
           ))}
         </div>
@@ -274,7 +274,7 @@ export default function TroteSection({ user }) {
                   }}>{fat.icon} {fat.label}</span>
                 )}
               </div>
-              <div style={{ display: 'flex', gap: '10px', fontSize: '12px', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '10px', fontSize: '12px', color: 'var(--text-muted)', flexWrap: 'wrap', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>
                 <span>{new Date(s.date + 'T12:00').toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
                 {s.duration_minutes && <span>⏱ {s.duration_minutes} min</span>}
                 {s.distance_km && <span>📍 {s.distance_km} km</span>}

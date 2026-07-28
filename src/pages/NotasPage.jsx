@@ -50,7 +50,7 @@ export default function NotasPage({ user }) {
       {/* Lista */}
       <div style={{ width: '240px', display: 'flex', flexDirection: 'column', gap: '8px', flexShrink: 0 }}>
         <button onClick={newNote}
-          style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '12px', padding: '10px', fontWeight: '700', fontSize: '13px', width: '100%' }}>
+          style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '12px', padding: '10px', fontWeight: '700', fontSize: '13px', width: '100%', boxShadow: '0 4px 14px -4px var(--accent-glow)' }}>
           + Nueva nota
         </button>
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar..."
@@ -58,13 +58,13 @@ export default function NotasPage({ user }) {
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {filtered.map(n => (
             <button key={n.id} onClick={() => { setSelected(n); setEditing(false) }}
-              style={{ textAlign: 'left', padding: '12px', borderRadius: '12px', border: `1px solid ${selected?.id === n.id ? 'var(--accent)' : 'var(--border-card)'}`, background: selected?.id === n.id ? 'var(--accent-soft)' : 'var(--card-bg)', cursor: 'pointer', width: '100%' }}>
-              <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-1)', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              style={{ textAlign: 'left', padding: '12px', borderRadius: '12px', border: `1px solid ${selected?.id === n.id ? 'var(--accent-bright)' : 'var(--border-card)'}`, background: selected?.id === n.id ? 'var(--accent-soft)' : 'var(--card-bg)', cursor: 'pointer', width: '100%' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '14px', fontWeight: '500', color: 'var(--text-1)', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 {n.pinned && <span style={{ fontSize: '10px' }}>📌</span>}
                 {n.title || 'Sin título'}
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.content}</div>
-              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
                 {new Date(n.updated_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
               </div>
             </button>
@@ -80,14 +80,14 @@ export default function NotasPage({ user }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               {editing
                 ? <input value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} placeholder="Título de la nota"
-                    style={{ fontSize: '20px', fontWeight: '700', background: 'transparent', border: 'none', color: 'var(--text-1)', flex: 1 }} />
-                : <h2 style={{ fontSize: '20px', fontWeight: '700', flex: 1 }}>{selected?.title || 'Sin título'}</h2>
+                    style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: '500', background: 'transparent', border: 'none', color: 'var(--text-1)', flex: 1 }} />
+                : <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: '500', flex: 1 }}>{selected?.title || 'Sin título'}</h2>
               }
               <div style={{ display: 'flex', gap: '8px' }}>
                 {!editing && selected && <button onClick={() => pin(selected)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '16px' }}>{selected.pinned ? '📌' : '📍'}</button>}
                 {!editing && selected && <button onClick={() => { setForm({ title: selected.title || '', content: selected.content }); setEditing(true) }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '14px' }}>✏️</button>}
                 {!editing && selected && <button onClick={() => del(selected.id)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '14px' }}>🗑️</button>}
-                {editing && <button onClick={save} style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '10px', padding: '8px 16px', fontWeight: '700', fontSize: '13px' }}>Guardar</button>}
+                {editing && <button onClick={save} style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '10px', padding: '8px 16px', fontWeight: '700', fontSize: '13px', boxShadow: '0 4px 14px -4px var(--accent-glow)' }}>Guardar</button>}
                 {editing && <button onClick={() => setEditing(false)} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '10px', padding: '8px 14px', color: 'var(--text-muted)', fontSize: '13px' }}>Cancelar</button>}
               </div>
             </div>

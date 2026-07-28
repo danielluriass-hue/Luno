@@ -124,7 +124,7 @@ export default function MejorasPage({ user }) {
     <div style={{ maxWidth: '1100px' }}>
       {/* Header + Tabs */}
       <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: '800', letterSpacing: '-0.03em', marginBottom: '16px' }}>Mejoras</h1>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '30px', fontWeight: '500', letterSpacing: '-0.01em', marginBottom: '16px' }}>Mejoras</h1>
         <div style={{ display: 'flex', gap: '4px', background: 'var(--inner-bg)', borderRadius: '12px', padding: '4px', width: 'fit-content' }}>
           {[{ key: 'mediciones', label: 'Mediciones' }, { key: 'gym', label: '🏋️ Gym' }, { key: 'trote', label: '🏃 Cardio' }].map(t => (
             <button key={t.key} onClick={() => setTab(t.key)} style={{
@@ -150,7 +150,7 @@ export default function MejorasPage({ user }) {
             <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Mediciones corporales semanales</p>
           </div>
           <button onClick={() => { setForm(emptyForm()); setEditing(null); setShowForm(true) }}
-            style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '12px', padding: '10px 18px', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>
+            style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '12px', padding: '10px 18px', fontWeight: '600', fontSize: '13px', cursor: 'pointer', boxShadow: '0 4px 14px -4px var(--accent-glow)' }}>
             + Nueva medición
           </button>
         </div>
@@ -175,11 +175,11 @@ export default function MejorasPage({ user }) {
                 return (
                   <div key={f.key} style={{ background: 'var(--inner-bg)', borderRadius: '12px', padding: '14px' }}>
                     <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>{f.label}</div>
-                    <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-1)', letterSpacing: '-0.02em' }}>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: '20px', fontWeight: '600', color: 'var(--text-1)', letterSpacing: '-0.02em' }}>
                       {c != null ? c : '—'}{c != null && <span style={{ fontSize: '11px', fontWeight: '400', color: 'var(--text-muted)' }}>{f.unit}</span>}
                     </div>
                     {d != null && d !== 0 && (
-                      <div style={{ fontSize: '11px', marginTop: '4px', color: improved ? '#10b981' : worsened ? '#f87171' : 'var(--text-muted)', fontWeight: '600' }}>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: '11px', marginTop: '4px', color: improved ? 'var(--green)' : worsened ? 'var(--red)' : 'var(--text-muted)', fontWeight: '600' }}>
                         {d > 0 ? '↑' : '↓'} {Math.abs(d)}{f.unit}
                       </div>
                     )}
@@ -210,7 +210,7 @@ export default function MejorasPage({ user }) {
                 <tbody>
                   {entries.map((entry, idx) => (
                     <tr key={entry.id}>
-                      <td style={{ padding: '9px 8px', color: 'var(--text-2)', whiteSpace: 'nowrap', borderBottom: '1px solid var(--border)', fontWeight: '500' }}>
+                      <td style={{ padding: '9px 8px', color: 'var(--text-2)', whiteSpace: 'nowrap', borderBottom: '1px solid var(--border)', fontWeight: '500', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>
                         {new Date(entry.date + 'T12:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: '2-digit' })}
                       </td>
                       {FIELDS.map(f => {
@@ -220,7 +220,7 @@ export default function MejorasPage({ user }) {
                         const improved = d != null && d !== 0 && (f.goodDown ? d < 0 : d > 0)
                         const worsened = d != null && d !== 0 && (f.goodDown ? d > 0 : d < 0)
                         return (
-                          <td key={f.key} style={{ padding: '9px 8px', textAlign: 'right', borderBottom: '1px solid var(--border)', color: c != null ? (improved ? '#10b981' : worsened ? '#f87171' : 'var(--text-1)') : 'var(--text-muted)' }}>
+                          <td key={f.key} style={{ padding: '9px 8px', textAlign: 'right', borderBottom: '1px solid var(--border)', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', color: c != null ? (improved ? 'var(--green)' : worsened ? 'var(--red)' : 'var(--text-1)') : 'var(--text-muted)' }}>
                             {c != null ? c : '—'}
                           </td>
                         )
@@ -286,10 +286,10 @@ export default function MejorasPage({ user }) {
               return (
                 <div style={{ marginTop: '16px', padding: '12px 14px', borderRadius: '12px', background: 'var(--inner-bg)' }}>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Cambio total ({entries.length} mediciones)</div>
-                  <div style={{ fontSize: '18px', fontWeight: '700', color: improved ? '#10b981' : worsened ? '#f87171' : 'var(--text-1)' }}>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: '18px', fontWeight: '600', color: improved ? 'var(--green)' : worsened ? 'var(--red)' : 'var(--text-1)' }}>
                     {total > 0 ? '+' : ''}{total}{selectedField.unit}
                   </div>
-                  <div style={{ fontSize: '11px', color: improved ? '#10b981' : worsened ? '#f87171' : 'var(--text-muted)', marginTop: '2px' }}>
+                  <div style={{ fontSize: '11px', color: improved ? 'var(--green)' : worsened ? 'var(--red)' : 'var(--text-muted)', marginTop: '2px' }}>
                     {improved ? '↓ Mejorando' : worsened ? '↑ Pendiente de mejorar' : '= Sin cambio'}
                   </div>
                 </div>

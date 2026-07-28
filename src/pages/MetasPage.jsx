@@ -53,9 +53,9 @@ export default function MetasPage({ user }) {
   return (
     <div style={{ maxWidth: '700px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: '800', letterSpacing: '-0.03em' }}>Metas</h1>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '30px', fontWeight: '500', letterSpacing: '-0.01em' }}>Metas</h1>
         <button onClick={() => { setForm(emptyForm); setEditing(null); setShowForm(true) }}
-          style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '12px', padding: '10px 18px', fontWeight: '600', fontSize: '13px' }}>
+          style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '12px', padding: '10px 18px', fontWeight: '600', fontSize: '13px', boxShadow: '0 4px 14px -4px var(--accent-glow)' }}>
           + Nueva meta
         </button>
       </div>
@@ -63,13 +63,13 @@ export default function MetasPage({ user }) {
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
         {[
-          { label: 'Total', value: goals.length, color: 'var(--text-1)' },
-          { label: 'Activas', value: goals.filter(g => !g.completed).length, color: 'var(--accent)' },
-          { label: 'Completadas', value: goals.filter(g => g.completed).length, color: '#10b981' },
+          { label: 'Total', value: goals.length, color: 'var(--text-1)', glow: 'var(--accent-glow)' },
+          { label: 'Activas', value: goals.filter(g => !g.completed).length, color: 'var(--accent-bright)', glow: 'var(--accent-glow)' },
+          { label: 'Completadas', value: goals.filter(g => g.completed).length, color: 'var(--green)', glow: 'var(--green-glow)' },
         ].map(s => (
-          <div key={s.label} style={{ background: 'var(--card-bg)', borderRadius: '14px', border: '1px solid var(--border-card)', padding: '16px 18px' }}>
+          <div key={s.label} className="glow-tile" style={{ background: 'var(--card-bg)', borderRadius: '16px', border: '1px solid var(--border-card)', padding: '16px 18px', '--tile-glow': s.glow }}>
             <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>{s.label}</div>
-            <div style={{ fontSize: '26px', fontWeight: '800', color: s.color }}>{s.value}</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: '26px', fontWeight: '600', color: s.color }}>{s.value}</div>
           </div>
         ))}
       </div>
@@ -78,7 +78,7 @@ export default function MetasPage({ user }) {
       <div style={{ display: 'flex', gap: '4px', background: 'var(--card-bg)', borderRadius: '14px', padding: '4px', border: '1px solid var(--border-card)', marginBottom: '16px', width: 'fit-content' }}>
         {['todas', 'activas', 'completadas'].map(f => (
           <button key={f} onClick={() => setFilter(f)}
-            style={{ padding: '7px 16px', borderRadius: '10px', border: 'none', background: filter === f ? 'var(--accent-soft)' : 'transparent', color: filter === f ? 'var(--accent)' : 'var(--text-muted)', fontWeight: filter === f ? '700' : '400', fontSize: '13px' }}>
+            style={{ padding: '7px 16px', borderRadius: '10px', border: 'none', background: filter === f ? 'var(--accent-soft)' : 'transparent', color: filter === f ? 'var(--accent-bright)' : 'var(--text-muted)', fontWeight: filter === f ? '700' : '400', fontSize: '13px' }}>
             {f.charAt(0).toUpperCase() + f.slice(1)}
           </button>
         ))}
@@ -99,11 +99,11 @@ export default function MetasPage({ user }) {
                 <span style={{ fontSize: '11px', fontWeight: '700', color: periodColor(g.period), background: `${periodColor(g.period)}18`, padding: '2px 8px', borderRadius: '6px' }}>
                   {g.period}
                 </span>
-                {g.completed && <span style={{ fontSize: '11px', color: '#10b981', background: 'rgba(16,185,129,0.1)', padding: '2px 8px', borderRadius: '6px', fontWeight: '700' }}>✓ Completada</span>}
-                {g.start_date && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Inicio: {g.start_date}</span>}
-                {g.due_date && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Límite: {g.due_date}</span>}
+                {g.completed && <span style={{ fontSize: '11px', color: 'var(--green)', background: 'var(--green-soft)', padding: '2px 8px', borderRadius: '6px', fontWeight: '700' }}>✓ Completada</span>}
+                {g.start_date && <span style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: '11px', color: 'var(--text-muted)' }}>Inicio: {g.start_date}</span>}
+                {g.due_date && <span style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: '11px', color: 'var(--text-muted)' }}>Límite: {g.due_date}</span>}
               </div>
-              <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-1)', marginBottom: '2px' }}>{g.title}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px', fontWeight: '500', color: 'var(--text-1)', marginBottom: '2px' }}>{g.title}</div>
               {g.description && <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{g.description}</div>}
             </div>
             <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
@@ -116,16 +116,16 @@ export default function MetasPage({ user }) {
           <div style={{ marginBottom: '8px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
               <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Progreso</span>
-              <span style={{ fontSize: '12px', fontWeight: '700', color: g.completed ? '#10b981' : 'var(--accent)' }}>{g.progress}%</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: '12px', fontWeight: '700', color: g.completed ? 'var(--green)' : 'var(--accent-bright)' }}>{g.progress}%</span>
             </div>
             <div style={{ height: '6px', background: 'var(--inner-bg)', borderRadius: '3px', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${g.progress}%`, background: g.completed ? '#10b981' : 'var(--accent)', borderRadius: '3px', transition: 'width 0.3s' }} />
+              <div style={{ height: '100%', width: `${g.progress}%`, background: g.completed ? 'var(--green)' : 'var(--accent)', borderRadius: '3px', transition: 'width 0.3s' }} />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '6px' }}>
             {[0, 25, 50, 75, 100].map(v => (
               <button key={v} onClick={() => updateProgress(g, v)}
-                style={{ flex: 1, padding: '5px', borderRadius: '8px', border: `1px solid ${g.progress === v ? 'var(--accent)' : 'var(--border)'}`, background: g.progress === v ? 'var(--accent-soft)' : 'transparent', color: g.progress === v ? 'var(--accent)' : 'var(--text-muted)', fontSize: '11px', fontWeight: '600' }}>
+                style={{ flex: 1, padding: '5px', borderRadius: '8px', border: `1px solid ${g.progress === v ? 'var(--accent-bright)' : 'var(--border)'}`, background: g.progress === v ? 'var(--accent-soft)' : 'transparent', color: g.progress === v ? 'var(--accent-bright)' : 'var(--text-muted)', fontSize: '11px', fontWeight: '600', fontFamily: 'var(--font-mono)' }}>
                 {v}%
               </button>
             ))}

@@ -111,7 +111,7 @@ export default function HabitosPage({ user }) {
           <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{h.name}</span>
         </div>
         {timeRange(h) && (
-          <div style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: '600', marginTop: '1px', paddingLeft: '20px' }}>{timeRange(h)}</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: '10px', color: 'var(--accent-bright)', fontWeight: '600', marginTop: '1px', paddingLeft: '20px' }}>{timeRange(h)}</div>
         )}
       </div>
       {last7.map(d => {
@@ -143,8 +143,8 @@ export default function HabitosPage({ user }) {
             <div style={{ fontSize: '11px', color: 'var(--text-2)', marginTop: '1px' }}>{h.description}</div>
           )}
           <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <span>🔥 {streak} días · {weekDone}/7 esta semana</span>
-            {timeRange(h) && <span style={{ color: 'var(--accent)', fontWeight: '600' }}>⏰ {timeRange(h)}</span>}
+            <span style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>🔥 {streak} días · {weekDone}/7 esta semana</span>
+            {timeRange(h) && <span style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', color: 'var(--accent-bright)', fontWeight: '600' }}>⏰ {timeRange(h)}</span>}
           </div>
         </div>
         <div style={{ display: 'flex', gap: '4px' }}>
@@ -159,9 +159,9 @@ export default function HabitosPage({ user }) {
   return (
     <div style={{ maxWidth: '700px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: '800', letterSpacing: '-0.03em' }}>Hábitos</h1>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '30px', fontWeight: '500', letterSpacing: '-0.01em' }}>Hábitos</h1>
         <button onClick={() => { setForm(emptyForm); setEditing(null); setShowForm(true) }}
-          style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '12px', padding: '10px 18px', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>
+          style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '12px', padding: '10px 18px', fontWeight: '600', fontSize: '13px', cursor: 'pointer', boxShadow: '0 4px 14px -4px var(--accent-glow)' }}>
           + Nuevo hábito
         </button>
       </div>
@@ -173,10 +173,10 @@ export default function HabitosPage({ user }) {
           <div style={{ display: 'grid', gridTemplateColumns: `${isMobile ? '120px' : '180px'} repeat(7, ${isMobile ? '36px' : '1fr'})`, gap: '6px', alignItems: 'center', minWidth: isMobile ? '400px' : 'auto' }}>
             <div />
             {last7.map(d => (
-              <div key={d} style={{ textAlign: 'center', fontSize: '10px', color: d === todayStr ? 'var(--accent)' : 'var(--text-muted)', fontWeight: d === todayStr ? '700' : '400' }}>
+              <div key={d} style={{ textAlign: 'center', fontSize: '10px', color: d === todayStr ? 'var(--accent-bright)' : 'var(--text-muted)', fontWeight: d === todayStr ? '700' : '400' }}>
                 {new Date(d + 'T12:00').toLocaleDateString('es-ES', { weekday: 'short' }).slice(0, 2).toUpperCase()}
                 <br />
-                <span style={{ fontSize: '11px' }}>{new Date(d + 'T12:00').getDate()}</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: '11px' }}>{new Date(d + 'T12:00').getDate()}</span>
               </div>
             ))}
             {renderGridRows(withTime, false)}

@@ -47,9 +47,9 @@ export default function TareasPage({ user }) {
   return (
     <div style={{ maxWidth: '700px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: '800', letterSpacing: '-0.03em' }}>Tareas</h1>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '30px', fontWeight: '500', letterSpacing: '-0.01em' }}>Tareas</h1>
         <button onClick={() => { setForm(emptyForm); setEditing(null); setShowForm(true) }}
-          style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '12px', padding: '10px 18px', fontWeight: '600', fontSize: '13px' }}>
+          style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '12px', padding: '10px 18px', fontWeight: '600', fontSize: '13px', boxShadow: '0 4px 14px -4px var(--accent-glow)' }}>
           + Nueva tarea
         </button>
       </div>
@@ -58,7 +58,7 @@ export default function TareasPage({ user }) {
       <div style={{ display: 'flex', gap: '4px', background: 'var(--card-bg)', borderRadius: '14px', padding: '4px', border: '1px solid var(--border-card)', marginBottom: '16px', width: 'fit-content' }}>
         {['pendientes', 'completadas'].map(f => (
           <button key={f} onClick={() => setFilter(f)}
-            style={{ padding: '7px 16px', borderRadius: '10px', border: 'none', background: filter === f ? 'var(--accent-soft)' : 'transparent', color: filter === f ? 'var(--accent)' : 'var(--text-muted)', fontWeight: filter === f ? '700' : '400', fontSize: '13px' }}>
+            style={{ padding: '7px 16px', borderRadius: '10px', border: 'none', background: filter === f ? 'var(--accent-soft)' : 'transparent', color: filter === f ? 'var(--accent-bright)' : 'var(--text-muted)', fontWeight: filter === f ? '700' : '400', fontSize: '13px' }}>
             {f.charAt(0).toUpperCase() + f.slice(1)}
           </button>
         ))}
@@ -71,6 +71,7 @@ export default function TareasPage({ user }) {
             </p>
           : filtered.map(t => (
             <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ width: '4px', alignSelf: 'stretch', borderRadius: '3px', flexShrink: 0, background: priorityColor(t.priority) }} />
               <button onClick={() => toggle(t)}
                 style={{ width: '22px', height: '22px', borderRadius: '50%', border: `2px solid ${priorityColor(t.priority)}`, background: t.completed ? priorityColor(t.priority) : 'transparent', flexShrink: 0, marginTop: '1px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '11px' }}>
                 {t.completed ? '✓' : ''}
@@ -78,10 +79,10 @@ export default function TareasPage({ user }) {
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: '14px', color: t.completed ? 'var(--text-muted)' : 'var(--text-1)', textDecoration: t.completed ? 'line-through' : 'none', fontWeight: '500' }}>{t.title}</div>
                 {t.description && <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{t.description}</div>}
-                <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '4px', alignItems: 'center' }}>
                   {t.category && <span style={{ fontSize: '11px', background: 'var(--inner-bg)', color: 'var(--text-muted)', padding: '2px 8px', borderRadius: '6px' }}>{t.category}</span>}
-                  {t.due_date && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>📅 {t.due_date}</span>}
-                  <span style={{ fontSize: '11px', color: priorityColor(t.priority), fontWeight: '600' }}>{t.priority}</span>
+                  {t.due_date && <span style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: '11px', color: 'var(--text-muted)' }}>📅 {t.due_date}</span>}
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', textTransform: 'uppercase', letterSpacing: '0.04em', color: priorityColor(t.priority), fontWeight: '600' }}>{t.priority}</span>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>

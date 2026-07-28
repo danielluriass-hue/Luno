@@ -71,7 +71,7 @@ export default function CalendarioView({ user }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
           <button onClick={() => setMonth(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
             style={{ background: 'var(--inner-bg)', border: 'none', borderRadius: '8px', padding: '7px 14px', cursor: 'pointer', color: 'var(--text-2)', fontSize: '16px', fontWeight: '700' }}>‹</button>
-          <h2 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-1)', textTransform: 'capitalize' }}>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '17px', fontWeight: '500', color: 'var(--text-1)', textTransform: 'capitalize' }}>
             {month.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
           </h2>
           <button onClick={() => setMonth(d => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
@@ -104,15 +104,16 @@ export default function CalendarioView({ user }) {
                   padding: '5px 4px',
                   cursor: 'pointer',
                   background: isSelected ? 'var(--accent-soft)' : isToday ? 'var(--inner-bg)' : 'transparent',
-                  border: `1.5px solid ${isSelected ? 'var(--accent)' : isToday ? 'var(--accent)' : 'transparent'}`,
+                  border: `1.5px solid ${isSelected ? 'var(--accent-bright)' : isToday ? 'var(--accent-bright)' : 'transparent'}`,
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
                   transition: 'all 0.12s',
                 }}>
                 {/* Day number */}
                 <span style={{
+                  fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums',
                   fontSize: isMobile ? '12px' : '13px',
                   fontWeight: isToday ? '800' : '500',
-                  color: isToday ? 'var(--accent)' : 'var(--text-1)',
+                  color: isToday ? 'var(--accent-bright)' : 'var(--text-1)',
                   lineHeight: 1,
                 }}>{dayNum}</span>
 
@@ -140,9 +141,9 @@ export default function CalendarioView({ user }) {
         {/* Leyenda */}
         <div style={{ display: 'flex', gap: '14px', marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--border)', flexWrap: 'wrap' }}>
           {[
-            { shape: 'circle', color: 'var(--accent)', label: 'Hábitos' },
+            { shape: 'circle', color: 'var(--accent-bright)', label: 'Hábitos' },
             { shape: 'circle', color: '#818cf8', label: 'Eventos' },
-            { shape: 'square', color: '#34d399', label: 'Tareas hechas' },
+            { shape: 'square', color: 'var(--green)', label: 'Tareas hechas' },
           ].map(l => (
             <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: 'var(--text-muted)' }}>
               <div style={{ width: '7px', height: '7px', borderRadius: l.shape === 'circle' ? '50%' : '2px', background: l.color, flexShrink: 0 }} />
@@ -155,7 +156,7 @@ export default function CalendarioView({ user }) {
       {/* Selected day detail */}
       {selectedDay && selData && (
         <div style={{ ...card }}>
-          <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-1)', marginBottom: '16px', textTransform: 'capitalize' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '18px', fontWeight: '500', color: 'var(--text-1)', marginBottom: '16px', textTransform: 'capitalize' }}>
             {new Date(selectedDay + 'T12:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
           </div>
 
@@ -174,7 +175,7 @@ export default function CalendarioView({ user }) {
                       <span style={{ fontSize: '13px', color: done ? 'var(--text-1)' : 'var(--text-muted)' }}>
                         {h.icon} {h.name}
                       </span>
-                      {done && <span style={{ marginLeft: 'auto', fontSize: '12px', color: '#10b981', fontWeight: '700' }}>✓</span>}
+                      {done && <span style={{ marginLeft: 'auto', fontSize: '12px', color: 'var(--green)', fontWeight: '700' }}>✓</span>}
                     </div>
                   )
                 })}
@@ -193,7 +194,7 @@ export default function CalendarioView({ user }) {
                   <div style={{ width: '3px', height: '18px', borderRadius: '2px', background: ev.color || '#818cf8', flexShrink: 0 }} />
                   <div>
                     <div style={{ fontSize: '13px', color: 'var(--text-1)', fontWeight: '500' }}>{ev.title}</div>
-                    {ev.start_time && <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{ev.start_time.slice(0,5)}{ev.end_time ? ` – ${ev.end_time.slice(0,5)}` : ''}</div>}
+                    {ev.start_time && <div style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: '11px', color: 'var(--text-muted)' }}>{ev.start_time.slice(0,5)}{ev.end_time ? ` – ${ev.end_time.slice(0,5)}` : ''}</div>}
                   </div>
                 </div>
               ))}
@@ -208,7 +209,7 @@ export default function CalendarioView({ user }) {
               </div>
               {selData.tasks.map(t => (
                 <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
                   <span style={{ fontSize: '13px', color: 'var(--text-2)', textDecoration: 'line-through' }}>{t.title}</span>
                 </div>
               ))}
