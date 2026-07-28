@@ -69,7 +69,7 @@ export default function HoyPage({ user }) {
 
   const priorityColor = (p) => p === 'alta' ? '#ff3b30' : p === 'media' ? '#ff9500' : '#34c759'
 
-  const card = { background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border-card)', padding: '20px 22px' }
+  const card = { background: 'var(--card-bg)', borderRadius: '16px', border: '1px solid var(--border-card)', padding: '20px 22px' }
   const label = { fontSize: '11px', fontWeight: '500', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '14px' }
 
   const todayLogs = habitLogs.filter(l => l.date === todayStr())
@@ -83,17 +83,17 @@ export default function HoyPage({ user }) {
   ]
 
   return (
-    <div style={{ maxWidth: '800px' }}>
+    <div style={{ maxWidth: '800px', position: 'relative' }}>
       {/* Header */}
       <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>{dayName()}</p>
-          <h1 style={{ fontSize: '28px', fontWeight: '700', letterSpacing: '-0.03em', color: 'var(--text-1)' }}>
-            Buen día, {user?.user_metadata?.full_name?.split(' ')[0] || 'hola'}
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '32px', fontWeight: '500', letterSpacing: '-0.01em', color: 'var(--text-1)' }}>
+            Buen día, <span style={{ fontStyle: 'italic', color: 'var(--accent-bright)' }}>{user?.user_metadata?.full_name?.split(' ')[0] || 'hola'}</span>
           </h1>
         </div>
         {/* Period tabs */}
-        <div style={{ display: 'flex', background: 'var(--inner-bg)', borderRadius: '10px', padding: '3px', gap: '2px' }}>
+        <div style={{ display: 'flex', background: 'var(--inner-bg)', border: '1px solid var(--border)', borderRadius: '11px', padding: '3px', gap: '2px' }}>
           {PERIODS.map(p => (
             <button key={p.key} onClick={() => setPeriod(p.key)} style={{
               padding: '6px 14px', borderRadius: '8px', border: 'none', fontSize: '12px', fontWeight: '500',
@@ -114,13 +114,13 @@ export default function HoyPage({ user }) {
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '16px' }}>
         {[
-          { label: period === 'HOY' ? 'Eventos hoy' : period === 'SEMANA' ? 'Eventos semana' : 'Eventos mes', value: events.length, color: 'var(--accent)' },
-          { label: period === 'HOY' ? 'Tareas pendientes' : 'Tareas completadas', value: period === 'HOY' ? tasks.length : completedTasks.length, color: '#ff9500' },
-          { label: 'Hábitos', value: period === 'HOY' ? `${todayLogs.length}/${habits.length}` : `${Math.min(habitRate, 100)}%`, color: '#34c759' },
+          { label: period === 'HOY' ? 'Eventos hoy' : period === 'SEMANA' ? 'Eventos semana' : 'Eventos mes', value: events.length, color: 'var(--accent-bright)', glow: 'var(--accent-glow)' },
+          { label: period === 'HOY' ? 'Tareas pendientes' : 'Tareas completadas', value: period === 'HOY' ? tasks.length : completedTasks.length, color: 'var(--yellow)', glow: 'var(--yellow-glow)' },
+          { label: 'Hábitos', value: period === 'HOY' ? `${todayLogs.length}/${habits.length}` : `${Math.min(habitRate, 100)}%`, color: 'var(--green)', glow: 'var(--green-glow)' },
         ].map(s => (
-          <div key={s.label} style={{ ...card }}>
+          <div key={s.label} className="glow-tile" style={{ ...card, '--tile-glow': s.glow }}>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>{s.label}</div>
-            <div style={{ fontSize: '28px', fontWeight: '700', color: s.color, letterSpacing: '-0.02em' }}>{s.value}</div>
+            <div style={{ position: 'relative', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: '28px', fontWeight: '600', color: s.color, letterSpacing: '-0.02em' }}>{s.value}</div>
           </div>
         ))}
       </div>
@@ -179,6 +179,7 @@ export default function HoyPage({ user }) {
                         width: '18px', height: '18px', borderRadius: '5px', flexShrink: 0,
                         border: `2px solid ${done ? (h.color || 'var(--accent)') : 'var(--border)'}`,
                         background: done ? (h.color || 'var(--accent)') : 'transparent',
+                        boxShadow: done ? `0 0 8px 1px var(--accent-glow)` : 'none',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                       }}>
                         {done && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5"><polyline points="20 6 9 17 4 12"/></svg>}
@@ -188,7 +189,7 @@ export default function HoyPage({ user }) {
                         {h.name}
                       </span>
                       {timeLabel && (
-                        <span style={{ fontSize: '10px', color: done ? 'var(--text-muted)' : 'var(--accent)', fontWeight: '600', flexShrink: 0 }}>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: '10px', color: done ? 'var(--text-muted)' : 'var(--accent-bright)', fontWeight: '600', flexShrink: 0 }}>
                           {timeLabel}
                         </span>
                       )}
@@ -205,7 +206,8 @@ export default function HoyPage({ user }) {
         {tasks.length === 0
           ? <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Sin tareas pendientes</p>
           : tasks.slice(0, 8).map(t => (
-            <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+            <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 2px', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ width: '4px', alignSelf: 'stretch', borderRadius: '3px', flexShrink: 0, background: priorityColor(t.priority) }} />
               <button onClick={() => toggleTask(t)} style={{
                 width: '15px', height: '15px', borderRadius: '50%', flexShrink: 0,
                 border: `1.5px solid ${priorityColor(t.priority)}`, background: 'transparent', cursor: 'pointer',
@@ -214,7 +216,9 @@ export default function HoyPage({ user }) {
                 <div style={{ fontSize: '13px', color: 'var(--text-1)' }}>{t.title}</div>
                 {t.category && <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '1px' }}>{t.category}</div>}
               </div>
-              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: priorityColor(t.priority) }} />
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: priorityColor(t.priority), flexShrink: 0 }}>
+                {t.priority}
+              </span>
             </div>
           ))
         }

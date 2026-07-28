@@ -20,10 +20,16 @@ input[type=number] { -moz-appearance: textfield; }
   --text-muted: #999999;
   --accent: #5856d6;
   --accent-soft: rgba(88,86,214,0.08);
+  --accent-bright: #5856d6;
+  --accent-glow: rgba(88,86,214,0.18);
   --green: #34c759;
   --green-soft: rgba(52,199,89,0.1);
+  --green-glow: rgba(52,199,89,0.18);
   --red: #ff3b30;
   --yellow: #ff9500;
+  --yellow-glow: rgba(255,149,0,0.18);
+  --font-display: "Iowan Old Style", "Sitka Text", Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
 }
 
 .dark {
@@ -38,10 +44,23 @@ input[type=number] { -moz-appearance: textfield; }
   --text-muted: #636366;
   --accent: #7b79f7;
   --accent-soft: rgba(123,121,247,0.15);
+  --accent-bright: #b3a6ff;
+  --accent-glow: rgba(139,124,245,0.32);
   --green: #30d158;
   --green-soft: rgba(48,209,88,0.1);
+  --green-glow: rgba(48,209,88,0.24);
   --red: #ff453a;
   --yellow: #ffd60a;
+  --yellow-glow: rgba(255,214,10,0.2);
+}
+
+.glow-tile { position: relative; overflow: hidden; }
+.glow-tile::after {
+  content: "";
+  position: absolute; width: 120px; height: 120px; border-radius: 50%;
+  right: -40px; top: -40px; filter: blur(30px); opacity: 0.5;
+  background: var(--tile-glow, var(--accent-glow));
+  pointer-events: none;
 }
 
 body {

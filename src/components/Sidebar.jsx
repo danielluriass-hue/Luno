@@ -80,16 +80,25 @@ function useTodayStats(userId, refreshKey) {
   return stats
 }
 
-function StatBar({ label, value, color }) {
+function ProgressRing({ label, value, color }) {
+  const r = 17, c = 2 * Math.PI * r
+  const pct = value ?? 0
+  const off = c - (Math.min(pct, 100) / 100) * c
   return (
-    <div style={{ marginBottom: '10px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>
-        <span>{label}</span>
-        <span style={{ color: 'var(--text-1)', fontWeight: '600' }}>{value === null ? '—' : `${value}%`}</span>
-      </div>
-      <div style={{ height: '5px', borderRadius: '3px', background: 'var(--inner-bg)', overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${value ?? 0}%`, background: color, borderRadius: '3px', transition: 'width 0.3s' }} />
-      </div>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }}>
+      <svg width="42" height="42" viewBox="0 0 42 42">
+        <circle cx="21" cy="21" r={r} fill="none" stroke="var(--border)" strokeWidth="4" />
+        <circle
+          cx="21" cy="21" r={r} fill="none" stroke={color} strokeWidth="4" strokeLinecap="round"
+          strokeDasharray={c} strokeDashoffset={off}
+          transform="rotate(-90 21 21)"
+          style={{ transition: 'stroke-dashoffset 0.4s cubic-bezier(.4,0,.2,1)' }}
+        />
+        <text x="21" y="25" textAnchor="middle" style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: '10px', fontWeight: '600', fill: 'var(--text-1)' }}>
+          {value === null ? '–' : pct}
+        </text>
+      </svg>
+      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{label}</span>
     </div>
   )
 }
@@ -131,13 +140,20 @@ export default function Sidebar({ page, setPage, user, darkMode, toggleDark, isM
           const active = page === item.key
           return (
             <button key={item.key} onClick={() => setPage(item.key)} style={{
-              display: 'flex', alignItems: 'center', gap: '9px',
+              display: 'flex', alignItems: 'center', gap: '9px', position: 'relative',
               padding: '8px 10px', borderRadius: '8px', border: 'none',
               background: active ? 'var(--accent-soft)' : 'transparent',
-              color: active ? 'var(--accent)' : 'var(--text-muted)',
-              fontWeight: active ? '500' : '400',
+              color: active ? 'var(--accent-bright)' : 'var(--text-muted)',
+              fontWeight: active ? '600' : '400',
               fontSize: '13.5px', textAlign: 'left', transition: 'all 0.12s', width: '100%',
             }}>
+              {active && (
+                <span style={{
+                  position: 'absolute', left: '-6px', top: '50%', transform: 'translateY(-50%)',
+                  width: '3px', height: '16px', borderRadius: '3px',
+                  background: 'var(--accent-bright)', boxShadow: '0 0 8px 1px var(--accent-glow)',
+                }} />
+              )}
               <span style={{ flexShrink: 0 }}>{icons[item.key]}</span>
               {item.label}
             </button>
@@ -146,13 +162,15 @@ export default function Sidebar({ page, setPage, user, darkMode, toggleDark, isM
       </nav>
 
       {/* Progreso de hoy */}
-      <div style={{ padding: '12px 10px', marginBottom: '4px', borderTop: '1px solid var(--border)' }}>
-        <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
+      <div style={{ padding: '14px 6px 4px', marginBottom: '4px', borderTop: '1px solid var(--border)' }}>
+        <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px', padding: '0 4px' }}>
           Progreso de hoy
         </div>
-        <StatBar label="Agenda" value={stats.agenda} color="var(--accent)" />
-        <StatBar label="Hábitos" value={stats.habitos} color="#34c759" />
-        <StatBar label="Tareas" value={stats.tareas} color="#ff9500" />
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <ProgressRing label="Agenda" value={stats.agenda} color="var(--accent-bright)" />
+          <ProgressRing label="Hábitos" value={stats.habitos} color="var(--green)" />
+          <ProgressRing label="Tareas" value={stats.tareas} color="var(--yellow)" />
+        </div>
       </div>
 
       {/* Dark mode toggle */}
