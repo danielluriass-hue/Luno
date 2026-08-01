@@ -50,7 +50,7 @@ function useTodayStats(userId) {
     }
 
     load()
-    const interval = setInterval(load, 60_000)
+    const interval = setInterval(load, 2_000)
     return () => { cancelled = true; clearInterval(interval) }
   }, [userId])
 
