@@ -106,6 +106,7 @@ export default function HoyPage({ user }) {
   const [habits, setHabits] = useState([])
   const [habitLogs, setHabitLogs] = useState([])
   const [completedTasks, setCompletedTasks] = useState([])
+  const [checkedTaskIds, setCheckedTaskIds] = useState(new Set())
   const stats = useTodayStats(user?.id)
 
   useEffect(() => {
@@ -124,6 +125,7 @@ export default function HoyPage({ user }) {
       setHabits(h.data || [])
       setHabitLogs(hl.data || [])
       setCompletedTasks(ct.data || [])
+      setCheckedTaskIds(new Set())
     })
   }, [user.id, period])
 
@@ -140,8 +142,16 @@ export default function HoyPage({ user }) {
   }
 
   const toggleTask = async (task) => {
-    await supabase.from('tasks').update({ completed: true, completed_at: new Date().toISOString() }).eq('id', task.id)
-    setTasks(prev => prev.filter(t => t.id !== task.id))
+    const done = checkedTaskIds.has(task.id)
+    if (done) {
+      await supabase.from('tasks').update({ completed: false, completed_at: null }).eq('id', task.id)
+      setCheckedTaskIds(prev => { const s = new Set(prev); s.delete(task.id); return s })
+      setCompletedTasks(prev => prev.filter(t => t.id !== task.id))
+    } else {
+      await supabase.from('tasks').update({ completed: true, completed_at: new Date().toISOString() }).eq('id', task.id)
+      setCheckedTaskIds(prev => new Set(prev).add(task.id))
+      setCompletedTasks(prev => [...prev, task])
+    }
   }
 
   const priorityColor = (p) => p === 'alta' ? '#ff3b30' : p === 'media' ? '#ff9500' : '#34c759'
@@ -149,6 +159,7 @@ export default function HoyPage({ user }) {
   const card = { background: 'var(--card-bg)', borderRadius: '16px', border: '1px solid var(--border-card)', padding: '20px 22px' }
   const label = { fontSize: '11px', fontWeight: '500', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '14px' }
 
+  const pendingCount = tasks.filter(t => !checkedTaskIds.has(t.id)).length
   const todayLogs = habitLogs.filter(l => l.date === todayStr())
   const habitRate = habits.length > 0 ? Math.round((habitLogs.length / (habits.length * (period === 'HOY' ? 1 : period === 'SEMANA' ? 7 : 30))) * 100) : 0
 
@@ -193,7 +204,7 @@ export default function HoyPage({ user }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '16px' }}>
         {[
           { label: period === 'HOY' ? 'Eventos hoy' : period === 'SEMANA' ? 'Eventos semana' : 'Eventos mes', value: events.length, color: 'var(--accent-bright)', glow: 'var(--accent-glow)' },
-          { label: period === 'HOY' ? 'Tareas pendientes' : 'Tareas completadas', value: period === 'HOY' ? tasks.length : completedTasks.length, color: 'var(--yellow)', glow: 'var(--yellow-glow)' },
+          { label: period === 'HOY' ? 'Tareas pendientes' : 'Tareas completadas', value: period === 'HOY' ? pendingCount : completedTasks.length, color: 'var(--yellow)', glow: 'var(--yellow-glow)' },
           { label: 'Hábitos', value: period === 'HOY' ? `${todayLogs.length}/${habits.length}` : `${Math.min(habitRate, 100)}%`, color: 'var(--green)', glow: 'var(--green-glow)' },
         ].map(s => (
           <div key={s.label} className="glow-tile" style={{ ...card, '--tile-glow': s.glow }}>
@@ -283,22 +294,28 @@ export default function HoyPage({ user }) {
         <div style={label}>Tareas pendientes</div>
         {tasks.length === 0
           ? <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Sin tareas pendientes</p>
-          : tasks.slice(0, 8).map(t => (
+          : tasks.slice(0, 8).map(t => {
+            const done = checkedTaskIds.has(t.id)
+            return (
             <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 2px', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ width: '4px', alignSelf: 'stretch', borderRadius: '3px', flexShrink: 0, background: priorityColor(t.priority) }} />
+              <div style={{ width: '4px', alignSelf: 'stretch', borderRadius: '3px', flexShrink: 0, background: priorityColor(t.priority), opacity: done ? 0.4 : 1 }} />
               <button onClick={() => toggleTask(t)} style={{
                 width: '15px', height: '15px', borderRadius: '50%', flexShrink: 0,
-                border: `1.5px solid ${priorityColor(t.priority)}`, background: 'transparent', cursor: 'pointer',
-              }} />
+                border: `1.5px solid ${priorityColor(t.priority)}`,
+                background: done ? priorityColor(t.priority) : 'transparent', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                {done && <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="4"><polyline points="20 6 9 17 4 12"/></svg>}
+              </button>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '13px', color: 'var(--text-1)' }}>{t.title}</div>
+                <div style={{ fontSize: '13px', color: done ? 'var(--text-muted)' : 'var(--text-1)', textDecoration: done ? 'line-through' : 'none' }}>{t.title}</div>
                 {t.category && <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '1px' }}>{t.category}</div>}
               </div>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: priorityColor(t.priority), flexShrink: 0 }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: priorityColor(t.priority), flexShrink: 0, opacity: done ? 0.4 : 1 }}>
                 {t.priority}
               </span>
             </div>
-          ))
+          )})
         }
       </div>
       </>}
