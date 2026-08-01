@@ -130,7 +130,7 @@ export default function HoyPage({ user }) {
       setHabits(h.data || [])
       setHabitLogs(hl.data || [])
       setCompletedTasks(ct.data || [])
-      setCheckedTaskIds(new Set())
+      setCheckedTaskIds(new Set((ct.data || []).map(t => t.id)))
     })
   }, [user.id, period])
 
@@ -152,10 +152,11 @@ export default function HoyPage({ user }) {
       await supabase.from('tasks').update({ completed: false, completed_at: null }).eq('id', task.id)
       setCheckedTaskIds(prev => { const s = new Set(prev); s.delete(task.id); return s })
       setCompletedTasks(prev => prev.filter(t => t.id !== task.id))
+      setTasks(prev => prev.some(t => t.id === task.id) ? prev : [...prev, task])
     } else {
       await supabase.from('tasks').update({ completed: true, completed_at: new Date().toISOString() }).eq('id', task.id)
       setCheckedTaskIds(prev => new Set(prev).add(task.id))
-      setCompletedTasks(prev => [...prev, task])
+      setCompletedTasks(prev => prev.some(t => t.id === task.id) ? prev : [...prev, task])
     }
   }
 
@@ -165,6 +166,10 @@ export default function HoyPage({ user }) {
   const label = { fontSize: '11px', fontWeight: '500', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '14px' }
 
   const pendingCount = tasks.filter(t => !checkedTaskIds.has(t.id)).length
+  const displayTasks = period === 'HOY'
+    ? [...tasks, ...completedTasks.filter(ct => !tasks.some(t => t.id === ct.id))]
+        .sort((a, b) => (checkedTaskIds.has(a.id) ? 1 : 0) - (checkedTaskIds.has(b.id) ? 1 : 0))
+    : tasks
   const todayLogs = habitLogs.filter(l => l.date === todayStr())
   const habitRate = habits.length > 0 ? Math.round((habitLogs.length / (habits.length * (period === 'HOY' ? 1 : period === 'SEMANA' ? 7 : 30))) * 100) : 0
 
@@ -297,9 +302,9 @@ export default function HoyPage({ user }) {
       {/* Tareas */}
       <div style={card}>
         <div style={label}>Tareas pendientes</div>
-        {tasks.length === 0
+        {displayTasks.length === 0
           ? <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Sin tareas pendientes</p>
-          : tasks.slice(0, 8).map(t => {
+          : displayTasks.slice(0, 8).map(t => {
             const done = checkedTaskIds.has(t.id)
             return (
             <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 2px', borderBottom: '1px solid var(--border)' }}>
