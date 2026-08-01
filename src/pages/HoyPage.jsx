@@ -57,25 +57,27 @@ function useTodayStats(userId) {
   return stats
 }
 
-function ProgressRing({ label, value, color }) {
-  const r = 17, c = 2 * Math.PI * r
+function ProgressRow({ label, value, color, glow }) {
+  const r = 24, c = 2 * Math.PI * r
   const pct = value ?? 0
   const off = c - (Math.min(pct, 100) / 100) * c
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }}>
-      <svg width="42" height="42" viewBox="0 0 42 42">
-        <circle cx="21" cy="21" r={r} fill="none" stroke="var(--border)" strokeWidth="4" />
+    <div className="glow-tile" style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '10px 4px', '--tile-glow': glow }}>
+      <svg width="60" height="60" viewBox="0 0 60 60" style={{ flexShrink: 0 }}>
+        <circle cx="30" cy="30" r={r} fill="none" stroke="var(--border)" strokeWidth="5" />
         <circle
-          cx="21" cy="21" r={r} fill="none" stroke={color} strokeWidth="4" strokeLinecap="round"
+          cx="30" cy="30" r={r} fill="none" stroke={color} strokeWidth="5" strokeLinecap="round"
           strokeDasharray={c} strokeDashoffset={off}
-          transform="rotate(-90 21 21)"
+          transform="rotate(-90 30 30)"
           style={{ transition: 'stroke-dashoffset 0.4s cubic-bezier(.4,0,.2,1)' }}
         />
-        <text x="21" y="25" textAnchor="middle" style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: '10px', fontWeight: '600', fill: 'var(--text-1)' }}>
-          {value === null ? '–' : pct}
-        </text>
       </svg>
-      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{label}</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>{label}</div>
+        <div style={{ position: 'relative', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: '24px', fontWeight: '600', color, letterSpacing: '-0.02em' }}>
+          {value === null ? '–' : `${pct}%`}
+        </div>
+      </div>
     </div>
   )
 }
@@ -158,7 +160,7 @@ export default function HoyPage({ user }) {
   ]
 
   return (
-    <div style={{ display: 'flex', gap: '28px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', gap: '28px', alignItems: 'stretch', flexWrap: 'wrap' }}>
     <div style={{ flex: '1 1 700px', maxWidth: '800px', position: 'relative' }}>
       {/* Header */}
       <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -303,14 +305,18 @@ export default function HoyPage({ user }) {
     </div>
 
     {/* Progreso de hoy */}
-    <div style={{ ...card, width: '220px', flexShrink: 0 }}>
-      <div style={label}>Progreso de hoy</div>
-      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-        <ProgressRing label="Agenda" value={stats.agenda} color="var(--accent-bright)" />
-        <ProgressRing label="Hábitos" value={stats.habitos} color="var(--green)" />
-        <ProgressRing label="Tareas" value={stats.tareas} color="var(--yellow)" />
+    {period !== 'CALENDARIO' && (
+      <div style={{ ...card, width: '260px', flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
+        <div style={label}>Progreso de hoy</div>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <ProgressRow label="Agenda" value={stats.agenda} color="var(--accent-bright)" glow="var(--accent-glow)" />
+          <div style={{ height: '1px', background: 'var(--border)' }} />
+          <ProgressRow label="Hábitos" value={stats.habitos} color="var(--green)" glow="var(--green-glow)" />
+          <div style={{ height: '1px', background: 'var(--border)' }} />
+          <ProgressRow label="Tareas" value={stats.tareas} color="var(--yellow)" glow="var(--yellow-glow)" />
+        </div>
       </div>
-    </div>
+    )}
     </div>
   )
 }
