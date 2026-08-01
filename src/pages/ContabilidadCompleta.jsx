@@ -2219,17 +2219,22 @@ function ResultadosTab({ cuentas, asientos, empresaNombre = '' }) {
   const [ano, setAno] = useState(() => anos.includes(hoy) ? hoy : (anos[0] || hoy))
   const [mes, setMes]             = useState(null)
   const [trimestre, setTrimestre] = useState(null)
+  const [fechaDesde, setFechaDesde] = useState('')
+  const [fechaHasta, setFechaHasta] = useState('')
+  const usandoRango = !!(fechaDesde && fechaHasta)
   const TRIM_MESES  = { 1:[1,2,3], 2:[4,5,6], 3:[7,8,9], 4:[10,11,12] }
   const TRIM_LABELS = ['1er Trimestre','2do Trimestre','3er Trimestre','4to Trimestre']
-  const handleSetAno  = (y) => { setAno(y); setMes(null); setTrimestre(null) }
-  const handleSetMes  = (m) => { setMes(mes===m ? null : m); setTrimestre(null) }
-  const handleSetTrim = (t) => { setTrimestre(trimestre===t ? null : t); setMes(null) }
+  const handleSetAno  = (y) => { setAno(y); setMes(null); setTrimestre(null); setFechaDesde(''); setFechaHasta('') }
+  const handleSetMes  = (m) => { setMes(mes===m ? null : m); setTrimestre(null); setFechaDesde(''); setFechaHasta('') }
+  const handleSetTrim = (t) => { setTrimestre(trimestre===t ? null : t); setMes(null); setFechaDesde(''); setFechaHasta('') }
+  const limpiarRango = () => { setFechaDesde(''); setFechaHasta('') }
   const mesesDisp = [...new Set(asientos.filter(a => a.estado==='ACTIVO' && new Date(a.fecha+'T00:00:00').getFullYear()===ano).map(a => new Date(a.fecha+'T00:00:00').getMonth()+1))].sort((a,b)=>a-b)
-  const periodoLabel = trimestre !== null ? `${TRIM_LABELS[trimestre-1]} ${ano}` : mes !== null ? `${MESES_ES[mes-1]} ${ano}` : `Año ${ano}`
+  const periodoLabel = usandoRango ? `${fechaDesde} al ${fechaHasta}` : trimestre !== null ? `${TRIM_LABELS[trimestre-1]} ${ano}` : mes !== null ? `${MESES_ES[mes-1]} ${ano}` : `Año ${ano}`
 
   const activos = asientos.filter(a => {
     if (a.estado !== 'ACTIVO') return false
     const d = new Date(a.fecha+'T00:00:00')
+    if (usandoRango) return d >= new Date(fechaDesde) && d <= new Date(fechaHasta)
     if (d.getFullYear() !== ano) return false
     const mv = d.getMonth()+1
     if (trimestre !== null) return TRIM_MESES[trimestre].includes(mv)
@@ -2277,10 +2282,12 @@ function ResultadosTab({ cuentas, asientos, empresaNombre = '' }) {
 
   const descargarPDF = () => {
     const doc = initPDF('ESTADO DE RESULTADOS',
-      trimestre !== null
-        ? `Período: ${TRIM_LABELS[trimestre-1]} ${ano} (${MESES_ES[TRIM_MESES[trimestre][0]-1]} – ${MESES_ES[TRIM_MESES[trimestre][2]-1]})`
-        : mes !== null ? `Período: ${MESES_ES[mes-1]} ${ano}`
-        : `Período: 1 de enero al 31 de diciembre de ${ano}`,
+      usandoRango
+        ? `Período: ${fechaDesde} al ${fechaHasta}`
+        : trimestre !== null
+          ? `Período: ${TRIM_LABELS[trimestre-1]} ${ano} (${MESES_ES[TRIM_MESES[trimestre][0]-1]} – ${MESES_ES[TRIM_MESES[trimestre][2]-1]})`
+          : mes !== null ? `Período: ${MESES_ES[mes-1]} ${ano}`
+          : `Período: 1 de enero al 31 de diciembre de ${ano}`,
       empresaNombre)
     const col = { 0:{cellWidth:24}, 2:{cellWidth:46, halign:'right'} }
 
@@ -2407,6 +2414,46 @@ function ResultadosTab({ cuentas, asientos, empresaNombre = '' }) {
           })}
         </div>
       )}
+      {/* Rango de fechas */}
+      <div style={{
+        display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap',
+        marginBottom:'14px', padding:'10px 16px', borderRadius:'10px',
+        border: usandoRango ? '1px solid var(--accent)' : '1px solid var(--border)',
+        background:'var(--inner-bg)', transition:'border-color 0.2s',
+      }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: usandoRango ? 'var(--accent)' : 'var(--text-muted)', flexShrink:0 }}>
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+        <span style={{ fontSize:'11px', fontWeight:'700', color: usandoRango ? 'var(--accent)' : 'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.05em' }}>Rango</span>
+        <div style={{ width:'1px', height:'16px', background:'var(--border)', flexShrink:0 }}/>
+        <span style={{ fontSize:'12px', color:'var(--text-muted)' }}>Desde</span>
+        <input type="date" value={fechaDesde}
+          onChange={e => { setFechaDesde(e.target.value); setMes(null); setTrimestre(null) }}
+          style={{
+            padding:'5px 10px', borderRadius:'8px', border:'1px solid var(--border)',
+            background:'var(--card-bg)', color:'var(--text-1)', fontSize:'12px',
+            colorScheme:'dark', outline:'none', cursor:'pointer',
+          }}
+        />
+        <span style={{ fontSize:'13px', color:'var(--text-muted)', fontWeight:'300' }}>—</span>
+        <span style={{ fontSize:'12px', color:'var(--text-muted)' }}>Hasta</span>
+        <input type="date" value={fechaHasta}
+          onChange={e => { setFechaHasta(e.target.value); setMes(null); setTrimestre(null) }}
+          style={{
+            padding:'5px 10px', borderRadius:'8px', border:'1px solid var(--border)',
+            background:'var(--card-bg)', color:'var(--text-1)', fontSize:'12px',
+            colorScheme:'dark', outline:'none', cursor:'pointer',
+          }}
+        />
+        {usandoRango && (
+          <button onClick={limpiarRango} style={{
+            marginLeft:'4px', padding:'4px 10px', borderRadius:'6px',
+            border:'1px solid var(--border)', background:'transparent',
+            color:'var(--text-muted)', fontSize:'11px', cursor:'pointer',
+            display:'flex', alignItems:'center', gap:'4px',
+          }}>✕ Limpiar</button>
+        )}
+      </div>
       <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:'16px' }}>
         <button onClick={descargarPDF} style={{ padding:'7px 14px', borderRadius:'8px', border:'1.5px solid var(--accent)', background:'transparent', color:'var(--accent)', fontWeight:'600', fontSize:'12px', cursor:'pointer' }}>Descargar PDF</button>
       </div>
@@ -2567,10 +2614,7 @@ function BalanceTab({ cuentas, asientos, empresaNombre = '' }) {
     </div>
   )
 
-  return (
-    <div style={{ maxWidth:'580px' }}>
-      <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:'16px' }}>
-        <button onClick={() => {
+  const handlePDFBalance = () => {
           const doc = initPDF('BALANCE GENERAL', mes !== null ? `Al ${MESES_ES[mes-1]} de ${ano}` : `Al 31 de diciembre de ${ano}`, empresaNombre)
           const colB = { 0:{cellWidth:24}, 2:{cellWidth:46, halign:'right'} }
 
@@ -2619,8 +2663,10 @@ function BalanceTab({ cuentas, asientos, empresaNombre = '' }) {
           })
 
           doc.save(`balance-general-${periodoLabel.toLowerCase().replace(' ','-')}.pdf`)
-        }} style={{ padding:'7px 14px', borderRadius:'8px', border:'1.5px solid var(--accent)', background:'transparent', color:'var(--accent)', fontWeight:'600', fontSize:'12px', cursor:'pointer' }}>Descargar PDF</button>
-      </div>
+  }
+
+  return (
+    <div style={{ maxWidth:'580px' }}>
       {/* Selector de año */}
       {anos.length > 0 && (
         <div style={{ display:'flex', gap:'6px', marginBottom:'8px', flexWrap:'wrap' }}>
@@ -2641,6 +2687,9 @@ function BalanceTab({ cuentas, asientos, empresaNombre = '' }) {
           ))}
         </div>
       )}
+      <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:'16px' }}>
+        <button onClick={handlePDFBalance} style={{ padding:'7px 14px', borderRadius:'8px', border:'1.5px solid var(--accent)', background:'transparent', color:'var(--accent)', fontWeight:'600', fontSize:'12px', cursor:'pointer' }}>Descargar PDF</button>
+      </div>
       <div style={{ textAlign:'center', marginBottom:'24px' }}>
         <div style={{ fontSize:'15px', fontWeight:'700', color:'var(--text-1)', textTransform:'uppercase', letterSpacing:'0.04em' }}>Balance General</div>
         <div style={{ fontSize:'12px', color:'var(--text-muted)' }}>{mes !== null ? `Al ${MESES_ES[mes-1]} ${ano}` : `Enero – Diciembre ${ano}`}</div>
@@ -3187,7 +3236,6 @@ function ISRTab({ empresaId, userId, cuentas = [], asientos = [], empresaNombre 
   const [bases,   setBases]   = useState({ q1:'', q2:'', q3:'', q4:'' })
   const [saving,  setSaving]  = useState({ q1:false, q2:false, q3:false, q4:false })
   const [loading, setLoading] = useState(true)
-  const [mesesSel, setMesesSel] = useState([])
 
   const TRIMS = [
     { q:'q1', label:'1er Trimestre', periodo:'Enero – Marzo',        vence:`30/04/${ano}`,     meses:[1,2,3]  },
@@ -3232,29 +3280,6 @@ function ISRTab({ empresaId, userId, cuentas = [], asientos = [], empresaNombre 
     setDatos(prev => ({ ...prev, ...upd }))
   }
 
-  const toggleMes = (m) => setMesesSel(prev => prev.includes(m) ? prev.filter(x=>x!==m) : [...prev, m])
-
-  // ── Referencia — Estado de Resultados filtrado por meses ─────────────────
-  const asentosRef = asientos.filter(a => {
-    if (a.estado !== 'ACTIVO') return false
-    const d = new Date(a.fecha+'T00:00:00')
-    if (d.getFullYear() !== ano) return false
-    if (mesesSel.length > 0 && !mesesSel.includes(d.getMonth()+1)) return false
-    return true
-  })
-  const smRef = {}
-  asentosRef.forEach(a => (a.conta_lineas||[]).forEach(l => {
-    if (!smRef[l.cuenta_id]) smRef[l.cuenta_id] = { deb:0, cre:0 }
-    smRef[l.cuenta_id].deb += parseFloat(l.debito)||0
-    smRef[l.cuenta_id].cre += parseFloat(l.credito)||0
-  }))
-  const getSRef = (c) => { const s=smRef[c.id]||{deb:0,cre:0}; return ['ACTIVO','GASTO'].includes(c.tipo)?s.deb-s.cre:s.cre-s.deb }
-  const refIng  = cuentas.filter(c=>c.tipo==='INGRESO').reduce((s,c)=>s+getSRef(c),0)
-  const refGas  = cuentas.filter(c=>c.tipo==='GASTO'&&c.subtipo!=='Impuestos').reduce((s,c)=>s+getSRef(c),0)
-  const refUtil = refIng - refGas
-  const refISR  = Math.max(refUtil,0) * 0.25
-  const hayRef  = mesesSel.length > 0
-
   const totalISR = TRIMS.reduce((s,{q}) => s + (parseFloat(bases[q])||0)*0.25, 0)
 
   // ── PDF ──────────────────────────────────────────────────────────────────
@@ -3283,9 +3308,7 @@ function ISRTab({ empresaId, userId, cuentas = [], asientos = [], empresaNombre 
   const labelStyle = { fontSize:'12px', fontWeight:'700', color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'14px' }
 
   return (
-    <div style={{ display:'flex', gap:'24px', alignItems:'flex-start', maxWidth:'900px' }}>
-      {/* ── Columna izquierda ────────────────────────────────────────────── */}
-      <div style={{ flex:1, minWidth:0 }}>
+    <div style={{ maxWidth:'600px' }}>
         {/* Año + PDF */}
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'24px' }}>
           <div style={{ display:'flex', gap:'6px' }}>
@@ -3374,59 +3397,6 @@ function ISRTab({ empresaId, userId, cuentas = [], asientos = [], empresaNombre 
             )}
           </>
         )}
-      </div>
-
-      {/* ── Columna derecha — Referencia ─────────────────────────────────── */}
-      <div style={{ width:'300px', flexShrink:0, position:'sticky', top:'16px' }}>
-        <div style={{ background:'var(--card-bg)', borderRadius:'12px', border:'1px solid var(--border)', padding:'20px' }}>
-          <div style={labelStyle}>Referencia — {ano}</div>
-          <div style={{ fontSize:'11px', color:'var(--text-muted)', marginBottom:'12px' }}>Selecciona los meses a consultar</div>
-          {/* Chips de meses */}
-          <div style={{ display:'flex', flexWrap:'wrap', gap:'5px', marginBottom:'16px' }}>
-            {MESES_ES.map((m, i) => {
-              const num = i + 1
-              const sel = mesesSel.includes(num)
-              return (
-                <button key={num} onClick={() => toggleMes(num)} style={{
-                  padding:'3px 9px', borderRadius:'6px', border:'1px solid var(--border)', fontSize:'11px',
-                  fontWeight: sel?'700':'400',
-                  background: sel?'var(--accent-soft)':'transparent',
-                  color: sel?'var(--accent)':'var(--text-muted)', cursor:'pointer',
-                }}>{m.slice(0,3)}</button>
-              )
-            })}
-            {mesesSel.length > 0 && (
-              <button onClick={() => setMesesSel([])} style={{ padding:'3px 8px', borderRadius:'6px', border:'1px solid var(--border)', fontSize:'11px', background:'transparent', color:'var(--text-muted)', cursor:'pointer' }}>✕</button>
-            )}
-          </div>
-          {/* Resumen */}
-          {hayRef ? (
-            <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
-              {[
-                { label:'Ingresos',          valor:refIng,  color:'#16a34a' },
-                { label:'Gastos Operativos', valor:refGas,  color:'var(--text-1)' },
-              ].map(({ label, valor, color }) => (
-                <div key={label} style={{ display:'flex', justifyContent:'space-between', fontSize:'12px' }}>
-                  <span style={{ color:'var(--text-muted)' }}>{label}</span>
-                  <span style={{ color, fontWeight:'600', fontFamily:'monospace', whiteSpace:'nowrap' }}>{Qp(valor)}</span>
-                </div>
-              ))}
-              <div style={{ borderTop:'1px solid var(--border)', paddingTop:'8px', display:'flex', justifyContent:'space-between', fontSize:'12px' }}>
-                <span style={{ color:'var(--text-muted)' }}>Utilidad Antes de ISR</span>
-                <span style={{ color: refUtil>=0?'var(--text-1)':'#dc2626', fontWeight:'700', fontFamily:'monospace', whiteSpace:'nowrap' }}>{Qp(refUtil)}</span>
-              </div>
-              <div style={{ marginTop:'4px', padding:'10px 12px', borderRadius:'8px', background:'var(--accent-soft)', border:'1px solid var(--accent)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                <span style={{ fontSize:'12px', fontWeight:'700', color:'var(--accent)' }}>ISR estimado (25%)</span>
-                <span style={{ fontSize:'14px', fontWeight:'800', color:'var(--accent)', fontFamily:'monospace', whiteSpace:'nowrap' }}>{Qp(refISR)}</span>
-              </div>
-            </div>
-          ) : (
-            <div style={{ fontSize:'12px', color:'var(--text-muted)', textAlign:'center', padding:'20px 0', lineHeight:'1.6' }}>
-              Selecciona los meses<br/>para ver el resumen
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   )
 }
