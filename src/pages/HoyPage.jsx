@@ -6,6 +6,11 @@ import { localDateStr } from '../lib/dateUtils'
 const todayStr = () => localDateStr()
 const dayName = () => new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
 
+// completed_at es timestamptz (UTC); estos límites convierten el día LOCAL a su rango UTC real,
+// evitando que tareas completadas en la noche (hora local) queden fuera del "hoy" al comparar en UTC.
+const dayStartISO = (dateStr) => new Date(`${dateStr}T00:00:00`).toISOString()
+const dayEndISO = (dateStr) => new Date(`${dateStr}T23:59:59.999`).toISOString()
+
 function useTodayStats(userId) {
   const [stats, setStats] = useState({ agenda: null, habitos: null, tareas: null })
 
@@ -20,7 +25,7 @@ function useTodayStats(userId) {
         supabase.from('habits').select('id').eq('user_id', userId),
         supabase.from('habit_logs').select('habit_id').eq('user_id', userId).eq('date', today),
         supabase.from('tasks').select('id').eq('user_id', userId).eq('completed', false),
-        supabase.from('tasks').select('id').eq('user_id', userId).eq('completed', true).gte('completed_at', today + 'T00:00:00').lte('completed_at', today + 'T23:59:59'),
+        supabase.from('tasks').select('id').eq('user_id', userId).eq('completed', true).gte('completed_at', dayStartISO(today)).lte('completed_at', dayEndISO(today)),
       ])
       if (cancelled) return
 
@@ -118,7 +123,7 @@ export default function HoyPage({ user }) {
       supabase.from('events').select('*').eq('user_id', uid).gte('date', from).lte('date', to).order('date').order('start_time'),
       supabase.from('habits').select('*').eq('user_id', uid).order('created_at'),
       supabase.from('habit_logs').select('*').eq('user_id', uid).gte('date', from).lte('date', to),
-      supabase.from('tasks').select('*').eq('user_id', uid).eq('completed', true).gte('completed_at', from + 'T00:00:00').lte('completed_at', to + 'T23:59:59'),
+      supabase.from('tasks').select('*').eq('user_id', uid).eq('completed', true).gte('completed_at', dayStartISO(from)).lte('completed_at', dayEndISO(to)),
     ]).then(([t, e, h, hl, ct]) => {
       setTasks(t.data || [])
       setEvents(e.data || [])
