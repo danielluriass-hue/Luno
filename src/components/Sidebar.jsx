@@ -1,7 +1,3 @@
-import { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
-import { localDateStr } from '../lib/dateUtils'
-
 const icons = {
   HOY:           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>,
   CONTABILIDADES:<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="6" y1="8" x2="6" y2="13"/><line x1="10" y1="10" x2="10" y2="13"/><line x1="14" y1="7" x2="14" y2="13"/><line x1="18" y1="9" x2="18" y2="13"/></svg>,
@@ -29,80 +25,6 @@ const NAV_BASE = [
 
 const CONTA_ALLOWED = 'daniell.uriass@gmail.com'
 
-function useTodayStats(userId, refreshKey) {
-  const [stats, setStats] = useState({ agenda: null, habitos: null, tareas: null })
-
-  useEffect(() => {
-    if (!userId) return
-    let cancelled = false
-    const today = localDateStr()
-
-    const load = async () => {
-      const [{ data: events }, { data: habits }, { data: habitLogs }, { data: pendingTasks }, { data: doneToday }] = await Promise.all([
-        supabase.from('events').select('start_time,end_time').eq('user_id', userId).eq('date', today),
-        supabase.from('habits').select('id').eq('user_id', userId),
-        supabase.from('habit_logs').select('habit_id').eq('user_id', userId).eq('date', today),
-        supabase.from('tasks').select('id').eq('user_id', userId).eq('completed', false),
-        supabase.from('tasks').select('id').eq('user_id', userId).eq('completed', true).gte('completed_at', today + 'T00:00:00').lte('completed_at', today + 'T23:59:59'),
-      ])
-      if (cancelled) return
-
-      let agenda = null
-      if (events && events.length > 0) {
-        const now = new Date()
-        const nowMin = now.getHours() * 60 + now.getMinutes()
-        const past = events.filter(ev => {
-          const t = ev.end_time || ev.start_time
-          if (!t) return false
-          const [h, m] = t.split(':').map(Number)
-          return (h * 60 + m) <= nowMin
-        }).length
-        agenda = Math.round((past / events.length) * 100)
-      }
-
-      const habitos = habits && habits.length > 0
-        ? Math.round(((habitLogs?.length || 0) / habits.length) * 100)
-        : null
-
-      const totalTareas = (pendingTasks?.length || 0) + (doneToday?.length || 0)
-      const tareas = totalTareas > 0
-        ? Math.round(((doneToday?.length || 0) / totalTareas) * 100)
-        : null
-
-      setStats({ agenda, habitos, tareas })
-    }
-
-    load()
-    const interval = setInterval(load, 60_000)
-    return () => { cancelled = true; clearInterval(interval) }
-  }, [userId, refreshKey])
-
-  return stats
-}
-
-function ProgressRing({ label, value, color }) {
-  const r = 17, c = 2 * Math.PI * r
-  const pct = value ?? 0
-  const off = c - (Math.min(pct, 100) / 100) * c
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }}>
-      <svg width="42" height="42" viewBox="0 0 42 42">
-        <circle cx="21" cy="21" r={r} fill="none" stroke="var(--border)" strokeWidth="4" />
-        <circle
-          cx="21" cy="21" r={r} fill="none" stroke={color} strokeWidth="4" strokeLinecap="round"
-          strokeDasharray={c} strokeDashoffset={off}
-          transform="rotate(-90 21 21)"
-          style={{ transition: 'stroke-dashoffset 0.4s cubic-bezier(.4,0,.2,1)' }}
-        />
-        <text x="21" y="25" textAnchor="middle" style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: '10px', fontWeight: '600', fill: 'var(--text-1)' }}>
-          {value === null ? '–' : pct}
-        </text>
-      </svg>
-      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{label}</span>
-    </div>
-  )
-}
-
 export default function Sidebar({ page, setPage, user, darkMode, toggleDark, isMobile, onClose }) {
   const initials = (user?.user_metadata?.full_name || user?.email || 'U')
     .split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
@@ -110,7 +32,6 @@ export default function Sidebar({ page, setPage, user, darkMode, toggleDark, isM
   const NAV = user?.email === CONTA_ALLOWED
     ? [...NAV_BASE, { key: 'CONTABILIDADES', label: 'Contabilidades' }]
     : NAV_BASE
-  const stats = useTodayStats(user?.id, page)
 
   return (
     <div style={{
@@ -160,18 +81,6 @@ export default function Sidebar({ page, setPage, user, darkMode, toggleDark, isM
           )
         })}
       </nav>
-
-      {/* Progreso de hoy */}
-      <div style={{ padding: '14px 6px 4px', marginBottom: '4px', borderTop: '1px solid var(--border)' }}>
-        <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px', padding: '0 4px' }}>
-          Progreso de hoy
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <ProgressRing label="Agenda" value={stats.agenda} color="var(--accent-bright)" />
-          <ProgressRing label="Hábitos" value={stats.habitos} color="var(--green)" />
-          <ProgressRing label="Tareas" value={stats.tareas} color="var(--yellow)" />
-        </div>
-      </div>
 
       {/* Dark mode toggle */}
       <button onClick={toggleDark} style={{

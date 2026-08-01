@@ -6,6 +6,80 @@ import { localDateStr } from '../lib/dateUtils'
 const todayStr = () => localDateStr()
 const dayName = () => new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
 
+function useTodayStats(userId) {
+  const [stats, setStats] = useState({ agenda: null, habitos: null, tareas: null })
+
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+    const today = localDateStr()
+
+    const load = async () => {
+      const [{ data: events }, { data: habits }, { data: habitLogs }, { data: pendingTasks }, { data: doneToday }] = await Promise.all([
+        supabase.from('events').select('start_time,end_time').eq('user_id', userId).eq('date', today),
+        supabase.from('habits').select('id').eq('user_id', userId),
+        supabase.from('habit_logs').select('habit_id').eq('user_id', userId).eq('date', today),
+        supabase.from('tasks').select('id').eq('user_id', userId).eq('completed', false),
+        supabase.from('tasks').select('id').eq('user_id', userId).eq('completed', true).gte('completed_at', today + 'T00:00:00').lte('completed_at', today + 'T23:59:59'),
+      ])
+      if (cancelled) return
+
+      let agenda = null
+      if (events && events.length > 0) {
+        const now = new Date()
+        const nowMin = now.getHours() * 60 + now.getMinutes()
+        const past = events.filter(ev => {
+          const t = ev.end_time || ev.start_time
+          if (!t) return false
+          const [h, m] = t.split(':').map(Number)
+          return (h * 60 + m) <= nowMin
+        }).length
+        agenda = Math.round((past / events.length) * 100)
+      }
+
+      const habitos = habits && habits.length > 0
+        ? Math.round(((habitLogs?.length || 0) / habits.length) * 100)
+        : null
+
+      const totalTareas = (pendingTasks?.length || 0) + (doneToday?.length || 0)
+      const tareas = totalTareas > 0
+        ? Math.round(((doneToday?.length || 0) / totalTareas) * 100)
+        : null
+
+      setStats({ agenda, habitos, tareas })
+    }
+
+    load()
+    const interval = setInterval(load, 60_000)
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [userId])
+
+  return stats
+}
+
+function ProgressRing({ label, value, color }) {
+  const r = 17, c = 2 * Math.PI * r
+  const pct = value ?? 0
+  const off = c - (Math.min(pct, 100) / 100) * c
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }}>
+      <svg width="42" height="42" viewBox="0 0 42 42">
+        <circle cx="21" cy="21" r={r} fill="none" stroke="var(--border)" strokeWidth="4" />
+        <circle
+          cx="21" cy="21" r={r} fill="none" stroke={color} strokeWidth="4" strokeLinecap="round"
+          strokeDasharray={c} strokeDashoffset={off}
+          transform="rotate(-90 21 21)"
+          style={{ transition: 'stroke-dashoffset 0.4s cubic-bezier(.4,0,.2,1)' }}
+        />
+        <text x="21" y="25" textAnchor="middle" style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: '10px', fontWeight: '600', fill: 'var(--text-1)' }}>
+          {value === null ? '–' : pct}
+        </text>
+      </svg>
+      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{label}</span>
+    </div>
+  )
+}
+
 const getPeriodRange = (period) => {
   const now = new Date()
   const today = localDateStr(now)
@@ -30,6 +104,7 @@ export default function HoyPage({ user }) {
   const [habits, setHabits] = useState([])
   const [habitLogs, setHabitLogs] = useState([])
   const [completedTasks, setCompletedTasks] = useState([])
+  const stats = useTodayStats(user?.id)
 
   useEffect(() => {
     const uid = user.id
@@ -83,7 +158,8 @@ export default function HoyPage({ user }) {
   ]
 
   return (
-    <div style={{ maxWidth: '800px', position: 'relative' }}>
+    <div style={{ display: 'flex', gap: '28px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+    <div style={{ flex: '1 1 700px', maxWidth: '800px', position: 'relative' }}>
       {/* Header */}
       <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
@@ -224,6 +300,17 @@ export default function HoyPage({ user }) {
         }
       </div>
       </>}
+    </div>
+
+    {/* Progreso de hoy */}
+    <div style={{ ...card, width: '220px', flexShrink: 0 }}>
+      <div style={label}>Progreso de hoy</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+        <ProgressRing label="Agenda" value={stats.agenda} color="var(--accent-bright)" />
+        <ProgressRing label="Hábitos" value={stats.habitos} color="var(--green)" />
+        <ProgressRing label="Tareas" value={stats.tareas} color="var(--yellow)" />
+      </div>
+    </div>
     </div>
   )
 }
