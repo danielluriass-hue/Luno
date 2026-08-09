@@ -6,6 +6,21 @@ const COLORS = ['#818cf8', '#10b981', '#f87171', '#fbbf24', '#f472b6', '#38bdf8'
 
 const emptyForm = { title: '', description: '', date: '', start_time: '', end_time: '', color: '#818cf8', reminder_email: false }
 
+async function syncToGoogle(action, event, googleEventId) {
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return null
+    const res = await fetch('/api/google/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: session.user.id, action, event, googleEventId }),
+    })
+    return await res.json()
+  } catch {
+    return null
+  }
+}
+
 export default function AgendaPage({ user }) {
   const [events, setEvents] = useState([])
   const [month, setMonth] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() } })
@@ -18,21 +33,39 @@ export default function AgendaPage({ user }) {
     supabase.from('events').select('*').eq('user_id', user.id).order('date').then(({ data }) => setEvents(data || []))
   }, [user.id])
 
+  const linkGoogleEvent = (eventId, googleEventId) => {
+    supabase.from('events').update({ google_event_id: googleEventId }).eq('id', eventId)
+      .then(() => setEvents(prev => prev.map(ev => ev.id === eventId ? { ...ev, google_event_id: googleEventId } : ev)))
+  }
+
   const save = async (e) => {
     e.preventDefault()
     if (editing) {
+      const prevGoogleId = events.find(ev => ev.id === editing)?.google_event_id
       const { data } = await supabase.from('events').update(form).eq('id', editing).select().single()
-      if (data) setEvents(prev => prev.map(ev => ev.id === editing ? data : ev))
+      if (data) {
+        setEvents(prev => prev.map(ev => ev.id === editing ? data : ev))
+        syncToGoogle('upsert', data, prevGoogleId).then(result => {
+          if (result?.googleEventId && result.googleEventId !== prevGoogleId) linkGoogleEvent(data.id, result.googleEventId)
+        })
+      }
     } else {
       const { data } = await supabase.from('events').insert({ ...form, user_id: user.id }).select().single()
-      if (data) setEvents(prev => [...prev, data])
+      if (data) {
+        setEvents(prev => [...prev, data])
+        syncToGoogle('upsert', data, null).then(result => {
+          if (result?.googleEventId) linkGoogleEvent(data.id, result.googleEventId)
+        })
+      }
     }
     setForm(emptyForm); setShowForm(false); setEditing(null)
   }
 
   const del = async (id) => {
+    const ev = events.find(e => e.id === id)
     await supabase.from('events').delete().eq('id', id)
-    setEvents(prev => prev.filter(ev => ev.id !== id))
+    setEvents(prev => prev.filter(e => e.id !== id))
+    if (ev?.google_event_id) syncToGoogle('delete', null, ev.google_event_id)
   }
 
   const daysInMonth = (y, m) => new Date(y, m + 1, 0).getDate()

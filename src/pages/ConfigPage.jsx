@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-export default function ConfigPage({ user }) {
+export default function ConfigPage({ user, googleNotice, onClearGoogleNotice }) {
   const [name, setName] = useState(user?.user_metadata?.full_name || '')
   const [email, setEmail] = useState(user?.email || '')
   const [password, setPassword] = useState('')
@@ -9,8 +9,33 @@ export default function ConfigPage({ user }) {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
+  const [gcalConn, setGcalConn] = useState(null)
+  const [gcalLoading, setGcalLoading] = useState(true)
 
   const clear = () => { setSuccess(''); setError('') }
+
+  useEffect(() => {
+    supabase.from('google_calendar_tokens').select('id, created_at').eq('user_id', user.id).maybeSingle()
+      .then(({ data }) => { setGcalConn(data || null); setGcalLoading(false) })
+  }, [user.id])
+
+  useEffect(() => {
+    if (!googleNotice) return
+    if (googleNotice === 'success') setSuccess('Google Calendar conectado correctamente.')
+    else setError('No se pudo conectar Google Calendar. Intenta de nuevo.')
+    onClearGoogleNotice?.()
+  }, [googleNotice])
+
+  const connectGoogle = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+    window.location.href = `/api/google/auth?token=${encodeURIComponent(session.access_token)}`
+  }
+
+  const disconnectGoogle = async () => {
+    await supabase.from('google_calendar_tokens').delete().eq('user_id', user.id)
+    setGcalConn(null)
+  }
 
   const updateProfile = async (e) => {
     e.preventDefault()
@@ -123,6 +148,36 @@ export default function ConfigPage({ user }) {
             {loading ? 'Actualizando...' : 'Actualizar contraseña'}
           </button>
         </form>
+      </div>
+
+      {/* Google Calendar */}
+      <div style={card}>
+        <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-1)', marginBottom: '8px' }}>Google Calendar</div>
+        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '14px' }}>
+          Sincroniza tus eventos de Agenda con tu Google Calendar principal para recibir notificaciones en tu celular.
+        </p>
+        {gcalLoading ? null : gcalConn ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '600', color: 'var(--green)', background: 'rgba(52,199,89,0.12)', padding: '5px 10px', borderRadius: '20px' }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--green)' }} />
+              Conectado
+            </span>
+            <button onClick={disconnectGoogle} style={{
+              padding: '9px 18px', borderRadius: '10px', border: '1px solid rgba(255,59,48,0.3)',
+              background: 'transparent', color: 'var(--red)', fontWeight: '600', fontSize: '13px',
+            }}>
+              Desconectar
+            </button>
+          </div>
+        ) : (
+          <button onClick={connectGoogle} style={{
+            padding: '10px 18px', borderRadius: '10px', border: 'none',
+            background: 'var(--accent)', color: '#fff', fontWeight: '600', fontSize: '13px',
+            boxShadow: '0 4px 14px -4px var(--accent-glow)',
+          }}>
+            Conectar con Google
+          </button>
+        )}
       </div>
 
       {/* Peligro */}

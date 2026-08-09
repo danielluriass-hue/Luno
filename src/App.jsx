@@ -108,6 +108,13 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true')
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [googleNotice, setGoogleNotice] = useState(() => new URLSearchParams(window.location.search).get('google'))
+
+  useEffect(() => {
+    if (!googleNotice) return
+    window.history.replaceState(null, '', window.location.pathname)
+    setPage('CONFIG')
+  }, [])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
@@ -156,7 +163,7 @@ export default function App() {
     MEJORAS:        <MejorasPage user={user} />,
     PRESUPUESTO:    <PresupuestoGate><PresupuestoPage user={user} /></PresupuestoGate>,
     ...(user.email === 'daniell.uriass@gmail.com' ? { CONTABILIDADES: <ContabilidadPage user={user} /> } : {}),
-    CONFIG:         <ConfigPage user={user} />,
+    CONFIG:         <ConfigPage user={user} googleNotice={googleNotice} onClearGoogleNotice={() => setGoogleNotice(null)} />,
   }
 
   return (

@@ -9,10 +9,23 @@ create table events (
   end_time time,
   color text default '#10b981',
   reminder_email boolean default false,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  google_event_id text
 );
 alter table events enable row level security;
 create policy "users own events" on events for all using (auth.uid() = user_id);
+
+-- ─── GOOGLE CALENDAR (tokens OAuth por usuario, sync Luno → Google) ──
+create table google_calendar_tokens (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade not null unique,
+  access_token text not null,
+  refresh_token text not null,
+  token_expires_at timestamptz not null,
+  created_at timestamptz default now()
+);
+alter table google_calendar_tokens enable row level security;
+create policy "users own google_calendar_tokens" on google_calendar_tokens for all using (auth.uid() = user_id);
 
 -- ─── TAREAS ─────────────────────────────────────────────────────────
 create table tasks (
