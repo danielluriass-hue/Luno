@@ -48,9 +48,12 @@ export default function AgendaPage({ user }) {
   const pad = (d) => `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
 
   const card = { background: 'var(--card-bg)', borderRadius: '16px', border: '1px solid var(--border-card)', padding: '20px' }
+  const dowNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+  const eventsOn = (dateStr) => events.filter(ev => ev.date === dateStr)
+  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1)
 
   return (
-    <div style={{ maxWidth: '900px' }}>
+    <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '30px', fontWeight: '500', letterSpacing: '-0.01em' }}>Agenda</h1>
         <button onClick={() => { setForm(emptyForm); setEditing(null); setShowForm(true) }}
@@ -59,40 +62,53 @@ export default function AgendaPage({ user }) {
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '16px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {/* Calendario */}
         <div style={card}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
             <button onClick={() => setMonth(p => { const d = new Date(p.y, p.m - 1); return { y: d.getFullYear(), m: d.getMonth() } })}
-              style={{ background: 'none', border: 'none', color: 'var(--text-2)', fontSize: '18px' }}>‹</button>
-            <span style={{ fontWeight: '700', fontSize: '15px', color: 'var(--text-1)' }}>
-              {new Date(y, m).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+              style={{ background: 'var(--inner-bg)', border: '1px solid var(--border)', borderRadius: '8px', width: '30px', height: '30px', color: 'var(--text-2)', fontSize: '16px', cursor: 'pointer' }}>‹</button>
+            <span style={{ fontFamily: 'var(--font-display)', fontWeight: '500', fontSize: '20px', color: 'var(--text-1)' }}>
+              {cap(new Date(y, m).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }))}
             </span>
             <button onClick={() => setMonth(p => { const d = new Date(p.y, p.m + 1); return { y: d.getFullYear(), m: d.getMonth() } })}
-              style={{ background: 'none', border: 'none', color: 'var(--text-2)', fontSize: '18px' }}>›</button>
+              style={{ background: 'var(--inner-bg)', border: '1px solid var(--border)', borderRadius: '8px', width: '30px', height: '30px', color: 'var(--text-2)', fontSize: '16px', cursor: 'pointer' }}>›</button>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '4px' }}>
-            {['D','L','M','M','J','V','S'].map((d, i) => (
-              <div key={i} style={{ textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600', padding: '4px 0' }}>{d}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px', marginBottom: '8px' }}>
+            {dowNames.map((d, i) => (
+              <div key={i} style={{ textAlign: 'center', fontSize: '12px', color: 'var(--text-2)', fontWeight: '700', padding: '8px 0', border: '1px solid var(--border)', borderRadius: '10px', background: 'var(--inner-bg)' }}>{d}</div>
             ))}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px' }}>
             {Array(startDay).fill(null).map((_, i) => <div key={`e${i}`} />)}
             {Array(totalDays).fill(null).map((_, i) => {
               const d = i + 1
               const dateStr = pad(d)
-              const hasEvent = events.some(ev => ev.date === dateStr)
+              const dayEvs = eventsOn(dateStr)
               const isToday = dateStr === today
               const isSel = dateStr === selected
+              const visible = dayEvs.slice(0, 2)
+              const extra = dayEvs.length - visible.length
               return (
                 <button key={d} onClick={() => setSelected(dateStr)}
                   style={{
-                    borderRadius: '10px', border: 'none', padding: '8px 4px', position: 'relative',
-                    background: isSel ? 'var(--accent)' : isToday ? 'var(--accent-soft)' : 'transparent',
-                    color: isSel ? '#fff' : isToday ? 'var(--accent-bright)' : 'var(--text-1)',
-                    fontWeight: isSel || isToday ? '700' : '400', fontSize: '13px', cursor: 'pointer',
-                    fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums',
+                    borderRadius: '12px', padding: '8px', cursor: 'pointer', textAlign: 'left',
+                    display: 'flex', flexDirection: 'column', gap: '4px', minHeight: '82px',
+                    background: isSel ? 'var(--accent-soft)' : 'var(--inner-bg)',
+                    border: isSel ? '2px solid var(--accent-bright)' : isToday ? '1px solid var(--accent-bright)' : '1px solid var(--border)',
                   }}>
-                  {d}
-                  {hasEvent && <div style={{ position: 'absolute', bottom: '3px', left: '50%', transform: 'translateX(-50%)', width: '4px', height: '4px', borderRadius: '50%', background: isSel ? '#fff' : 'var(--accent)' }} />}
+                  <span style={{
+                    fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: '13px',
+                    fontWeight: isSel || isToday ? '700' : '600',
+                    color: isSel || isToday ? 'var(--accent-bright)' : 'var(--text-1)',
+                  }}>{d}</span>
+                  {visible.map(ev => (
+                    <span key={ev.id} style={{
+                      fontSize: '10px', fontWeight: '600', padding: '1px 5px', borderRadius: '5px',
+                      background: ev.color + '26', color: ev.color, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    }}>{ev.title}</span>
+                  ))}
+                  {extra > 0 && <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600' }}>+{extra} más</span>}
                 </button>
               )
             })}
@@ -102,25 +118,27 @@ export default function AgendaPage({ user }) {
         {/* Eventos del día seleccionado */}
         <div style={card}>
           <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-1)', marginBottom: '14px' }}>
-            {new Date(selected + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
+            {cap(new Date(selected + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }))}
           </div>
           {dayEvents.length === 0
             ? <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Sin eventos este día</p>
-            : dayEvents.map(ev => (
-              <div key={ev.id} style={{ display: 'flex', gap: '10px', marginBottom: '12px', alignItems: 'flex-start' }}>
-                <div style={{ width: '3px', borderRadius: '2px', background: ev.color, alignSelf: 'stretch', flexShrink: 0 }} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-1)' }}>{ev.title}</div>
-                  {ev.start_time && <div style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: '11px', color: 'var(--text-muted)' }}>{ev.start_time.slice(0,5)}{ev.end_time ? ` – ${ev.end_time.slice(0,5)}` : ''}</div>}
-                  {ev.description && <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{ev.description}</div>}
+            : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '12px' }}>
+              {dayEvents.map(ev => (
+                <div key={ev.id} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', background: 'var(--inner-bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '10px 12px' }}>
+                  <div style={{ width: '3px', borderRadius: '2px', background: ev.color, alignSelf: 'stretch', flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-1)' }}>{ev.title}</div>
+                    {ev.start_time && <div style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: '11px', color: 'var(--text-muted)' }}>{ev.start_time.slice(0,5)}{ev.end_time ? ` – ${ev.end_time.slice(0,5)}` : ''}</div>}
+                    {ev.description && <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{ev.description}</div>}
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button onClick={() => { setForm({ title: ev.title, description: ev.description || '', date: ev.date, start_time: ev.start_time || '', end_time: ev.end_time || '', color: ev.color, reminder_email: ev.reminder_email }); setEditing(ev.id); setShowForm(true) }}
+                      style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '13px' }}>✏️</button>
+                    <button onClick={() => del(ev.id)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '13px' }}>🗑️</button>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <button onClick={() => { setForm({ title: ev.title, description: ev.description || '', date: ev.date, start_time: ev.start_time || '', end_time: ev.end_time || '', color: ev.color, reminder_email: ev.reminder_email }); setEditing(ev.id); setShowForm(true) }}
-                    style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '13px' }}>✏️</button>
-                  <button onClick={() => del(ev.id)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '13px' }}>🗑️</button>
-                </div>
-              </div>
-            ))
+              ))}
+            </div>
           }
         </div>
       </div>
