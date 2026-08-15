@@ -12,4 +12,10 @@ export default {
 
     return env.ASSETS.fetch(request)
   },
+
+  async scheduled(event, env) {
+    await fetch(`${env.SUPABASE_URL}/rest/v1/`, {
+      headers: { apikey: env.SUPABASE_ANON_KEY },
+    })
+  },
 }
