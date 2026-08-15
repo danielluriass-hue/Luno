@@ -44,7 +44,7 @@ function SubHead({ label, total, onAdd }) {
         <div style={{width:'3px',height:'14px',background:'var(--accent)',borderRadius:'2px',flexShrink:0}}/>
         <div>
           <div style={{fontSize:'12px',fontWeight:'700',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em'}}>{label}</div>
-          {total!==undefined && <div style={{fontSize:'12px',color:'var(--text-muted)',marginTop:'1px'}}>{q(total)}</div>}
+          {total!==undefined && <div style={{fontSize:'12px',color:'var(--text-muted)',marginTop:'1px',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(total)}</div>}
         </div>
       </div>
       {onAdd && <button onClick={onAdd} style={{background:'var(--accent-soft)',color:'var(--accent)',border:'none',borderRadius:'8px',padding:'5px 12px',fontSize:'12px',fontWeight:'600',cursor:'pointer'}}>+ Agregar</button>}
@@ -99,7 +99,7 @@ function ModalBtns({ onClose }) {
   return (
     <div style={{display:'flex',gap:'10px',marginTop:'4px'}}>
       <button type="button" onClick={onClose} style={{flex:1,padding:'9px',borderRadius:'10px',border:'1px solid var(--border)',background:'transparent',color:'var(--text-2)',fontWeight:'600',fontSize:'13px',cursor:'pointer'}}>Cancelar</button>
-      <button type="submit" style={{flex:1,padding:'9px',borderRadius:'10px',border:'none',background:'var(--accent)',color:'#fff',fontWeight:'700',fontSize:'13px',cursor:'pointer'}}>Guardar</button>
+      <button type="submit" style={{flex:1,padding:'9px',borderRadius:'10px',border:'none',background:'var(--accent)',color:'#fff',fontWeight:'700',fontSize:'13px',cursor:'pointer',boxShadow:'0 4px 14px -4px var(--accent-glow)'}}>Guardar</button>
     </div>
   )
 }
@@ -499,10 +499,10 @@ export default function PresupuestoPage({ user }) {
 
       {/* ── Header ── */}
       <div style={{marginBottom:'24px'}}>
-        <h1 style={{fontSize:'28px',fontWeight:'800',letterSpacing:'-0.03em',color:'var(--text-1)',margin:'0 0 16px'}}>Presupuesto</h1>
+        <h1 style={{fontFamily:'var(--font-display)',fontSize:'28px',fontWeight:'500',letterSpacing:'-0.03em',color:'var(--text-1)',margin:'0 0 16px'}}>Presupuesto</h1>
         <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
           <button onClick={prevMes} style={navBtn}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg></button>
-          <div style={{fontSize:'14px',fontWeight:'600',color:'var(--text-1)',minWidth:'140px',textAlign:'center'}}>{fmtMes(mes)}</div>
+          <div style={{fontSize:'14px',fontWeight:'600',color:'var(--text-1)',minWidth:'140px',textAlign:'center',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{fmtMes(mes)}</div>
           <button onClick={nextMes} style={navBtn}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg></button>
         </div>
       </div>
@@ -528,11 +528,11 @@ export default function PresupuestoPage({ user }) {
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'20px'}}>
               <div>
                 <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em'}}>Calendario Operativo</div>
-                <div style={{fontSize:'20px',fontWeight:'800',letterSpacing:'-0.02em',color:'var(--text-1)',marginTop:'4px'}}>{fmtMes(mes)}</div>
+                <div style={{fontSize:'20px',fontWeight:'800',letterSpacing:'-0.02em',color:'var(--text-1)',marginTop:'4px',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{fmtMes(mes)}</div>
               </div>
               <div style={{textAlign:'right'}}>
                 <div style={{fontSize:'10px',color:'var(--text-muted)',marginBottom:'2px'}}>Total compromisos del mes</div>
-                <div style={{fontSize:'16px',fontWeight:'800',color:'#ff9500'}}>{q(Object.values(calEvents).flat().reduce((s,e)=>s+parseFloat(e.amount||0),0))}</div>
+                <div style={{fontSize:'16px',fontWeight:'800',color:'#ff9500',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(Object.values(calEvents).flat().reduce((s,e)=>s+parseFloat(e.amount||0),0))}</div>
               </div>
             </div>
 
@@ -572,14 +572,14 @@ export default function PresupuestoPage({ user }) {
                             <button key={dateStr} onClick={()=>setCalSelDay(isSel?null:dateStr)} style={{
                               minHeight:'72px',borderRadius:'10px',padding:'8px 8px 6px',
                               cursor:evts.length?'pointer':'default',
-                              border:isSel?'2px solid var(--accent)':isToday?'1px solid var(--accent)':'1px solid var(--border)',
+                              border:isSel?'2px solid var(--accent-bright)':isToday?'1px solid var(--accent-bright)':'1px solid var(--border)',
                               background:isSel?'var(--accent-soft)':isToday?'rgba(88,86,214,0.06)':'transparent',
                               display:'flex',flexDirection:'column',alignItems:'flex-start',gap:'2px',
                               transition:'all 0.12s',textAlign:'left',
                             }}>
-                              <span style={{fontSize:'13px',fontWeight:isToday?'700':'500',color:isToday?'var(--accent)':isSel?'var(--accent)':'var(--text-1)'}}>{day}</span>
-                              {ingTotal>0&&<span style={{fontSize:'10px',fontWeight:'700',color:'var(--green)',lineHeight:1}}>+{q(ingTotal)}</span>}
-                              {gasTotal>0&&<span style={{fontSize:'10px',fontWeight:'700',color:'var(--red)',lineHeight:1}}>{q(gasTotal)}</span>}
+                              <span style={{fontSize:'13px',fontWeight:isToday?'700':'500',color:isToday?'var(--accent-bright)':isSel?'var(--accent-bright)':'var(--text-1)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{day}</span>
+                              {ingTotal>0&&<span style={{fontSize:'10px',fontWeight:'700',color:'var(--green)',lineHeight:1,fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>+{q(ingTotal)}</span>}
+                              {gasTotal>0&&<span style={{fontSize:'10px',fontWeight:'700',color:'var(--red)',lineHeight:1,fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(gasTotal)}</span>}
                               {evts.length>0&&(
                                 <div style={{display:'flex',gap:'3px',flexWrap:'wrap',marginTop:'auto'}}>
                                   {evts.slice(0,4).map((e,i)=><div key={i} style={{width:'5px',height:'5px',borderRadius:'50%',background:e.color}}/>)}
@@ -596,9 +596,9 @@ export default function PresupuestoPage({ user }) {
                           display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'3px',
                         }}>
                           <div style={{fontSize:'9px',fontWeight:'600',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.05em'}}>Total</div>
-                          <div style={{fontSize:'13px',fontWeight:'800',color:weekTotal>0?'var(--red)':'var(--text-muted)'}}>{weekTotal>0?q(weekTotal):'—'}</div>
+                          <div style={{fontSize:'13px',fontWeight:'800',color:weekTotal>0?'var(--red)':'var(--text-muted)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{weekTotal>0?q(weekTotal):'—'}</div>
                           {weekDays.length>0&&(
-                            <div style={{fontSize:'9px',color:'var(--text-muted)',textAlign:'center'}}>
+                            <div style={{fontSize:'9px',color:'var(--text-muted)',textAlign:'center',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>
                               {weekDays[0]}–{weekDays[weekDays.length-1]}
                             </div>
                           )}
@@ -613,7 +613,7 @@ export default function PresupuestoPage({ user }) {
             {/* Panel día seleccionado */}
             {calSelDay&&(
               <div style={{marginTop:'14px',padding:'14px',background:'var(--inner-bg)',borderRadius:'12px',border:'1px solid var(--border)'}}>
-                <div style={{fontSize:'13px',fontWeight:'600',color:'var(--text-1)',marginBottom:'10px'}}>
+                <div style={{fontSize:'13px',fontWeight:'600',color:'var(--text-1)',marginBottom:'10px',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>
                   {(()=>{const[,,d]=calSelDay.split('-');return`${parseInt(d)} de ${fmtMes(mes)}`})()}
                 </div>
                 {calSelEvents.length===0
@@ -625,13 +625,13 @@ export default function PresupuestoPage({ user }) {
                         <div style={{fontSize:'13px',fontWeight:'500',color:'var(--text-1)'}}>{e.label}</div>
                         <div style={{fontSize:'10px',color:'var(--text-muted)'}}>{e.tipo}</div>
                       </div>
-                      <div style={{fontSize:'13px',fontWeight:'700',color:e.color}}>{q(e.amount)}</div>
+                      <div style={{fontSize:'13px',fontWeight:'700',color:e.color,fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(e.amount)}</div>
                     </div>
                   ))
                 }
                 {calSelEvents.length>0&&(
                   <div style={{display:'flex',justifyContent:'flex-end',paddingTop:'8px'}}>
-                    <span style={{fontSize:'11px',fontWeight:'700',color:'var(--text-muted)'}}>Total: {q(calSelEvents.reduce((s,e)=>s+parseFloat(e.amount||0),0))}</span>
+                    <span style={{fontSize:'11px',fontWeight:'700',color:'var(--text-muted)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>Total: {q(calSelEvents.reduce((s,e)=>s+parseFloat(e.amount||0),0))}</span>
                   </div>
                 )}
               </div>
@@ -648,7 +648,7 @@ export default function PresupuestoPage({ user }) {
                 ))}
               </div>
               <div style={{fontSize:'12px',fontWeight:'800',color:'var(--text-1)',letterSpacing:'0.03em'}}>
-                MES TOTAL <span style={{color:'var(--red)',marginLeft:'6px'}}>
+                MES TOTAL <span style={{color:'var(--red)',marginLeft:'6px',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>
                   {q(Object.values(calEvents).flat().reduce((s,e)=>s+parseFloat(e.amount||0),0))}
                 </span>
               </div>
@@ -656,26 +656,26 @@ export default function PresupuestoPage({ user }) {
           </div>
 
           {/* ── Disponible ── */}
-          <div style={{...card,background:disponible>=0?'rgba(52,199,89,0.08)':'rgba(255,59,48,0.08)',border:`1px solid ${disponible>=0?'rgba(52,199,89,0.25)':'rgba(255,59,48,0.25)'}`}}>
-            <div style={{fontSize:'11px',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'6px'}}>Disponible · {fmtMes(mes)}</div>
-            <div style={{fontSize:'36px',fontWeight:'800',letterSpacing:'-0.03em',color:disponible>=0?'var(--green)':'var(--red)'}}>{q(disponible)}</div>
-            <div style={{display:'flex',gap:'12px',marginTop:'10px',flexWrap:'wrap'}}>
-              <span style={{fontSize:'12px',color:'var(--green)'}}>↑ {q(totalIngresos)} ingresos</span>
-              <span style={{fontSize:'12px',color:'var(--red)'}}>↓ {q(totalGastosAll)} gastos</span>
+          <div className="glow-tile" style={{...card,background:disponible>=0?'rgba(52,199,89,0.08)':'rgba(255,59,48,0.08)',border:`1px solid ${disponible>=0?'rgba(52,199,89,0.25)':'rgba(255,59,48,0.25)'}`,'--tile-glow':disponible>=0?'var(--green-glow)':'var(--accent-glow)'}}>
+            <div style={{fontSize:'11px',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'6px',position:'relative',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>Disponible · {fmtMes(mes)}</div>
+            <div style={{fontSize:'36px',fontWeight:'800',letterSpacing:'-0.03em',color:disponible>=0?'var(--green)':'var(--red)',position:'relative',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(disponible)}</div>
+            <div style={{display:'flex',gap:'12px',marginTop:'10px',flexWrap:'wrap',position:'relative'}}>
+              <span style={{fontSize:'12px',color:'var(--green)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>↑ {q(totalIngresos)} ingresos</span>
+              <span style={{fontSize:'12px',color:'var(--red)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>↓ {q(totalGastosAll)} gastos</span>
             </div>
           </div>
 
           {/* ── 4 mini-cards ── */}
           <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr 1fr':'repeat(4,1fr)',gap:'10px'}}>
             {[
-              {label:'Ingresos',amount:totalIngresos,color:'var(--green)',bg:'rgba(52,199,89,0.08)',action:()=>setTab('ingresos')},
-              {label:'Deudas',amount:totalPrestamos,color:'#ff9500',bg:'rgba(255,149,0,0.08)',action:()=>setTab('deudas')},
-              {label:'Gastos',amount:totalFijos+totalVariables,color:'#ff6b6b',bg:'rgba(255,107,107,0.08)',action:()=>setTab('gastos')},
-              {label:'Ahorros',amount:totalAhorros,color:'var(--accent)',bg:'var(--accent-soft)',action:()=>setTab('ahorros')},
-            ].map(({label,amount,color,bg,action})=>(
-              <button key={label} onClick={action} style={{background:bg,borderRadius:'12px',padding:'14px 16px',borderLeft:`3px solid ${color}`,border:'none',cursor:'pointer',textAlign:'left'}}>
-                <div style={{fontSize:'11px',color:'var(--text-muted)',marginBottom:'4px'}}>{label}</div>
-                <div style={{fontSize:'15px',fontWeight:'700',color}}>{q(amount)}</div>
+              {label:'Ingresos',amount:totalIngresos,color:'var(--green)',bg:'rgba(52,199,89,0.08)',glow:'var(--green-glow)',action:()=>setTab('ingresos')},
+              {label:'Deudas',amount:totalPrestamos,color:'#ff9500',bg:'rgba(255,149,0,0.08)',glow:'var(--yellow-glow)',action:()=>setTab('deudas')},
+              {label:'Gastos',amount:totalFijos+totalVariables,color:'#ff6b6b',bg:'rgba(255,107,107,0.08)',glow:'var(--accent-glow)',action:()=>setTab('gastos')},
+              {label:'Ahorros',amount:totalAhorros,color:'var(--accent)',bg:'var(--accent-soft)',glow:'var(--accent-glow)',action:()=>setTab('ahorros')},
+            ].map(({label,amount,color,bg,glow,action})=>(
+              <button key={label} className="glow-tile" onClick={action} style={{background:bg,borderRadius:'12px',padding:'14px 16px',borderLeft:`3px solid ${color}`,border:'none',cursor:'pointer',textAlign:'left','--tile-glow':glow}}>
+                <div style={{fontSize:'11px',color:'var(--text-muted)',marginBottom:'4px',position:'relative'}}>{label}</div>
+                <div style={{fontSize:'15px',fontWeight:'700',color,position:'relative',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(amount)}</div>
               </button>
             ))}
           </div>
@@ -696,12 +696,12 @@ export default function PresupuestoPage({ user }) {
                     <div style={{width:'6px',height:'6px',borderRadius:'50%',background:color}}/>
                     <span style={{fontSize:'13px',color:'var(--text-1)'}}>{label}</span>
                   </div>
-                  <span style={{fontSize:'13px',fontWeight:'600',color}}>{sign} {q(amount)}</span>
+                  <span style={{fontSize:'13px',fontWeight:'600',color,fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{sign} {q(amount)}</span>
                 </div>
               ))}
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',paddingTop:'14px'}}>
                 <span style={{fontSize:'14px',fontWeight:'700',color:'var(--text-1)'}}>Disponible</span>
-                <span style={{fontSize:'16px',fontWeight:'800',color:disponible>=0?'var(--green)':'var(--red)'}}>= {q(disponible)}</span>
+                <span style={{fontSize:'16px',fontWeight:'800',color:disponible>=0?'var(--green)':'var(--red)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>= {q(disponible)}</span>
               </div>
             </div>
 
@@ -719,7 +719,7 @@ export default function PresupuestoPage({ user }) {
                     <div key={label} style={{marginBottom:'12px'}}>
                       <div style={{display:'flex',justifyContent:'space-between',marginBottom:'5px'}}>
                         <span style={{fontSize:'12px',color:'var(--text-2)'}}>{label}</span>
-                        <span style={{fontSize:'12px',color:'var(--text-muted)'}}>{pct.toFixed(1)}% · {q(amount)}</span>
+                        <span style={{fontSize:'12px',color:'var(--text-muted)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{pct.toFixed(1)}% · {q(amount)}</span>
                       </div>
                       <div style={{height:'6px',background:'var(--inner-bg)',borderRadius:'3px'}}>
                         <div style={{height:'6px',background:color,borderRadius:'3px',width:`${pct}%`}}/>
@@ -743,11 +743,11 @@ export default function PresupuestoPage({ user }) {
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'20px'}}>
               <div>
                 <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em'}}>Calendario de Ingresos</div>
-                <div style={{fontSize:'20px',fontWeight:'800',letterSpacing:'-0.02em',color:'var(--text-1)',marginTop:'4px'}}>{fmtMes(mes)}</div>
+                <div style={{fontSize:'20px',fontWeight:'800',letterSpacing:'-0.02em',color:'var(--text-1)',marginTop:'4px',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{fmtMes(mes)}</div>
               </div>
               <div style={{textAlign:'right'}}>
                 <div style={{fontSize:'10px',color:'var(--text-muted)',marginBottom:'2px'}}>Total del mes</div>
-                <div style={{fontSize:'16px',fontWeight:'800',color:'var(--green)'}}>{q(totalIngresos)}</div>
+                <div style={{fontSize:'16px',fontWeight:'800',color:'var(--green)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(totalIngresos)}</div>
               </div>
             </div>
 
@@ -782,14 +782,14 @@ export default function PresupuestoPage({ user }) {
                             <button key={`i${dateStr}`} onClick={()=>setIngSelDay(isSel?null:dateStr)} style={{
                               minHeight:'72px',borderRadius:'10px',padding:'8px 8px 6px',
                               cursor:evts.length?'pointer':'default',
-                              border:isSel?'2px solid var(--green)':isToday?'1px solid var(--accent)':'1px solid var(--border)',
+                              border:isSel?'2px solid var(--green)':isToday?'1px solid var(--accent-bright)':'1px solid var(--border)',
                               background:isSel?'rgba(52,199,89,0.1)':isToday?'rgba(88,86,214,0.06)':'transparent',
                               display:'flex',flexDirection:'column',alignItems:'flex-start',gap:'4px',
                               transition:'all 0.12s',textAlign:'left',
                             }}>
-                              <span style={{fontSize:'13px',fontWeight:isToday?'700':'500',color:isToday?'var(--accent)':isSel?'var(--green)':'var(--text-1)'}}>{day}</span>
+                              <span style={{fontSize:'13px',fontWeight:isToday?'700':'500',color:isToday?'var(--accent-bright)':isSel?'var(--green)':'var(--text-1)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{day}</span>
                               {dayTotal>0&&(
-                                <span style={{fontSize:'11px',fontWeight:'700',color:'var(--green)',lineHeight:1}}>+{q(dayTotal)}</span>
+                                <span style={{fontSize:'11px',fontWeight:'700',color:'var(--green)',lineHeight:1,fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>+{q(dayTotal)}</span>
                               )}
                               {evts.length>0&&(
                                 <div style={{display:'flex',gap:'3px',marginTop:'auto'}}>
@@ -806,9 +806,9 @@ export default function PresupuestoPage({ user }) {
                           display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'3px',
                         }}>
                           <div style={{fontSize:'9px',fontWeight:'600',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.05em'}}>Total</div>
-                          <div style={{fontSize:'13px',fontWeight:'800',color:weekTotal>0?'var(--green)':'var(--text-muted)'}}>{weekTotal>0?`+${q(weekTotal)}`:'—'}</div>
+                          <div style={{fontSize:'13px',fontWeight:'800',color:weekTotal>0?'var(--green)':'var(--text-muted)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{weekTotal>0?`+${q(weekTotal)}`:'—'}</div>
                           {weekDays.length>0&&(
-                            <div style={{fontSize:'9px',color:'var(--text-muted)',textAlign:'center'}}>{weekDays[0]}–{weekDays[weekDays.length-1]}</div>
+                            <div style={{fontSize:'9px',color:'var(--text-muted)',textAlign:'center',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{weekDays[0]}–{weekDays[weekDays.length-1]}</div>
                           )}
                         </div>
                       </div>
@@ -820,7 +820,7 @@ export default function PresupuestoPage({ user }) {
 
             {ingSelDay&&(
               <div style={{marginTop:'14px',padding:'14px',background:'var(--inner-bg)',borderRadius:'12px',border:'1px solid var(--border)'}}>
-                <div style={{fontSize:'13px',fontWeight:'600',color:'var(--text-1)',marginBottom:'10px'}}>
+                <div style={{fontSize:'13px',fontWeight:'600',color:'var(--text-1)',marginBottom:'10px',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>
                   {(()=>{const[,,d]=ingSelDay.split('-');return`${parseInt(d)} de ${fmtMes(mes)}`})()}
                 </div>
                 {ingSelEvents.length===0
@@ -832,13 +832,13 @@ export default function PresupuestoPage({ user }) {
                         <div style={{fontSize:'13px',fontWeight:'500',color:'var(--text-1)'}}>{e.label}</div>
                         <div style={{fontSize:'10px',color:'var(--text-muted)'}}>{e.tipo}</div>
                       </div>
-                      <div style={{fontSize:'13px',fontWeight:'700',color:'var(--green)'}}>+{q(e.amount)}</div>
+                      <div style={{fontSize:'13px',fontWeight:'700',color:'var(--green)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>+{q(e.amount)}</div>
                     </div>
                   ))
                 }
                 {ingSelEvents.length>0&&(
                   <div style={{display:'flex',justifyContent:'flex-end',paddingTop:'8px'}}>
-                    <span style={{fontSize:'11px',fontWeight:'700',color:'var(--text-muted)'}}>Total: +{q(ingSelEvents.reduce((s,e)=>s+parseFloat(e.amount||0),0))}</span>
+                    <span style={{fontSize:'11px',fontWeight:'700',color:'var(--text-muted)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>Total: +{q(ingSelEvents.reduce((s,e)=>s+parseFloat(e.amount||0),0))}</span>
                   </div>
                 )}
               </div>
@@ -846,7 +846,7 @@ export default function PresupuestoPage({ user }) {
 
             <div style={{display:'flex',justifyContent:'flex-end',marginTop:'16px',paddingTop:'14px',borderTop:'1px solid var(--border)'}}>
               <div style={{fontSize:'12px',fontWeight:'800',color:'var(--text-1)',letterSpacing:'0.03em'}}>
-                MES TOTAL <span style={{color:'var(--green)',marginLeft:'6px'}}>{q(totalIngresos)}</span>
+                MES TOTAL <span style={{color:'var(--green)',marginLeft:'6px',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(totalIngresos)}</span>
               </div>
             </div>
           </div>
@@ -862,11 +862,11 @@ export default function PresupuestoPage({ user }) {
                     <div style={{fontSize:'13.5px',fontWeight:'500',color:'var(--text-1)'}}>{i.nombre}</div>
                     <div style={{display:'flex',gap:'8px',marginTop:'2px'}}>
                       <span style={{fontSize:'11px',color:'var(--text-muted)'}}>{i.tipo==='fijo'?'Fijo':'Variable'}</span>
-                      {i.tipo==='fijo'&&i.dia&&<span style={{fontSize:'11px',color:'var(--accent)'}}>día {i.dia}</span>}
-                      {i.tipo!=='fijo'&&i.fecha&&<span style={{fontSize:'11px',color:'var(--accent)'}}>{new Date(i.fecha+'T00:00:00').toLocaleDateString('es-GT',{day:'numeric',month:'short'})}</span>}
+                      {i.tipo==='fijo'&&i.dia&&<span style={{fontSize:'11px',color:'var(--accent)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>día {i.dia}</span>}
+                      {i.tipo!=='fijo'&&i.fecha&&<span style={{fontSize:'11px',color:'var(--accent)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{new Date(i.fecha+'T00:00:00').toLocaleDateString('es-GT',{day:'numeric',month:'short'})}</span>}
                     </div>
                   </div>
-                  <div style={{fontWeight:'600',fontSize:'14px',color:'var(--green)'}}>{q(i.monto)}</div>
+                  <div style={{fontWeight:'600',fontSize:'14px',color:'var(--green)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(i.monto)}</div>
                   <div style={{display:'flex',gap:'4px'}}>
                     <button onClick={()=>{setFIng({nombre:i.nombre,tipo:i.tipo,monto:String(i.monto),dia:i.dia!=null?String(i.dia):'',fecha:i.fecha||''});setModalIng(i)}} style={bEdit}><IcoEdit/></button>
                     <button onClick={()=>askDel(`"${i.nombre}" se eliminará.`,()=>del('budget_ingresos',i.id,setIngresos))} style={bDel}><IcoDel/></button>
@@ -874,7 +874,7 @@ export default function PresupuestoPage({ user }) {
                 </div>
               ))
             }
-            {ingMes.length>0&&<div style={{display:'flex',justifyContent:'flex-end',paddingTop:'14px'}}><span style={{fontSize:'14px',fontWeight:'700',color:'var(--green)'}}>Total: {q(totalIngresos)}</span></div>}
+            {ingMes.length>0&&<div style={{display:'flex',justifyContent:'flex-end',paddingTop:'14px'}}><span style={{fontSize:'14px',fontWeight:'700',color:'var(--green)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>Total: {q(totalIngresos)}</span></div>}
           </div>
 
         </div>
@@ -902,16 +902,16 @@ export default function PresupuestoPage({ user }) {
                           <span style={{fontSize:'11px',fontWeight:'600',color:TIPO_COLOR[tipo],background:'var(--card-bg)',padding:'2px 7px',borderRadius:'6px'}}>{tipo}</span>
                           <span style={{fontSize:'10px',color:'var(--text-muted)',marginLeft:'6px'}}>{count}</span>
                         </td>
-                        <td style={{padding:'8px 10px',textAlign:'right',color:'var(--text-2)',whiteSpace:'nowrap'}}>{q(totalOriginal)}</td>
-                        <td style={{padding:'8px 10px',textAlign:'right',color:'var(--text-1)',fontWeight:'500',whiteSpace:'nowrap'}}>{q(totalSaldo)}</td>
-                        <td style={{padding:'8px 0 8px 10px',textAlign:'right',color:'var(--accent)',fontWeight:'700',whiteSpace:'nowrap'}}>{q(totalCuota)}</td>
+                        <td style={{padding:'8px 10px',textAlign:'right',color:'var(--text-2)',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(totalOriginal)}</td>
+                        <td style={{padding:'8px 10px',textAlign:'right',color:'var(--text-1)',fontWeight:'500',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(totalSaldo)}</td>
+                        <td style={{padding:'8px 0 8px 10px',textAlign:'right',color:'var(--accent)',fontWeight:'700',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(totalCuota)}</td>
                       </tr>
                     ))}
                     <tr style={{borderTop:'2px solid var(--border-card)'}}>
                       <td style={{padding:'8px 10px 8px 0',fontWeight:'700',color:'var(--text-1)',fontSize:'12px'}}>Total</td>
-                      <td style={{padding:'8px 10px',textAlign:'right',fontWeight:'600',color:'var(--text-2)',whiteSpace:'nowrap'}}>{q(resumenDeudas.reduce((s,r)=>s+r.totalOriginal,0))}</td>
-                      <td style={{padding:'8px 10px',textAlign:'right',fontWeight:'600',color:'var(--text-1)',whiteSpace:'nowrap'}}>{q(resumenDeudas.reduce((s,r)=>s+r.totalSaldo,0))}</td>
-                      <td style={{padding:'8px 0 8px 10px',textAlign:'right',fontWeight:'800',color:'var(--red)',whiteSpace:'nowrap'}}>{q(totalPrestamos)}</td>
+                      <td style={{padding:'8px 10px',textAlign:'right',fontWeight:'600',color:'var(--text-2)',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(resumenDeudas.reduce((s,r)=>s+r.totalOriginal,0))}</td>
+                      <td style={{padding:'8px 10px',textAlign:'right',fontWeight:'600',color:'var(--text-1)',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(resumenDeudas.reduce((s,r)=>s+r.totalSaldo,0))}</td>
+                      <td style={{padding:'8px 0 8px 10px',textAlign:'right',fontWeight:'800',color:'var(--red)',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(totalPrestamos)}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -941,11 +941,11 @@ export default function PresupuestoPage({ user }) {
                           <td style={{padding:'11px 8px',whiteSpace:'nowrap'}}>
                             <span style={{fontSize:'11px',fontWeight:'600',color:TIPO_COLOR[tipo],background:'var(--inner-bg)',padding:'2px 7px',borderRadius:'6px'}}>{tipo}</span>
                           </td>
-                          <td style={{padding:'11px 8px',color:'var(--text-2)',whiteSpace:'nowrap'}}>{q(p.monto_original)}</td>
-                          <td style={{padding:'11px 8px',color:'var(--text-1)',fontWeight:'500',whiteSpace:'nowrap'}}>{q(p.saldo_actual)}</td>
-                          <td style={{padding:'11px 8px',color:'var(--accent)',fontWeight:'700',whiteSpace:'nowrap'}}>{q(p.cuota_mensual)}</td>
-                          <td style={{padding:'11px 8px',color:'var(--text-muted)',whiteSpace:'nowrap'}}>{p.dia_pago?`día ${p.dia_pago}`:'—'}</td>
-                          <td style={{padding:'11px 8px',color:'var(--text-muted)',whiteSpace:'nowrap'}}>{p.meses_restantes??'—'}</td>
+                          <td style={{padding:'11px 8px',color:'var(--text-2)',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(p.monto_original)}</td>
+                          <td style={{padding:'11px 8px',color:'var(--text-1)',fontWeight:'500',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(p.saldo_actual)}</td>
+                          <td style={{padding:'11px 8px',color:'var(--accent)',fontWeight:'700',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(p.cuota_mensual)}</td>
+                          <td style={{padding:'11px 8px',color:'var(--text-muted)',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{p.dia_pago?`día ${p.dia_pago}`:'—'}</td>
+                          <td style={{padding:'11px 8px',color:'var(--text-muted)',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{p.meses_restantes??'—'}</td>
                           <td style={{padding:'11px 0 11px 4px'}}>
                             <div style={{display:'flex',gap:'4px'}}>
                               <button onClick={()=>{setFPrest({nombre:p.nombre,tipo,monto_original:String(p.monto_original),saldo_actual:String(p.saldo_actual),cuota_mensual:String(p.cuota_mensual),meses_restantes:p.meses_restantes!=null?String(p.meses_restantes):'',dia_pago:p.dia_pago!=null?String(p.dia_pago):''});setModalPrest(p)}} style={bEdit}><IcoEdit/></button>
@@ -978,11 +978,11 @@ export default function PresupuestoPage({ user }) {
                         {alertColor&&<span style={{fontSize:'10px',fontWeight:'700',color:alertColor,background:venc?'rgba(255,59,48,0.1)':'rgba(255,149,0,0.12)',padding:'1px 7px',borderRadius:'5px'}}>{venc?'Vencido':'Próximo'}</span>}
                       </div>
                       <div style={{fontSize:'12px',color:'var(--text-2)',marginTop:'2px'}}>{c.descripcion}</div>
-                      {c.fecha_aprox&&<div style={{fontSize:'11px',color:alertColor||'var(--text-muted)',marginTop:'2px'}}>Aprox. {new Date(c.fecha_aprox+'T00:00:00').toLocaleDateString('es-GT',{day:'numeric',month:'long',year:'numeric'})}</div>}
+                      {c.fecha_aprox&&<div style={{fontSize:'11px',color:alertColor||'var(--text-muted)',marginTop:'2px',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>Aprox. {new Date(c.fecha_aprox+'T00:00:00').toLocaleDateString('es-GT',{day:'numeric',month:'long',year:'numeric'})}</div>}
                       {c.notas&&<div style={{fontSize:'11px',color:'var(--text-muted)',marginTop:'2px',fontStyle:'italic'}}>{c.notas}</div>}
                     </div>
                     <div style={{textAlign:'right',flexShrink:0}}>
-                      <div style={{fontSize:'14px',fontWeight:'700',color:'var(--accent)'}}>{q(c.monto)}</div>
+                      <div style={{fontSize:'14px',fontWeight:'700',color:'var(--accent)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(c.monto)}</div>
                       <div style={{display:'flex',gap:'4px',marginTop:'6px',justifyContent:'flex-end'}}>
                         <button onClick={()=>{setFComp({persona:c.persona,descripcion:c.descripcion,monto:String(c.monto),fecha_aprox:c.fecha_aprox||'',notas:c.notas||''});setModalComp(c)}} style={bEdit}><IcoEdit/></button>
                         <button onClick={()=>askDel(`Compromiso con "${c.persona}" se eliminará.`,()=>del('budget_compromisos',c.id,setCompromisos))} style={bDel}><IcoDel/></button>
@@ -1004,7 +1004,7 @@ export default function PresupuestoPage({ user }) {
                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
                     </button>
                     <div style={{flex:1}}><div style={{fontSize:'13px',fontWeight:'500',color:'var(--text-1)',textDecoration:'line-through'}}>{c.persona}</div><div style={{fontSize:'11px',color:'var(--text-muted)'}}>{c.descripcion}</div></div>
-                    <div style={{fontSize:'13px',fontWeight:'600',color:'var(--text-muted)',textDecoration:'line-through'}}>{q(c.monto)}</div>
+                    <div style={{fontSize:'13px',fontWeight:'600',color:'var(--text-muted)',textDecoration:'line-through',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(c.monto)}</div>
                     <button onClick={()=>askDel(`Compromiso con "${c.persona}" se eliminará.`,()=>del('budget_compromisos',c.id,setCompromisos))} style={bDel}><IcoDel/></button>
                   </div>
                 ))}
@@ -1023,11 +1023,11 @@ export default function PresupuestoPage({ user }) {
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'20px'}}>
               <div>
                 <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em'}}>Gastos Variables</div>
-                <div style={{fontSize:'20px',fontWeight:'800',letterSpacing:'-0.02em',color:'var(--text-1)',marginTop:'4px'}}>{fmtMes(mes)}</div>
+                <div style={{fontSize:'20px',fontWeight:'800',letterSpacing:'-0.02em',color:'var(--text-1)',marginTop:'4px',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{fmtMes(mes)}</div>
               </div>
               <div style={{textAlign:'right'}}>
                 <div style={{fontSize:'10px',color:'var(--text-muted)',marginBottom:'2px'}}>Total del mes</div>
-                <div style={{fontSize:'16px',fontWeight:'800',color:'var(--accent)'}}>{q(totalVariables)}</div>
+                <div style={{fontSize:'16px',fontWeight:'800',color:'var(--accent)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(totalVariables)}</div>
               </div>
             </div>
 
@@ -1064,13 +1064,13 @@ export default function PresupuestoPage({ user }) {
                           return(
                             <button key={dateStr} onClick={()=>setSelectedDay(isSel?null:dateStr)} style={{
                               minHeight:'72px',borderRadius:'10px',padding:'8px 8px 6px',cursor:'pointer',
-                              border:isSel?'2px solid var(--accent)':isToday?'1px solid var(--accent)':'1px solid var(--border)',
+                              border:isSel?'2px solid var(--accent-bright)':isToday?'1px solid var(--accent-bright)':'1px solid var(--border)',
                               background:isSel?'var(--accent-soft)':isToday?'rgba(88,86,214,0.06)':'transparent',
                               display:'flex',flexDirection:'column',alignItems:'flex-start',gap:'4px',
                               transition:'all 0.12s',textAlign:'left',
                             }}>
-                              <span style={{fontSize:'13px',fontWeight:isToday?'700':'500',color:isToday?'var(--accent)':isSel?'var(--accent)':'var(--text-1)'}}>{day}</span>
-                              {dayT>0&&<span style={{fontSize:'11px',fontWeight:'700',color:'#ff9500',lineHeight:1}}>{q(dayT)}</span>}
+                              <span style={{fontSize:'13px',fontWeight:isToday?'700':'500',color:isToday?'var(--accent-bright)':isSel?'var(--accent-bright)':'var(--text-1)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{day}</span>
+                              {dayT>0&&<span style={{fontSize:'11px',fontWeight:'700',color:'#ff9500',lineHeight:1,fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(dayT)}</span>}
                               {hasAny&&(
                                 <div style={{display:'flex',gap:'3px',marginTop:'auto',flexWrap:'wrap'}}>
                                   {dayFij.map((_,i)=><div key={`f${i}`} style={{width:'5px',height:'5px',borderRadius:'50%',background:'var(--accent)'}}/>)}
@@ -1087,8 +1087,8 @@ export default function PresupuestoPage({ user }) {
                           display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'3px',
                         }}>
                           <div style={{fontSize:'9px',fontWeight:'600',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.05em'}}>Total</div>
-                          <div style={{fontSize:'13px',fontWeight:'800',color:weekTotal>0?'#ff9500':'var(--text-muted)'}}>{weekTotal>0?q(weekTotal):'—'}</div>
-                          {weekDays.length>0&&<div style={{fontSize:'9px',color:'var(--text-muted)',textAlign:'center'}}>{weekDays[0]}–{weekDays[weekDays.length-1]}</div>}
+                          <div style={{fontSize:'13px',fontWeight:'800',color:weekTotal>0?'#ff9500':'var(--text-muted)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{weekTotal>0?q(weekTotal):'—'}</div>
+                          {weekDays.length>0&&<div style={{fontSize:'9px',color:'var(--text-muted)',textAlign:'center',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{weekDays[0]}–{weekDays[weekDays.length-1]}</div>}
                         </div>
                       </div>
                     )
@@ -1105,10 +1105,10 @@ export default function PresupuestoPage({ user }) {
                 <div style={{marginTop:'14px',padding:'16px',background:'var(--inner-bg)',borderRadius:'12px',border:'1px solid var(--border)'}}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}}>
                     <div>
-                      <div style={{fontSize:'13px',fontWeight:'600',color:'var(--text-1)'}}>{(()=>{const[,,d]=selectedDay.split('-');return`${parseInt(d)} de ${fmtMes(mes)}`})()}</div>
-                      {totalDia>0&&<div style={{fontSize:'11px',color:'var(--text-muted)',marginTop:'2px'}}>Total: {q(totalDia)}</div>}
+                      <div style={{fontSize:'13px',fontWeight:'600',color:'var(--text-1)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{(()=>{const[,,d]=selectedDay.split('-');return`${parseInt(d)} de ${fmtMes(mes)}`})()}</div>
+                      {totalDia>0&&<div style={{fontSize:'11px',color:'var(--text-muted)',marginTop:'2px',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>Total: {q(totalDia)}</div>}
                     </div>
-                    <button onClick={()=>openAddVar(selectedDay)} style={{background:'var(--accent)',color:'#fff',border:'none',borderRadius:'8px',padding:'6px 14px',fontSize:'12px',fontWeight:'600',cursor:'pointer'}}>+ Variable</button>
+                    <button onClick={()=>openAddVar(selectedDay)} style={{background:'var(--accent)',color:'#fff',border:'none',borderRadius:'8px',padding:'6px 14px',fontSize:'12px',fontWeight:'600',cursor:'pointer',boxShadow:'0 4px 14px -4px var(--accent-glow)'}}>+ Variable</button>
                   </div>
 
                   {selFijos.length>0&&(
@@ -1121,7 +1121,7 @@ export default function PresupuestoPage({ user }) {
                             <div style={{fontSize:'13px',fontWeight:'500',color:'var(--text-1)'}}>{g.nombre}</div>
                             <div style={{fontSize:'10px',color:'var(--text-muted)'}}>{g.categoria}</div>
                           </div>
-                          <div style={{fontSize:'13px',fontWeight:'600',color:'var(--accent)'}}>{q(g.monto)}</div>
+                          <div style={{fontSize:'13px',fontWeight:'600',color:'var(--accent)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(g.monto)}</div>
                         </div>
                       ))}
                     </>
@@ -1141,10 +1141,10 @@ export default function PresupuestoPage({ user }) {
                         <div style={{display:'flex',gap:'6px',marginTop:'3px',flexWrap:'wrap'}}>
                           <span style={{fontSize:'10px',color:'var(--text-muted)'}}>{g.categoria}</span>
                           <TarjetaChip g={g}/>
-                          {g.fecha_pago&&<span style={{fontSize:'10px',color:'var(--yellow)'}}>Pago: {new Date(g.fecha_pago+'T00:00:00').toLocaleDateString('es-GT',{day:'numeric',month:'short'})}</span>}
+                          {g.fecha_pago&&<span style={{fontSize:'10px',color:'var(--yellow)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>Pago: {new Date(g.fecha_pago+'T00:00:00').toLocaleDateString('es-GT',{day:'numeric',month:'short'})}</span>}
                         </div>
                       </div>
-                      <div style={{fontSize:'13px',fontWeight:'600',color:'var(--accent)'}}>{q(g.monto)}</div>
+                      <div style={{fontSize:'13px',fontWeight:'600',color:'var(--accent)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(g.monto)}</div>
                       <div style={{display:'flex',gap:'4px'}}>
                         <button onClick={()=>{setFVar({nombre:g.nombre,categoria:g.categoria,monto:String(g.monto),fecha:g.fecha||selectedDay,medio_pago:g.medio_pago||'Efectivo',tarjeta:g.tarjeta||'',fecha_pago:g.fecha_pago||''});setModalVar(g)}} style={bEdit}><IcoEdit/></button>
                         <button onClick={()=>askDel(`"${g.nombre}" se eliminará.`,()=>del('budget_gastos_variables',g.id,setGastosVar))} style={bDel}><IcoDel/></button>
@@ -1159,7 +1159,7 @@ export default function PresupuestoPage({ user }) {
             {varSinFecha.length>0&&(
               <div style={{marginTop:'14px',padding:'12px 14px',background:'rgba(255,149,0,0.06)',borderRadius:'10px',border:'1px solid rgba(255,149,0,0.2)'}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}>
-                  <div style={{fontSize:'11px',fontWeight:'700',color:'#ff9500',textTransform:'uppercase',letterSpacing:'0.05em'}}>Sin fecha — {varSinFecha.length} gasto{varSinFecha.length>1?'s':''} · {q(varSinFecha.reduce((s,g)=>s+parseFloat(g.monto||0),0))}</div>
+                  <div style={{fontSize:'11px',fontWeight:'700',color:'#ff9500',textTransform:'uppercase',letterSpacing:'0.05em',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>Sin fecha — {varSinFecha.length} gasto{varSinFecha.length>1?'s':''} · {q(varSinFecha.reduce((s,g)=>s+parseFloat(g.monto||0),0))}</div>
                   <span style={{fontSize:'10px',color:'var(--text-muted)'}}>Edítalos para asignar fecha</span>
                 </div>
                 {varSinFecha.map(g=>(
@@ -1168,7 +1168,7 @@ export default function PresupuestoPage({ user }) {
                       <div style={{fontSize:'13px',fontWeight:'500',color:'var(--text-1)'}}>{g.nombre}</div>
                       <div style={{display:'flex',gap:'6px',marginTop:'3px'}}><span style={{fontSize:'10px',color:'var(--text-muted)'}}>{g.categoria}</span><TarjetaChip g={g}/></div>
                     </div>
-                    <div style={{fontSize:'13px',fontWeight:'600',color:'var(--accent)'}}>{q(g.monto)}</div>
+                    <div style={{fontSize:'13px',fontWeight:'600',color:'var(--accent)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(g.monto)}</div>
                     <div style={{display:'flex',gap:'4px'}}>
                       <button onClick={()=>{setFVar({nombre:g.nombre,categoria:g.categoria,monto:String(g.monto),fecha:g.fecha||today,medio_pago:g.medio_pago||'Efectivo',tarjeta:g.tarjeta||'',fecha_pago:g.fecha_pago||''});setModalVar(g)}} style={bEdit}><IcoEdit/></button>
                       <button onClick={()=>askDel(`"${g.nombre}" se eliminará.`,()=>del('budget_gastos_variables',g.id,setGastosVar))} style={bDel}><IcoDel/></button>
@@ -1190,7 +1190,7 @@ export default function PresupuestoPage({ user }) {
                 </div>
               </div>
               <div style={{fontSize:'12px',fontWeight:'800',color:'var(--text-1)',letterSpacing:'0.03em'}}>
-                MES TOTAL <span style={{color:'#ff9500',marginLeft:'6px'}}>{q(totalFijos+totalVariables)}</span>
+                MES TOTAL <span style={{color:'#ff9500',marginLeft:'6px',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(totalFijos+totalVariables)}</span>
               </div>
             </div>
           </div>
@@ -1212,10 +1212,10 @@ export default function PresupuestoPage({ user }) {
                     <div style={{fontSize:'13.5px',fontWeight:'500',color:'var(--text-1)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{g.nombre}</div>
                     <div style={{display:'flex',gap:'6px',marginTop:'2px'}}>
                       <span style={{fontSize:'10px',color:'var(--text-muted)'}}>{g.categoria}</span>
-                      {g.dia_pago&&<span style={{fontSize:'10px',color:'var(--accent)'}}>día {g.dia_pago}</span>}
+                      {g.dia_pago&&<span style={{fontSize:'10px',color:'var(--accent)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>día {g.dia_pago}</span>}
                     </div>
                   </div>
-                  <div style={{fontSize:'13.5px',fontWeight:'600',color:'var(--accent)',whiteSpace:'nowrap'}}>{q(g.monto)}</div>
+                  <div style={{fontSize:'13.5px',fontWeight:'600',color:'var(--accent)',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(g.monto)}</div>
                   <div style={{display:'flex',gap:'3px'}}>
                     <button onClick={()=>{setFFij({nombre:g.nombre,categoria:g.categoria,monto:String(g.monto),activo:g.activo,dia_pago:g.dia_pago!=null?String(g.dia_pago):''});setModalFij(g)}} style={bEdit}><IcoEdit/></button>
                     <button onClick={()=>askDel(`"${g.nombre}" se eliminará.`,()=>del('budget_gastos_fijos',g.id,setGastosFijos))} style={bDel}><IcoDel/></button>
@@ -1239,12 +1239,12 @@ export default function PresupuestoPage({ user }) {
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:'13px',fontWeight:'500',color:'var(--text-1)'}}>{g.nombre}</div>
                     <div style={{display:'flex',gap:'6px',marginTop:'3px',flexWrap:'wrap',alignItems:'center'}}>
-                      {g.fecha&&<span style={{fontSize:'10px',color:'var(--text-muted)'}}>{new Date(g.fecha+'T00:00:00').toLocaleDateString('es-GT',{day:'numeric',month:'short'})}</span>}
+                      {g.fecha&&<span style={{fontSize:'10px',color:'var(--text-muted)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{new Date(g.fecha+'T00:00:00').toLocaleDateString('es-GT',{day:'numeric',month:'short'})}</span>}
                       <span style={{fontSize:'10px',color:'var(--text-muted)'}}>{g.categoria}</span>
                       <TarjetaChip g={g}/>
                     </div>
                   </div>
-                  <div style={{fontSize:'13px',fontWeight:'600',color:'var(--accent)',whiteSpace:'nowrap'}}>{q(g.monto)}</div>
+                  <div style={{fontSize:'13px',fontWeight:'600',color:'var(--accent)',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(g.monto)}</div>
                   <div style={{display:'flex',gap:'4px'}}>
                     <button onClick={()=>{setFVar({nombre:g.nombre,categoria:g.categoria,monto:String(g.monto),fecha:g.fecha||today,medio_pago:g.medio_pago||'Efectivo',tarjeta:g.tarjeta||'',fecha_pago:g.fecha_pago||''});setModalVar(g)}} style={bEdit}><IcoEdit/></button>
                     <button onClick={()=>askDel(`"${g.nombre}" se eliminará.`,()=>del('budget_gastos_variables',g.id,setGastosVar))} style={bDel}><IcoDel/></button>
@@ -1252,7 +1252,7 @@ export default function PresupuestoPage({ user }) {
                 </div>
               ))
             }
-            {varMes.length>0&&<div style={{display:'flex',justifyContent:'flex-end',paddingTop:'14px'}}><span style={{fontSize:'14px',fontWeight:'700',color:'var(--accent)'}}>Total: {q(totalVariables)}</span></div>}
+            {varMes.length>0&&<div style={{display:'flex',justifyContent:'flex-end',paddingTop:'14px'}}><span style={{fontSize:'14px',fontWeight:'700',color:'var(--accent)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>Total: {q(totalVariables)}</span></div>}
           </div>
 
           {/* Análisis por categoría */}
@@ -1267,7 +1267,7 @@ export default function PresupuestoPage({ user }) {
               <div style={card}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'18px'}}>
                   <div style={{fontSize:'13px',fontWeight:'700',color:'var(--text-1)'}}>Análisis por categoría</div>
-                  <div style={{fontSize:'11px',color:'var(--text-muted)'}}>{fmtMes(mes)} · {varMes.length} transacción{varMes.length!==1?'es':''}</div>
+                  <div style={{fontSize:'11px',color:'var(--text-muted)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{fmtMes(mes)} · {varMes.length} transacción{varMes.length!==1?'es':''}</div>
                 </div>
                 {sorted.map(([cat,amt])=>{
                   const pct=(amt/total)*100
@@ -1282,8 +1282,8 @@ export default function PresupuestoPage({ user }) {
                           <span style={{fontSize:'10px',color:'var(--text-muted)',background:'var(--inner-bg)',padding:'1px 6px',borderRadius:'5px'}}>{count} tx</span>
                         </div>
                         <div style={{textAlign:'right'}}>
-                          <span style={{fontSize:'13px',fontWeight:'700',color}}>{q(amt)}</span>
-                          <span style={{fontSize:'10px',color:'var(--text-muted)',marginLeft:'6px'}}>{pct.toFixed(1)}%</span>
+                          <span style={{fontSize:'13px',fontWeight:'700',color,fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(amt)}</span>
+                          <span style={{fontSize:'10px',color:'var(--text-muted)',marginLeft:'6px',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{pct.toFixed(1)}%</span>
                         </div>
                       </div>
                       <div style={{height:'6px',background:'var(--inner-bg)',borderRadius:'3px'}}>
@@ -1294,7 +1294,7 @@ export default function PresupuestoPage({ user }) {
                 })}
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',paddingTop:'12px',borderTop:'1px solid var(--border)'}}>
                   <span style={{fontSize:'12px',color:'var(--text-muted)'}}>Total variables</span>
-                  <span style={{fontSize:'14px',fontWeight:'800',color:'var(--accent)'}}>{q(total)}</span>
+                  <span style={{fontSize:'14px',fontWeight:'800',color:'var(--accent)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(total)}</span>
                 </div>
               </div>
             )
@@ -1317,9 +1317,9 @@ export default function PresupuestoPage({ user }) {
                   <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:'13.5px',fontWeight:'500',color:'var(--text-1)'}}>{a.nombre}</div>
-                      {a.meta_total>0&&<div style={{fontSize:'11px',color:'var(--text-muted)',marginTop:'2px'}}>Meta: {q(a.meta_total)} · Acumulado: {q(ahoTotal)} · {pct.toFixed(0)}%</div>}
+                      {a.meta_total>0&&<div style={{fontSize:'11px',color:'var(--text-muted)',marginTop:'2px',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>Meta: {q(a.meta_total)} · Acumulado: {q(ahoTotal)} · {pct.toFixed(0)}%</div>}
                     </div>
-                    <div style={{fontSize:'14px',fontWeight:'700',color:'var(--green)'}}>{q(a.aportado_mes)}</div>
+                    <div style={{fontSize:'14px',fontWeight:'700',color:'var(--green)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(a.aportado_mes)}</div>
                     <div style={{display:'flex',gap:'4px'}}>
                       <button onClick={()=>{setFAho({nombre:a.nombre,meta_total:String(a.meta_total),aportado_mes:String(a.aportado_mes)});setModalAho(a)}} style={bEdit}><IcoEdit/></button>
                       <button onClick={()=>askDel(`"${a.nombre}" se eliminará.`,()=>del('budget_ahorros',a.id,setAhorros))} style={bDel}><IcoDel/></button>
