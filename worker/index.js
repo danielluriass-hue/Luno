@@ -14,7 +14,7 @@ export default {
   },
 
   async scheduled(event, env) {
-    await fetch(`${env.SUPABASE_URL}/rest/v1/`, {
+    await fetch(`${env.SUPABASE_URL}/rest/v1/events?select=id&limit=1`, {
       headers: { apikey: env.SUPABASE_ANON_KEY },
     })
   },
