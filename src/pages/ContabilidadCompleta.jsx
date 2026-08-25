@@ -1160,6 +1160,7 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
   const [uploading, setUploading] = useState(false)
   const [err, setErr]           = useState('')
   const [archivoDisp, setArchivoDisp] = useState(false)
+  const [dragging, setDragging] = useState(false)
 
   const BUCKET      = 'libros-sat'
   const storagePath = (y, m) => `${userId}/${empresaId}/${tipo.toLowerCase()}/${y}-${m}.xlsx`
@@ -1469,16 +1470,27 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
 
       {/* Zona de upload */}
       <div style={{ marginBottom:'16px', display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap' }}>
-        <label style={{
+        <label
+          onDragOver={e => { e.preventDefault(); if (!uploading) setDragging(true) }}
+          onDragLeave={e => { e.preventDefault(); setDragging(false) }}
+          onDrop={e => {
+            e.preventDefault(); setDragging(false)
+            if (uploading) return
+            const file = e.dataTransfer.files?.[0]
+            if (file) handleFile(file)
+          }}
+          style={{
           display:'inline-flex', alignItems:'center', gap:'8px', padding:'8px 16px',
-          borderRadius:'8px', border:'1.5px dashed var(--accent)', cursor: uploading ? 'not-allowed':'pointer',
-          background:'var(--accent-soft)', color:'var(--accent)', fontSize:'13px', fontWeight:'600',
+          borderRadius:'8px', border: dragging ? '1.5px dashed var(--accent-bright)' : '1.5px dashed var(--accent)',
+          cursor: uploading ? 'not-allowed':'pointer',
+          background: dragging ? 'var(--accent)' : 'var(--accent-soft)',
+          color: dragging ? '#fff' : 'var(--accent)', fontSize:'13px', fontWeight:'600',
           opacity: uploading ? 0.6 : 1,
         }}>
           <input type="file" accept=".xls,.xlsx" style={{ display:'none' }}
             disabled={uploading}
             onChange={e => e.target.files[0] && handleFile(e.target.files[0])} />
-          {uploading ? 'Importando…' : (rows?.length ? '↑ Reemplazar datos SAT' : '↑ Cargar archivo SAT')}
+          {uploading ? 'Importando…' : dragging ? 'Suelta el archivo aquí' : (rows?.length ? '↑ Reemplazar datos SAT' : '↑ Cargar o arrastrar archivo SAT')}
         </label>
         {rows?.length > 0 && (
           <button onClick={handlePDF} style={{
