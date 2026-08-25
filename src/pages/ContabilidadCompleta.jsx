@@ -1420,7 +1420,23 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
   const sinDatos = rows !== null && rows.length === 0
 
   return (
-    <div>
+    <div
+      onDragOver={e => { e.preventDefault(); if (!uploading) setDragging(true) }}
+      onDragLeave={e => { e.preventDefault(); setDragging(false) }}
+      onDrop={e => {
+        e.preventDefault(); setDragging(false)
+        if (uploading) return
+        const file = e.dataTransfer.files?.[0]
+        if (file) handleFile(file)
+      }}
+      style={{
+        borderRadius:'12px',
+        outline: dragging ? '2px dashed var(--accent-bright)' : 'none',
+        outlineOffset: dragging ? '4px' : '0',
+        background: dragging ? 'var(--accent-soft)' : 'transparent',
+        transition:'background 0.15s, outline 0.15s',
+      }}
+    >
       {/* Selectores año/mes */}
       {anosDisp.length > 0 && (
         <div style={{ display:'flex', gap:'6px', marginBottom:'8px', flexWrap:'wrap' }}>
@@ -1470,16 +1486,7 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
 
       {/* Zona de upload */}
       <div style={{ marginBottom:'16px', display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap' }}>
-        <label
-          onDragOver={e => { e.preventDefault(); if (!uploading) setDragging(true) }}
-          onDragLeave={e => { e.preventDefault(); setDragging(false) }}
-          onDrop={e => {
-            e.preventDefault(); setDragging(false)
-            if (uploading) return
-            const file = e.dataTransfer.files?.[0]
-            if (file) handleFile(file)
-          }}
-          style={{
+        <label style={{
           display:'inline-flex', alignItems:'center', gap:'8px', padding:'8px 16px',
           borderRadius:'8px', border: dragging ? '1.5px dashed var(--accent-bright)' : '1.5px dashed var(--accent)',
           cursor: uploading ? 'not-allowed':'pointer',
@@ -1515,13 +1522,13 @@ function LibroSATTab({ tipo, empresaId, userId, empresaNombre }) {
 
       {/* Estado vacío */}
       {sinDatos && !mes && (
-        <div style={{ padding:'48px', textAlign:'center', color:'var(--text-muted)', fontSize:'13px', background:'var(--inner-bg)', borderRadius:'12px' }}>
-          Selecciona un mes o carga un archivo SAT para comenzar
+        <div style={{ padding:'48px', textAlign:'center', color: dragging?'var(--accent-bright)':'var(--text-muted)', fontSize:'13px', background:'var(--inner-bg)', borderRadius:'12px' }}>
+          {dragging ? 'Suelta el archivo aquí' : 'Selecciona un mes o carga un archivo SAT para comenzar'}
         </div>
       )}
       {sinDatos && mes && (
-        <div style={{ padding:'48px', textAlign:'center', color:'var(--text-muted)', fontSize:'13px', background:'var(--inner-bg)', borderRadius:'12px' }}>
-          Sin datos para {MESES[mes-1]} {ano}. Carga el archivo SAT del mes.
+        <div style={{ padding:'48px', textAlign:'center', color: dragging?'var(--accent-bright)':'var(--text-muted)', fontSize:'13px', background:'var(--inner-bg)', borderRadius:'12px' }}>
+          {dragging ? 'Suelta el archivo aquí' : `Sin datos para ${MESES[mes-1]} ${ano}. Carga el archivo SAT del mes.`}
         </div>
       )}
 
