@@ -3427,6 +3427,145 @@ function ISRTab({ empresaId, userId, cuentas = [], asientos = [], empresaNombre 
   )
 }
 
+// ── MÓDULO 9: NOTAS ──────────────────────────────────────────────────────────
+
+function NotasTab({ empresaId, userId }) {
+  const [notas, setNotas]         = useState([])
+  const [loading, setLoading]     = useState(true)
+  const [modalNota, setModalNota] = useState(null) // null cerrado | {} nueva | nota existente
+  const [form, setForm]           = useState({ texto:'', relacionado:'' })
+  const [saving, setSaving]       = useState(false)
+  const [delTarget, setDelTarget] = useState(null)
+  const [loadError, setLoadError] = useState(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const { data, error } = await supabase.from('conta_notas')
+      .select('*').eq('empresa_id', empresaId)
+      .order('fijada', { ascending:false })
+      .order('created_at', { ascending:false })
+    setLoadError(error ? error.message : null)
+    setNotas(data || [])
+    setLoading(false)
+  }, [empresaId])
+
+  useEffect(() => { load() }, [load])
+
+  const openNueva  = () => { setForm({ texto:'', relacionado:'' }); setModalNota({}) }
+  const openEditar = (n) => { setForm({ texto:n.texto, relacionado:n.relacionado||'' }); setModalNota(n) }
+
+  const handleSave = async () => {
+    if (!form.texto.trim()) return
+    setSaving(true)
+    if (modalNota?.id) {
+      await supabase.from('conta_notas').update({
+        texto: form.texto.trim(), relacionado: form.relacionado.trim(), updated_at: new Date().toISOString(),
+      }).eq('id', modalNota.id)
+    } else {
+      await supabase.from('conta_notas').insert({
+        empresa_id: empresaId, user_id: userId,
+        texto: form.texto.trim(), relacionado: form.relacionado.trim(),
+      })
+    }
+    setSaving(false)
+    setModalNota(null)
+    load()
+  }
+
+  const handleDelete = async (n) => {
+    await supabase.from('conta_notas').delete().eq('id', n.id)
+    setDelTarget(null)
+    load()
+  }
+
+  const togglePin = async (n) => {
+    await supabase.from('conta_notas').update({ fijada: !n.fijada }).eq('id', n.id)
+    load()
+  }
+
+  const fmtFecha = (iso) => new Date(iso).toLocaleDateString('es-GT', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })
+
+  const RELACIONADO_OPCIONES = TABS_LIST.filter(t => !['NOTAS','BITACORA'].includes(t.key)).map(t => t.label)
+
+  return (
+    <div style={{ maxWidth:'640px' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px' }}>
+        <div style={{ fontSize:'15px', fontWeight:'700', color:'var(--text-1)' }}>Notas</div>
+        <button onClick={openNueva} style={btn('primary')}>+ Nueva nota</button>
+      </div>
+
+      {loadError && (
+        <div style={{ marginBottom:'16px', padding:'12px 16px', background:'#fee2e2', borderRadius:'10px', border:'1px solid #fca5a5', fontSize:'13px', color:'#dc2626' }}>
+          Error al cargar notas: {loadError}
+        </div>
+      )}
+      {loading ? (
+        <div style={{ textAlign:'center', padding:'40px', color:'var(--text-muted)', fontSize:'13px' }}>Cargando…</div>
+      ) : notas.length === 0 ? (
+        <div style={{ textAlign:'center', padding:'40px', color:'var(--text-muted)', fontSize:'13px' }}>
+          Sin notas todavía. Usa "+ Nueva nota" para anotar algo sobre esta empresa.
+        </div>
+      ) : (
+        <div style={{ display:'flex', flexDirection:'column', gap:'10px' }}>
+          {notas.map(n => (
+            <div key={n.id} style={{
+              background:'var(--card-bg)', border:'1px solid var(--border)', borderRadius:'12px',
+              padding:'14px 16px', borderLeft: n.fijada ? '3px solid var(--accent)' : '1px solid var(--border)',
+            }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:'10px', marginBottom:'8px' }}>
+                <div style={{ display:'flex', gap:'8px', alignItems:'center', flexWrap:'wrap' }}>
+                  {n.relacionado && (
+                    <span style={{ fontSize:'10px', fontWeight:'700', color:'var(--accent)', background:'var(--accent-soft)', padding:'2px 8px', borderRadius:'6px', textTransform:'uppercase', letterSpacing:'0.04em' }}>{n.relacionado}</span>
+                  )}
+                  <span style={{ fontSize:'11px', color:'var(--text-muted)' }}>{fmtFecha(n.created_at)}</span>
+                </div>
+                <div style={{ display:'flex', gap:'4px', flexShrink:0 }}>
+                  <button onClick={()=>togglePin(n)} title={n.fijada ? 'Desfijar' : 'Fijar'} style={{ background:'none', border:'none', cursor:'pointer', padding:'2px', color: n.fijada ? 'var(--accent)' : 'var(--text-muted)' }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill={n.fijada ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2"><path d="M12 2l1.5 5.5L19 9l-4 3.5L16 18l-4-3-4 3 1-5.5-4-3.5 5.5-1.5z"/></svg>
+                  </button>
+                  <button onClick={()=>openEditar(n)} style={btnSm()}>Editar</button>
+                  <button onClick={()=>setDelTarget(n)} style={btnSm('danger')}>Eliminar</button>
+                </div>
+              </div>
+              <div style={{ fontSize:'13.5px', color:'var(--text-1)', whiteSpace:'pre-wrap', lineHeight:1.5 }}>{n.texto}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {modalNota && (
+        <Modal title={modalNota.id ? 'Editar nota' : 'Nueva nota'} onClose={()=>setModalNota(null)}>
+          <div style={{ display:'flex', flexDirection:'column', gap:'14px' }}>
+            <Field label="Relacionado con (opcional)">
+              <input list="notas-relacionado-opts" value={form.relacionado} onChange={e=>setForm(f=>({...f, relacionado:e.target.value}))} placeholder="Ej. Est. Resultados · Q1 2025" style={inp()} />
+              <datalist id="notas-relacionado-opts">
+                {RELACIONADO_OPCIONES.map(o => <option key={o} value={o} />)}
+              </datalist>
+            </Field>
+            <Field label="Nota">
+              <textarea value={form.texto} onChange={e=>setForm(f=>({...f, texto:e.target.value}))} rows={5} style={{ ...inp(), resize:'vertical', fontFamily:'inherit' }} autoFocus />
+            </Field>
+            <div style={{ display:'flex', justifyContent:'flex-end', gap:'8px' }}>
+              <button onClick={()=>setModalNota(null)} style={btn('secondary')}>Cancelar</button>
+              <button onClick={handleSave} disabled={saving || !form.texto.trim()} style={{ ...btn('primary'), opacity: (saving || !form.texto.trim()) ? 0.6 : 1 }}>{saving ? 'Guardando…' : 'Guardar'}</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {delTarget && (
+        <Modal title="Eliminar nota" onClose={()=>setDelTarget(null)}>
+          <p style={{ fontSize:'13px', color:'var(--text-2)', marginBottom:'20px' }}>¿Eliminar esta nota? Esta acción no se puede deshacer.</p>
+          <div style={{ display:'flex', justifyContent:'flex-end', gap:'8px' }}>
+            <button onClick={()=>setDelTarget(null)} style={btn('secondary')}>Cancelar</button>
+            <button onClick={()=>handleDelete(delTarget)} style={btn('danger')}>Eliminar</button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  )
+}
+
 const TABS_LIST = [
   { key:'CATALOGO',    label:'Catálogo' },
   { key:'DIARIO',      label:'Libro Diario' },
@@ -3438,6 +3577,7 @@ const TABS_LIST = [
   { key:'BALANCE',    label:'Balance Gral.' },
   { key:'ISO',         label:'ISO' },
   { key:'ISR',         label:'ISR' },
+  { key:'NOTAS',       label:'Notas' },
   { key:'BITACORA',   label:'Bitácora' },
 ]
 
@@ -3603,6 +3743,7 @@ export default function ContabilidadCompleta({ userId, empresaId, empresaNombre 
       {tab==='BALANCE'    && <BalanceTab   cuentas={cuentas} asientos={asientos} empresaNombre={empresaNombre} />}
       {tab==='ISO'        && <ISOTab       empresaId={empresaId} userId={userId} cuentas={cuentas} asientos={asientos} />}
       {tab==='ISR'        && <ISRTab       empresaId={empresaId} userId={userId} cuentas={cuentas} asientos={asientos} empresaNombre={empresaNombre} />}
+      {tab==='NOTAS'      && <NotasTab     empresaId={empresaId} userId={userId} />}
       {tab==='BITACORA'   && <BitacoraTab  auditoria={auditoria} cuentas={cuentas} />}
     </div>
   )
