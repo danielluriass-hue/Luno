@@ -2236,19 +2236,22 @@ function ResultadosTab({ cuentas, asientos, empresaNombre = '' }) {
   const anos = [...new Set(asientos.map(a => new Date(a.fecha+'T00:00:00').getFullYear()))].sort((a,b)=>b-a)
   const hoy  = new Date().getFullYear()
   const [ano, setAno] = useState(() => anos.includes(hoy) ? hoy : (anos[0] || hoy))
-  const [mes, setMes]             = useState(null)
-  const [trimestre, setTrimestre] = useState(null)
+  const [mes, setMes]               = useState(null)
+  const [trimestres, setTrimestres] = useState([])
   const [fechaDesde, setFechaDesde] = useState('')
   const [fechaHasta, setFechaHasta] = useState('')
   const usandoRango = !!(fechaDesde && fechaHasta)
   const TRIM_MESES  = { 1:[1,2,3], 2:[4,5,6], 3:[7,8,9], 4:[10,11,12] }
   const TRIM_LABELS = ['1er Trimestre','2do Trimestre','3er Trimestre','4to Trimestre']
-  const handleSetAno  = (y) => { setAno(y); setMes(null); setTrimestre(null); setFechaDesde(''); setFechaHasta('') }
-  const handleSetMes  = (m) => { setMes(mes===m ? null : m); setTrimestre(null); setFechaDesde(''); setFechaHasta('') }
-  const handleSetTrim = (t) => { setTrimestre(trimestre===t ? null : t); setMes(null); setFechaDesde(''); setFechaHasta('') }
+  const trimestresOrd = [...trimestres].sort((a,b)=>a-b)
+  const mesesEnTrimestres = trimestresOrd.flatMap(t => TRIM_MESES[t])
+  const trimLabelStr = trimestresOrd.map(t => TRIM_LABELS[t-1]).join(' + ')
+  const handleSetAno  = (y) => { setAno(y); setMes(null); setTrimestres([]); setFechaDesde(''); setFechaHasta('') }
+  const handleSetMes  = (m) => { setMes(mes===m ? null : m); setTrimestres([]); setFechaDesde(''); setFechaHasta('') }
+  const handleSetTrim = (t) => { setTrimestres(prev => prev.includes(t) ? prev.filter(x=>x!==t) : [...prev,t]); setMes(null); setFechaDesde(''); setFechaHasta('') }
   const limpiarRango = () => { setFechaDesde(''); setFechaHasta('') }
   const mesesDisp = [...new Set(asientos.filter(a => a.estado==='ACTIVO' && new Date(a.fecha+'T00:00:00').getFullYear()===ano).map(a => new Date(a.fecha+'T00:00:00').getMonth()+1))].sort((a,b)=>a-b)
-  const periodoLabel = usandoRango ? `${fechaDesde} al ${fechaHasta}` : trimestre !== null ? `${TRIM_LABELS[trimestre-1]} ${ano}` : mes !== null ? `${MESES_ES[mes-1]} ${ano}` : `Año ${ano}`
+  const periodoLabel = usandoRango ? `${fechaDesde} al ${fechaHasta}` : trimestres.length ? `${trimLabelStr} ${ano}` : mes !== null ? `${MESES_ES[mes-1]} ${ano}` : `Año ${ano}`
 
   const activos = asientos.filter(a => {
     if (a.estado !== 'ACTIVO') return false
@@ -2256,7 +2259,7 @@ function ResultadosTab({ cuentas, asientos, empresaNombre = '' }) {
     if (usandoRango) return d >= new Date(fechaDesde) && d <= new Date(fechaHasta)
     if (d.getFullYear() !== ano) return false
     const mv = d.getMonth()+1
-    if (trimestre !== null) return TRIM_MESES[trimestre].includes(mv)
+    if (trimestres.length) return mesesEnTrimestres.includes(mv)
     if (mes !== null) return mv === mes
     return true
   })
@@ -2303,10 +2306,12 @@ function ResultadosTab({ cuentas, asientos, empresaNombre = '' }) {
     const doc = initPDF('ESTADO DE RESULTADOS',
       usandoRango
         ? `Período: ${fechaDesde} al ${fechaHasta}`
-        : trimestre !== null
-          ? `Período: ${TRIM_LABELS[trimestre-1]} ${ano} (${MESES_ES[TRIM_MESES[trimestre][0]-1]} – ${MESES_ES[TRIM_MESES[trimestre][2]-1]})`
-          : mes !== null ? `Período: ${MESES_ES[mes-1]} ${ano}`
-          : `Período: 1 de enero al 31 de diciembre de ${ano}`,
+        : trimestres.length === 1
+          ? `Período: ${TRIM_LABELS[trimestres[0]-1]} ${ano} (${MESES_ES[TRIM_MESES[trimestres[0]][0]-1]} – ${MESES_ES[TRIM_MESES[trimestres[0]][2]-1]})`
+          : trimestres.length > 1
+            ? `Período: ${trimLabelStr} ${ano}`
+            : mes !== null ? `Período: ${MESES_ES[mes-1]} ${ano}`
+            : `Período: 1 de enero al 31 de diciembre de ${ano}`,
       empresaNombre)
     const col = { 0:{cellWidth:24}, 2:{cellWidth:46, halign:'right'} }
 
@@ -2412,16 +2417,16 @@ function ResultadosTab({ cuentas, asientos, empresaNombre = '' }) {
         {[1,2,3,4].map(t => (
           <button key={t} onClick={()=>handleSetTrim(t)} style={{
             padding:'4px 14px', borderRadius:'7px', border:'1px solid var(--border)', fontSize:'12px',
-            fontWeight: trimestre===t ? '700':'400',
-            background: trimestre===t ? 'var(--accent)' : 'transparent',
-            color: trimestre===t ? '#fff' : 'var(--text-muted)', cursor:'pointer',
+            fontWeight: trimestres.includes(t) ? '700':'400',
+            background: trimestres.includes(t) ? 'var(--accent)' : 'transparent',
+            color: trimestres.includes(t) ? '#fff' : 'var(--text-muted)', cursor:'pointer',
           }}>{TRIM_LABELS[t-1]}</button>
         ))}
       </div>
       {mesesDisp.length > 0 && (
         <div style={{ display:'flex', gap:'5px', marginBottom:'14px', flexWrap:'wrap' }}>
           {mesesDisp.map(m => {
-            const enTrim = trimestre !== null && TRIM_MESES[trimestre].includes(m)
+            const enTrim = mesesEnTrimestres.includes(m)
             return (
               <button key={m} onClick={()=>handleSetMes(m)} style={{
                 padding:'4px 12px', borderRadius:'7px', border:'1px solid var(--border)', fontSize:'12px',
@@ -2447,7 +2452,7 @@ function ResultadosTab({ cuentas, asientos, empresaNombre = '' }) {
         <div style={{ width:'1px', height:'16px', background:'var(--border)', flexShrink:0 }}/>
         <span style={{ fontSize:'12px', color:'var(--text-muted)' }}>Desde</span>
         <input type="date" value={fechaDesde}
-          onChange={e => { setFechaDesde(e.target.value); setMes(null); setTrimestre(null) }}
+          onChange={e => { setFechaDesde(e.target.value); setMes(null); setTrimestres([]) }}
           style={{
             padding:'5px 10px', borderRadius:'8px', border:'1px solid var(--border)',
             background:'var(--card-bg)', color:'var(--text-1)', fontSize:'12px',
@@ -2457,7 +2462,7 @@ function ResultadosTab({ cuentas, asientos, empresaNombre = '' }) {
         <span style={{ fontSize:'13px', color:'var(--text-muted)', fontWeight:'300' }}>—</span>
         <span style={{ fontSize:'12px', color:'var(--text-muted)' }}>Hasta</span>
         <input type="date" value={fechaHasta}
-          onChange={e => { setFechaHasta(e.target.value); setMes(null); setTrimestre(null) }}
+          onChange={e => { setFechaHasta(e.target.value); setMes(null); setTrimestres([]) }}
           style={{
             padding:'5px 10px', borderRadius:'8px', border:'1px solid var(--border)',
             background:'var(--card-bg)', color:'var(--text-1)', fontSize:'12px',
@@ -2479,8 +2484,9 @@ function ResultadosTab({ cuentas, asientos, empresaNombre = '' }) {
       <div style={{ textAlign:'center', marginBottom:'24px' }}>
         <div style={{ fontSize:'15px', fontWeight:'700', color:'var(--text-1)', textTransform:'uppercase', letterSpacing:'0.04em' }}>Estado de Resultados</div>
         <div style={{ fontSize:'12px', color:'var(--text-muted)' }}>
-          {trimestre !== null
-            ? `${TRIM_LABELS[trimestre-1]} ${ano} · ${MESES_ES[TRIM_MESES[trimestre][0]-1]} – ${MESES_ES[TRIM_MESES[trimestre][2]-1]}`
+          {trimestres.length === 1
+            ? `${TRIM_LABELS[trimestres[0]-1]} ${ano} · ${MESES_ES[TRIM_MESES[trimestres[0]][0]-1]} – ${MESES_ES[TRIM_MESES[trimestres[0]][2]-1]}`
+            : trimestres.length > 1 ? `${trimLabelStr} ${ano}`
             : mes !== null ? `${MESES_ES[mes-1]} ${ano}`
             : `Enero – Diciembre ${ano}`}
         </div>
@@ -2571,17 +2577,18 @@ function BalanceTab({ cuentas, asientos, empresaNombre = '' }) {
   const anos = [...new Set(asientos.map(a => new Date(a.fecha+'T00:00:00').getFullYear()))].sort((a,b)=>b-a)
   const hoy  = new Date().getFullYear()
   const [ano, setAno] = useState(() => anos.includes(hoy) ? hoy : (anos[0] || hoy))
-  const [mes, setMes] = useState(null)
-  const handleSetAno = (y) => { setAno(y); setMes(null) }
-  const handleSetMes = (m) => setMes(mes===m ? null : m)
+  const [meses, setMeses] = useState([])
+  const handleSetAno = (y) => { setAno(y); setMeses([]) }
+  const handleSetMes = (m) => setMeses(prev => prev.includes(m) ? prev.filter(x=>x!==m) : [...prev,m])
+  const mesCutoff = meses.length ? Math.max(...meses) : null
   const mesesDisp = [...new Set(asientos.filter(a => a.estado==='ACTIVO' && new Date(a.fecha+'T00:00:00').getFullYear()===ano).map(a => new Date(a.fecha+'T00:00:00').getMonth()+1))].sort((a,b)=>a-b)
-  const periodoLabel = mes !== null ? `${MESES_ES[mes-1]} ${ano}` : `Año ${ano}`
+  const periodoLabel = mesCutoff !== null ? `${MESES_ES[mesCutoff-1]} ${ano}` : `Año ${ano}`
 
   const activosAno = asientos.filter(a => {
     if (a.estado !== 'ACTIVO') return false
     const d = new Date(a.fecha+'T00:00:00')
     if (d.getFullYear() !== ano) return false
-    if (mes !== null && d.getMonth()+1 > mes) return false
+    if (mesCutoff !== null && d.getMonth()+1 > mesCutoff) return false
     return true
   })
   const saldoMap = {}
@@ -2634,7 +2641,7 @@ function BalanceTab({ cuentas, asientos, empresaNombre = '' }) {
   )
 
   const handlePDFBalance = () => {
-          const doc = initPDF('BALANCE GENERAL', mes !== null ? `Al ${MESES_ES[mes-1]} de ${ano}` : `Al 31 de diciembre de ${ano}`, empresaNombre)
+          const doc = initPDF('BALANCE GENERAL', mesCutoff !== null ? `Al ${MESES_ES[mesCutoff-1]} de ${ano}` : `Al 31 de diciembre de ${ano}`, empresaNombre)
           const colB = { 0:{cellWidth:24}, 2:{cellWidth:46, halign:'right'} }
 
           // ACTIVOS
@@ -2702,7 +2709,7 @@ function BalanceTab({ cuentas, asientos, empresaNombre = '' }) {
       {mesesDisp.length > 0 && (
         <div style={{ display:'flex', gap:'5px', marginBottom:'14px', flexWrap:'wrap' }}>
           {mesesDisp.map(m => (
-            <button key={m} onClick={()=>handleSetMes(m)} style={{ padding:'4px 12px', borderRadius:'7px', border:'1px solid var(--border)', fontSize:'12px', fontWeight:mes===m?'700':'400', background:mes===m?'var(--accent-soft)':'transparent', color:mes===m?'var(--accent)':'var(--text-muted)', cursor:'pointer' }}>{MESES_ES[m-1]}</button>
+            <button key={m} onClick={()=>handleSetMes(m)} style={{ padding:'4px 12px', borderRadius:'7px', border:'1px solid var(--border)', fontSize:'12px', fontWeight:meses.includes(m)?'700':'400', background:meses.includes(m)?'var(--accent-soft)':'transparent', color:meses.includes(m)?'var(--accent)':'var(--text-muted)', cursor:'pointer' }}>{MESES_ES[m-1]}</button>
           ))}
         </div>
       )}
@@ -2711,7 +2718,7 @@ function BalanceTab({ cuentas, asientos, empresaNombre = '' }) {
       </div>
       <div style={{ textAlign:'center', marginBottom:'24px' }}>
         <div style={{ fontSize:'15px', fontWeight:'700', color:'var(--text-1)', textTransform:'uppercase', letterSpacing:'0.04em' }}>Balance General</div>
-        <div style={{ fontSize:'12px', color:'var(--text-muted)' }}>{mes !== null ? `Al ${MESES_ES[mes-1]} ${ano}` : `Enero – Diciembre ${ano}`}</div>
+        <div style={{ fontSize:'12px', color:'var(--text-muted)' }}>{mesCutoff !== null ? `Al ${MESES_ES[mesCutoff-1]} ${ano}` : `Enero – Diciembre ${ano}`}</div>
       </div>
 
       <Seccion titulo="Activos"  rows={cActivos} tot={totAct} color="#16a34a" borderColor="#16a34a40" />
