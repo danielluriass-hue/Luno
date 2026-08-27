@@ -568,22 +568,24 @@ export default function PresupuestoPage({ user }) {
                           const gasTotal=gasEvts.reduce((s,e)=>s+parseFloat(e.amount||0),0)
                           const isToday=dateStr===today
                           const isSel=dateStr===calSelDay
+                          const hasIng=ingTotal>0,hasGas=gasTotal>0
+                          const fillBg=hasIng&&hasGas?'linear-gradient(135deg, var(--green) 50%, var(--red) 50%)':hasIng?'var(--green)':hasGas?'var(--red)':null
                           return(
                             <button key={dateStr} onClick={()=>setCalSelDay(isSel?null:dateStr)} style={{
                               minHeight:'72px',borderRadius:'10px',padding:'8px 8px 6px',
                               cursor:evts.length?'pointer':'default',
-                              border:isSel?'2px solid var(--accent-bright)':isToday?'1px solid var(--accent-bright)':'1px solid var(--border)',
-                              background:isSel?'var(--accent-soft)':isToday?'rgba(88,86,214,0.06)':'transparent',
+                              border:fillBg&&isSel?'2px solid #fff':isSel?'2px solid var(--accent-bright)':isToday?'1px solid var(--accent-bright)':'1px solid var(--border)',
+                              background:fillBg||(isSel?'var(--accent-soft)':isToday?'rgba(88,86,214,0.06)':'transparent'),
                               display:'flex',flexDirection:'column',alignItems:'flex-start',gap:'2px',
                               transition:'all 0.12s',textAlign:'left',
                             }}>
-                              <span style={{fontSize:'13px',fontWeight:isToday?'700':'500',color:isToday?'var(--accent-bright)':isSel?'var(--accent-bright)':'var(--text-1)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{day}</span>
-                              {ingTotal>0&&<span style={{fontSize:'10px',fontWeight:'700',color:'var(--green)',lineHeight:1,fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>+{q(ingTotal)}</span>}
-                              {gasTotal>0&&<span style={{fontSize:'10px',fontWeight:'700',color:'var(--red)',lineHeight:1,fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(gasTotal)}</span>}
+                              <span style={{fontSize:'13px',fontWeight:isToday||fillBg?'700':'500',color:fillBg?'#fff':isToday?'var(--accent-bright)':isSel?'var(--accent-bright)':'var(--text-1)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums',textShadow:fillBg?'0 1px 2px rgba(0,0,0,0.3)':'none'}}>{day}</span>
+                              {ingTotal>0&&<span style={{fontSize:'10px',fontWeight:'700',color:fillBg?'#fff':'var(--green)',lineHeight:1,fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums',textShadow:fillBg?'0 1px 2px rgba(0,0,0,0.3)':'none'}}>+{q(ingTotal)}</span>}
+                              {gasTotal>0&&<span style={{fontSize:'10px',fontWeight:'700',color:fillBg?'#fff':'var(--red)',lineHeight:1,fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums',textShadow:fillBg?'0 1px 2px rgba(0,0,0,0.3)':'none'}}>{q(gasTotal)}</span>}
                               {evts.length>0&&(
                                 <div style={{display:'flex',gap:'3px',flexWrap:'wrap',marginTop:'auto'}}>
-                                  {evts.slice(0,4).map((e,i)=><div key={i} style={{width:'5px',height:'5px',borderRadius:'50%',background:e.color}}/>)}
-                                  {evts.length>4&&<span style={{fontSize:'8px',color:'var(--text-muted)'}}>+{evts.length-4}</span>}
+                                  {evts.slice(0,4).map((e,i)=><div key={i} style={{width:'5px',height:'5px',borderRadius:'50%',background:e.color,border:fillBg?'1px solid rgba(255,255,255,0.6)':'none'}}/>)}
+                                  {evts.length>4&&<span style={{fontSize:'8px',color:fillBg?'rgba(255,255,255,0.85)':'var(--text-muted)'}}>+{evts.length-4}</span>}
                                 </div>
                               )}
                             </button>
@@ -778,23 +780,24 @@ export default function PresupuestoPage({ user }) {
                           const dayTotal=evts.reduce((s,e)=>s+parseFloat(e.amount||0),0)
                           const isToday=dateStr===today
                           const isSel=dateStr===ingSelDay
+                          const filled=dayTotal>0
                           return(
                             <button key={`i${dateStr}`} onClick={()=>setIngSelDay(isSel?null:dateStr)} style={{
                               minHeight:'72px',borderRadius:'10px',padding:'8px 8px 6px',
                               cursor:evts.length?'pointer':'default',
-                              border:isSel?'2px solid var(--green)':isToday?'1px solid var(--accent-bright)':'1px solid var(--border)',
-                              background:isSel?'rgba(52,199,89,0.1)':isToday?'rgba(88,86,214,0.06)':'transparent',
+                              border:filled&&isSel?'2px solid #fff':isSel?'2px solid var(--green)':isToday?'1px solid var(--accent-bright)':'1px solid var(--border)',
+                              background:filled?'var(--green)':(isSel?'rgba(52,199,89,0.1)':isToday?'rgba(88,86,214,0.06)':'transparent'),
                               display:'flex',flexDirection:'column',alignItems:'flex-start',gap:'4px',
                               transition:'all 0.12s',textAlign:'left',
                             }}>
-                              <span style={{fontSize:'13px',fontWeight:isToday?'700':'500',color:isToday?'var(--accent-bright)':isSel?'var(--green)':'var(--text-1)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{day}</span>
+                              <span style={{fontSize:'13px',fontWeight:isToday||filled?'700':'500',color:filled?'#fff':isToday?'var(--accent-bright)':isSel?'var(--green)':'var(--text-1)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums',textShadow:filled?'0 1px 2px rgba(0,0,0,0.3)':'none'}}>{day}</span>
                               {dayTotal>0&&(
-                                <span style={{fontSize:'11px',fontWeight:'700',color:'var(--green)',lineHeight:1,fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>+{q(dayTotal)}</span>
+                                <span style={{fontSize:'11px',fontWeight:'700',color:filled?'#fff':'var(--green)',lineHeight:1,fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums',textShadow:filled?'0 1px 2px rgba(0,0,0,0.3)':'none'}}>+{q(dayTotal)}</span>
                               )}
                               {evts.length>0&&(
                                 <div style={{display:'flex',gap:'3px',marginTop:'auto'}}>
-                                  {evts.slice(0,3).map((_,i)=><div key={i} style={{width:'5px',height:'5px',borderRadius:'50%',background:'var(--green)'}}/>)}
-                                  {evts.length>3&&<span style={{fontSize:'8px',color:'var(--text-muted)'}}>+{evts.length-3}</span>}
+                                  {evts.slice(0,3).map((_,i)=><div key={i} style={{width:'5px',height:'5px',borderRadius:'50%',background:filled?'rgba(255,255,255,0.85)':'var(--green)'}}/>)}
+                                  {evts.length>3&&<span style={{fontSize:'8px',color:filled?'rgba(255,255,255,0.85)':'var(--text-muted)'}}>+{evts.length-3}</span>}
                                 </div>
                               )}
                             </button>
@@ -1061,21 +1064,22 @@ export default function PresupuestoPage({ user }) {
                           const isToday=dateStr===today
                           const isSel=dateStr===selectedDay
                           const hasAny=dayVar.length>0||dayFij.length>0
+                          const filled=dayT>0
                           return(
                             <button key={dateStr} onClick={()=>setSelectedDay(isSel?null:dateStr)} style={{
                               minHeight:'72px',borderRadius:'10px',padding:'8px 8px 6px',cursor:'pointer',
-                              border:isSel?'2px solid var(--accent-bright)':isToday?'1px solid var(--accent-bright)':'1px solid var(--border)',
-                              background:isSel?'var(--accent-soft)':isToday?'rgba(88,86,214,0.06)':'transparent',
+                              border:filled&&isSel?'2px solid #fff':isSel?'2px solid var(--accent-bright)':isToday?'1px solid var(--accent-bright)':'1px solid var(--border)',
+                              background:filled?'var(--red)':(isSel?'var(--accent-soft)':isToday?'rgba(88,86,214,0.06)':'transparent'),
                               display:'flex',flexDirection:'column',alignItems:'flex-start',gap:'4px',
                               transition:'all 0.12s',textAlign:'left',
                             }}>
-                              <span style={{fontSize:'13px',fontWeight:isToday?'700':'500',color:isToday?'var(--accent-bright)':isSel?'var(--accent-bright)':'var(--text-1)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{day}</span>
-                              {dayT>0&&<span style={{fontSize:'11px',fontWeight:'700',color:'#ff9500',lineHeight:1,fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(dayT)}</span>}
+                              <span style={{fontSize:'13px',fontWeight:isToday||filled?'700':'500',color:filled?'#fff':isToday?'var(--accent-bright)':isSel?'var(--accent-bright)':'var(--text-1)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums',textShadow:filled?'0 1px 2px rgba(0,0,0,0.3)':'none'}}>{day}</span>
+                              {dayT>0&&<span style={{fontSize:'11px',fontWeight:'700',color:filled?'#fff':'#ff9500',lineHeight:1,fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums',textShadow:filled?'0 1px 2px rgba(0,0,0,0.3)':'none'}}>{q(dayT)}</span>}
                               {hasAny&&(
                                 <div style={{display:'flex',gap:'3px',marginTop:'auto',flexWrap:'wrap'}}>
-                                  {dayFij.map((_,i)=><div key={`f${i}`} style={{width:'5px',height:'5px',borderRadius:'50%',background:'var(--accent)'}}/>)}
-                                  {dayVar.slice(0,3).map((_,i)=><div key={`v${i}`} style={{width:'5px',height:'5px',borderRadius:'50%',background:'#ff9500'}}/>)}
-                                  {dayVar.length>3&&<span style={{fontSize:'8px',color:'var(--text-muted)'}}>+{dayVar.length-3}</span>}
+                                  {dayFij.map((_,i)=><div key={`f${i}`} style={{width:'5px',height:'5px',borderRadius:'50%',background:'var(--accent)',border:filled?'1px solid rgba(255,255,255,0.6)':'none'}}/>)}
+                                  {dayVar.slice(0,3).map((_,i)=><div key={`v${i}`} style={{width:'5px',height:'5px',borderRadius:'50%',background:'#ff9500',border:filled?'1px solid rgba(255,255,255,0.6)':'none'}}/>)}
+                                  {dayVar.length>3&&<span style={{fontSize:'8px',color:filled?'rgba(255,255,255,0.85)':'var(--text-muted)'}}>+{dayVar.length-3}</span>}
                                 </div>
                               )}
                             </button>
