@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useIsMobile } from '../lib/useIsMobile'
 import { localDateStr } from '../lib/dateUtils'
+import DoubleConfirm from '../components/DoubleConfirm'
 
 const ROUTINES = ['Pecho', 'Tríceps', 'Hombro', 'Espalda', 'Abdomen', 'Glúteo', 'Femoral', 'Cuádriceps', 'Cardio']
 
@@ -306,10 +307,13 @@ export default function GymSection({ user }) {
     setShowModal(false); setEditing(null)
   }
 
+  const [toDelete, setToDelete] = useState(null)
+
   const handleDelete = async (id) => {
     await supabase.from('gym_sessions').delete().eq('id', id)
     setSessions(prev => prev.filter(s => s.id !== id))
     if (expanded === id) setExpanded(null)
+    setToDelete(null)
   }
 
   const card = { background: 'var(--card-bg)', borderRadius: '16px', border: '1px solid var(--border-card)' }
@@ -366,7 +370,7 @@ export default function GymSection({ user }) {
                   <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                     <button onClick={e => { e.stopPropagation(); setEditing({ ...session, exercises: exList }); setShowModal(true) }}
                       style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '13px', padding: '4px 6px' }}>✏️</button>
-                    <button onClick={e => { e.stopPropagation(); handleDelete(session.id) }}
+                    <button onClick={e => { e.stopPropagation(); setToDelete(session) }}
                       style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '13px', padding: '4px 6px' }}>🗑️</button>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2"
                       style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: '0.15s', flexShrink: 0 }}>
@@ -426,6 +430,12 @@ export default function GymSection({ user }) {
           onClose={() => { setShowModal(false); setEditing(null) }}
           onSave={handleSave}
           initial={editing}
+        />
+      )}
+      {toDelete && (
+        <DoubleConfirm
+          what="la sesión" label={`${toDelete.routine_name || 'Sesión'} · ${new Date(toDelete.date + 'T12:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}`}
+          onConfirm={() => handleDelete(toDelete.id)} onCancel={() => setToDelete(null)}
         />
       )}
     </div>

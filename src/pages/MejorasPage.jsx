@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import GymSection from './GymSection'
 import TroteSection from './TroteSection'
+import DoubleConfirm from '../components/DoubleConfirm'
 import { useIsMobile } from '../lib/useIsMobile'
 import { localDateStr } from '../lib/dateUtils'
 
@@ -104,9 +105,12 @@ export default function MejorasPage({ user }) {
     setForm(emptyForm()); setShowForm(false); setEditing(null)
   }
 
+  const [toDelete, setToDelete] = useState(null)
+
   const del = async (id) => {
     await supabase.from('body_measurements').delete().eq('id', id)
     setEntries(prev => prev.filter(e => e.id !== id))
+    setToDelete(null)
   }
 
   const diff = (curr, prev) => {
@@ -229,7 +233,7 @@ export default function MejorasPage({ user }) {
                         <div style={{ display: 'flex', gap: '2px' }}>
                           <button onClick={() => { setForm({ date: entry.date, ...Object.fromEntries(FIELDS.map(f => [f.key, entry[f.key] ?? ''])) }); setEditing(entry.id); setShowForm(true) }}
                             style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '12px', cursor: 'pointer', padding: '2px 4px' }}>✏️</button>
-                          <button onClick={() => del(entry.id)}
+                          <button onClick={() => setToDelete(entry)}
                             style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '12px', cursor: 'pointer', padding: '2px 4px' }}>🗑️</button>
                         </div>
                       </td>
@@ -338,6 +342,12 @@ export default function MejorasPage({ user }) {
             </form>
           </div>
         </div>
+      )}
+      {toDelete && (
+        <DoubleConfirm
+          what="la medición" label={`Medición del ${new Date(toDelete.date + 'T12:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}`}
+          onConfirm={() => del(toDelete.id)} onCancel={() => setToDelete(null)}
+        />
       )}
     </div>
   )

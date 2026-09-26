@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useIsMobile } from '../lib/useIsMobile'
 import { localDateStr } from '../lib/dateUtils'
+import DoubleConfirm from '../components/DoubleConfirm'
 
 function ElipticaIcon() {
   return (
@@ -207,9 +208,12 @@ export default function TroteSection({ user }) {
     setShowModal(false); setEditing(null)
   }
 
+  const [toDelete, setToDelete] = useState(null)
+
   const handleDelete = async (id) => {
     await supabase.from('cardio_sessions').delete().eq('id', id)
     setSessions(prev => prev.filter(s => s.id !== id))
+    setToDelete(null)
   }
 
   const totalKm = sessions.reduce((t, s) => t + (s.distance_km || 0), 0).toFixed(1)
@@ -288,7 +292,7 @@ export default function TroteSection({ user }) {
             <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
               <button onClick={() => { setEditing(s); setShowModal(true) }}
                 style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '14px', padding: '4px 6px' }}>✏️</button>
-              <button onClick={() => handleDelete(s.id)}
+              <button onClick={() => setToDelete(s)}
                 style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '14px', padding: '4px 6px' }}>🗑️</button>
             </div>
           </div>
@@ -300,6 +304,12 @@ export default function TroteSection({ user }) {
           onClose={() => { setShowModal(false); setEditing(null) }}
           onSave={handleSave}
           initial={editing}
+        />
+      )}
+      {toDelete && (
+        <DoubleConfirm
+          what="la sesión de cardio" label={`${actInfo(toDelete.activity_type)?.label || 'Cardio'} · ${new Date(toDelete.date + 'T12:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}`}
+          onConfirm={() => handleDelete(toDelete.id)} onCancel={() => setToDelete(null)}
         />
       )}
     </div>
