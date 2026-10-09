@@ -130,6 +130,8 @@ export default function PresupuestoPage({ user }) {
   const [pagos,       setPagos]       = useState([])
   const [limites,     setLimites]     = useState([])     // límite mensual por categoría de gasto variable
   const [modalLim,    setModalLim]    = useState(false)
+  const [modalCopy,   setModalCopy]   = useState(null)   // {tipo:'ingresos'|'ahorros', items:[...]}
+  const [verSug,      setVerSug]      = useState(false)  // dropdown de sugerencias en descripción de gasto
   const [fLim,        setFLim]        = useState({})
   const [pagoBusy,    setPagoBusy]    = useState(null)
   const [modalPago,   setModalPago]   = useState(null)   // item de deuda a registrar
@@ -414,7 +416,54 @@ export default function PresupuestoPage({ user }) {
     const{data}=await supabase.from('budget_limites').select('*').eq('user_id',budgetUid)
     setLimites(data||[]);setModalLim(false)
   }
-  const openAddVar  =(dateStr)=>{setFVar({nombre:'',categoria:'Alimentación',monto:'',fecha:dateStr||today,medio_pago:'Efectivo',tarjeta:'',fecha_pago:''});setModalVar({})}
+  // Nuevo gasto: fecha de hoy y el medio de pago/tarjeta del último gasto registrado
+  const openAddVar  =(dateStr)=>{
+    const ult=gastosVar[gastosVar.length-1]
+    const medio=ult?.medio_pago||'Efectivo'
+    setFVar({nombre:'',categoria:'Alimentación',monto:'',fecha:dateStr||today,medio_pago:medio,tarjeta:medio!=='Efectivo'?(ult?.tarjeta||''):'',fecha_pago:''})
+    setVerSug(false);setModalVar({})
+  }
+  // Sugerencias de descripción a partir de gastos anteriores (más frecuentes primero)
+  const sugerenciasGasto=(txt)=>{
+    const t=txt.trim().toLowerCase()
+    if(t.length<2) return []
+    const por={}
+    gastosVar.forEach(g=>{
+      const n=(g.nombre||'').trim(); if(!n||!n.toLowerCase().includes(t)) return
+      const k=n.toLowerCase()
+      por[k]={g,count:(por[k]?.count||0)+1}   // gastosVar viene ordenado por fecha de creación → queda el más reciente
+    })
+    return Object.values(por).sort((a,b)=>b.count-a.count).slice(0,5).map(x=>x.g)
+  }
+  const usarSugerencia=(g)=>{
+    const medio=g.medio_pago||'Efectivo'
+    setFVar(p=>({...p,nombre:g.nombre,categoria:CATS_VAR.includes(g.categoria)?g.categoria:p.categoria,medio_pago:medio,tarjeta:medio!=='Efectivo'?(g.tarjeta||''):'',fecha_pago:''}))
+    setVerSug(false)
+  }
+
+  // ── Copiar ingresos/ahorros del mes anterior ──
+  const mesAnterior=(()=>{const[y,m]=mes.split('-').map(Number);const d=new Date(y,m-2);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`})()
+  const abrirCopiar=(tipo)=>{
+    const prev=(tipo==='ingresos'?ingresos:ahorros).filter(x=>x.mes===mesAnterior)
+    const actuales=new Set((tipo==='ingresos'?ingMes:ahoMes).map(x=>(x.nombre||'').trim().toLowerCase()))
+    setModalCopy({tipo,items:prev.map(x=>{const existe=actuales.has((x.nombre||'').trim().toLowerCase());return{...x,existe,sel:!existe}})})
+  }
+  const copiarSeleccion=async()=>{
+    const{tipo,items}=modalCopy
+    const sel=items.filter(x=>x.sel); if(!sel.length){setModalCopy(null);return}
+    const rows=sel.map(x=>{
+      if(tipo==='ahorros') return {user_id:budgetUid,nombre:x.nombre,meta_total:x.meta_total,aportado_mes:x.aportado_mes,mes}
+      // Ingreso variable con fecha: mismo día en el mes actual
+      let fecha=null
+      if(x.tipo!=='fijo'&&x.fecha){const d=Math.min(parseInt(String(x.fecha).slice(8,10)),daysInMonth);fecha=`${mes}-${String(d).padStart(2,'0')}`}
+      return {user_id:budgetUid,nombre:x.nombre,tipo:x.tipo,monto:x.monto,mes,dia:x.tipo==='fijo'?x.dia:null,fecha}
+    })
+    const table=tipo==='ingresos'?'budget_ingresos':'budget_ahorros'
+    const{data,error}=await supabase.from(table).insert(rows).select()
+    if(error){alert('No se pudo copiar: '+error.message);return}
+    ;(tipo==='ingresos'?setIngresos:setAhorros)(p=>[...p,...(data||[])])
+    setModalCopy(null)
+  }
 
   function isPróximo(f){if(!f)return false;const diff=(new Date(f+'T00:00:00')-new Date())/86400000;return diff>=0&&diff<=30}
   function isVencido(f){if(!f)return false;return new Date(f+'T00:00:00')<new Date()}
@@ -436,6 +485,18 @@ export default function PresupuestoPage({ user }) {
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   )
+
+  // Botón "Copiar de <mes anterior>" — solo si el mes anterior tiene registros
+  const btnCopiar=(tipo)=>{
+    const n=(tipo==='ingresos'?ingresos:ahorros).filter(x=>x.mes===mesAnterior).length
+    if(!n) return null
+    return(
+      <button onClick={()=>abrirCopiar(tipo)} style={{display:'flex',alignItems:'center',gap:'6px',width:'100%',justifyContent:'center',padding:'8px',marginBottom:'14px',borderRadius:'9px',border:'1px dashed var(--border-card)',background:'transparent',color:'var(--text-2)',fontSize:'12px',fontWeight:'600',cursor:'pointer'}}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        Copiar de {fmtMes(mesAnterior)} ({n})
+      </button>
+    )
+  }
 
   const navBtn={background:'var(--inner-bg)',border:'1px solid var(--border)',borderRadius:'8px',padding:'6px 10px',cursor:'pointer',color:'var(--text-2)',display:'flex',alignItems:'center'}
 
@@ -613,6 +674,7 @@ export default function PresupuestoPage({ user }) {
           <button onClick={prevMes} style={navBtn}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg></button>
           <div style={{fontSize:'14px',fontWeight:'600',color:'var(--text-1)',minWidth:'140px',textAlign:'center',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{fmtMes(mes)}</div>
           <button onClick={nextMes} style={navBtn}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg></button>
+          <button onClick={()=>openAddVar(today.startsWith(mes)?today:`${mes}-01`)} style={{marginLeft:'auto',background:'var(--accent)',color:'#fff',border:'none',borderRadius:'10px',padding:'8px 16px',fontSize:'13px',fontWeight:'700',cursor:'pointer',boxShadow:'0 4px 14px -4px var(--accent-glow)',whiteSpace:'nowrap'}}>+ Gasto</button>
         </div>
       </div>
 
@@ -966,6 +1028,7 @@ export default function PresupuestoPage({ user }) {
           {/* Lista de ingresos */}
           <div style={card}>
             <SubHead label="Ingresos del mes" total={totalIngresos} onAdd={()=>{setFIng({nombre:'',tipo:'fijo',monto:'',dia:''});setModalIng({})}}/>
+            {btnCopiar('ingresos')}
             {ingMes.length===0
               ?<p style={{fontSize:'13px',color:'var(--text-muted)',textAlign:'center',padding:'20px 0'}}>Sin ingresos registrados</p>
               :ingMes.map(i=>(
@@ -1547,6 +1610,7 @@ export default function PresupuestoPage({ user }) {
       {tab==='ahorros'&&(
         <div style={card}>
           <SubHead label="Ahorros" total={totalAhorros} onAdd={()=>{setFAho({nombre:'',meta_total:'',aportado_mes:''});setModalAho({})}}/>
+          {btnCopiar('ahorros')}
           {ahoMes.length===0
             ?<p style={{fontSize:'13px',color:'var(--text-muted)',textAlign:'center',padding:'20px 0'}}>Sin aportes de ahorro este mes</p>
             :ahoMes.map(a=>{
@@ -1622,9 +1686,49 @@ export default function PresupuestoPage({ user }) {
       {modalVar&&(
         <Modal title={modalVar.id?'Editar gasto variable':'Nuevo gasto variable'} onClose={()=>setModalVar(null)}>
           <form onSubmit={saveVar}>
-            <FormField label="Descripción *"><input required style={inp} value={fVar.nombre} onChange={e=>setFVar(p=>({...p,nombre:e.target.value}))} placeholder="ej. Supermercado, Gasolina..."/></FormField>
-            <FormField label="Categoría"><select style={inp} value={fVar.categoria} onChange={e=>setFVar(p=>({...p,categoria:e.target.value}))}>{CATS_VAR.map(c=><option key={c} value={c}>{c}</option>)}</select></FormField>
-            <FormField label="Monto *"><input required type="number" step="0.01" min="0" style={inp} value={fVar.monto} onChange={e=>setFVar(p=>({...p,monto:e.target.value}))} placeholder="0.00"/></FormField>
+            {/* Monto grande primero */}
+            <div style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 14px',marginBottom:'14px',borderRadius:'12px',background:'var(--inner-bg)',border:'1px solid var(--border)'}}>
+              <span style={{fontSize:'22px',fontWeight:'700',color:'var(--text-muted)',fontFamily:'var(--font-mono)'}}>Q</span>
+              <input required autoFocus type="number" inputMode="decimal" step="0.01" min="0" value={fVar.monto} onChange={e=>setFVar(p=>({...p,monto:e.target.value}))} placeholder="0.00"
+                style={{flex:1,minWidth:0,background:'transparent',border:'none',outline:'none',color:'var(--text-1)',fontSize:'28px',fontWeight:'800',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}/>
+            </div>
+            {/* Descripción con sugerencias de gastos anteriores */}
+            <FormField label="Descripción *">
+              <div style={{position:'relative'}}>
+                <input required style={inp} value={fVar.nombre} autoComplete="off"
+                  onChange={e=>{const v=e.target.value;setFVar(p=>({...p,nombre:v}));setVerSug(true)}}
+                  onFocus={()=>setVerSug(true)} onBlur={()=>setTimeout(()=>setVerSug(false),150)}
+                  placeholder="ej. Supermercado, Gasolina..."/>
+                {verSug&&(()=>{
+                  const sug=sugerenciasGasto(fVar.nombre)
+                  if(!sug.length) return null
+                  return(
+                    <div style={{position:'absolute',top:'calc(100% + 4px)',left:0,right:0,zIndex:10,background:'var(--card-bg)',border:'1px solid var(--border-card)',borderRadius:'10px',boxShadow:'0 10px 30px -8px rgba(0,0,0,0.5)',overflow:'hidden'}}>
+                      {sug.map(g=>(
+                        <button type="button" key={g.id} onMouseDown={e=>e.preventDefault()} onClick={()=>usarSugerencia(g)}
+                          style={{display:'flex',width:'100%',justifyContent:'space-between',alignItems:'center',gap:'8px',padding:'9px 12px',background:'transparent',border:'none',borderBottom:'1px solid var(--border)',cursor:'pointer',textAlign:'left'}}>
+                          <span style={{minWidth:0}}>
+                            <span style={{display:'block',fontSize:'13px',color:'var(--text-1)',fontWeight:'500'}}>{g.nombre}</span>
+                            <span style={{fontSize:'10.5px',color:'var(--text-muted)'}}>{g.categoria}{g.tarjeta?` · ${g.tarjeta}`:g.medio_pago==='Efectivo'||!g.medio_pago?' · Efectivo':''}</span>
+                          </span>
+                          <span style={{fontSize:'11px',color:'var(--text-muted)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums',whiteSpace:'nowrap'}}>últ. {q(g.monto)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )
+                })()}
+              </div>
+            </FormField>
+            {/* Categoría como botones */}
+            <FormField label="Categoría">
+              <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
+                {CATS_VAR.map(c=>{
+                  const on=fVar.categoria===c
+                  return <button type="button" key={c} onClick={()=>setFVar(p=>({...p,categoria:c}))}
+                    style={{padding:'6px 12px',borderRadius:'999px',fontSize:'12px',fontWeight:'600',cursor:'pointer',border:on?'1px solid var(--accent-bright)':'1px solid var(--border)',background:on?'var(--accent-soft)':'transparent',color:on?'var(--accent-bright)':'var(--text-2)'}}>{c}</button>
+                })}
+              </div>
+            </FormField>
             {(()=>{
               const lim=limiteDe(fVar.categoria)
               if(lim==null) return null
@@ -1708,6 +1812,40 @@ export default function PresupuestoPage({ user }) {
           </form>
         </Modal>
       )}
+
+      {modalCopy&&(()=>{
+        const{tipo,items}=modalCopy
+        const sel=items.filter(x=>x.sel)
+        const total=sel.reduce((s,x)=>s+parseFloat((tipo==='ingresos'?x.monto:x.aportado_mes)||0),0)
+        const toggle=(id)=>setModalCopy(m=>({...m,items:m.items.map(x=>x.id===id?{...x,sel:!x.sel}:x)}))
+        return(
+          <Modal title={`Copiar ${tipo==='ingresos'?'ingresos':'ahorros'} de ${fmtMes(mesAnterior)}`} onClose={()=>setModalCopy(null)}>
+            <div style={{fontSize:'12px',color:'var(--text-muted)',marginBottom:'14px'}}>Se agregarán a {fmtMes(mes)}. Desmarca lo que no se repite este mes.</div>
+            {items.map(x=>(
+              <div key={x.id} onClick={()=>toggle(x.id)} style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 2px',borderTop:'1px solid var(--border)',cursor:'pointer'}}>
+                <span style={{width:'18px',height:'18px',borderRadius:'5px',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',background:x.sel?'var(--accent)':'transparent',border:x.sel?'none':'2px solid var(--border-card)'}}>
+                  {x.sel&&<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                </span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:'13px',fontWeight:'500',color:'var(--text-1)'}}>{x.nombre}</div>
+                  <div style={{fontSize:'10.5px',color:x.existe?'var(--yellow)':'var(--text-muted)'}}>
+                    {x.existe?'Ya existe en este mes':tipo==='ingresos'?(x.tipo==='fijo'?`Fijo${x.dia?` · día ${x.dia}`:''}`:'Variable'):(x.meta_total>0?`Meta ${q(x.meta_total)}`:'Sin meta')}
+                  </div>
+                </div>
+                <span style={{fontSize:'13px',fontWeight:'700',color:'var(--green)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(tipo==='ingresos'?x.monto:x.aportado_mes)}</span>
+              </div>
+            ))}
+            <div style={{display:'flex',justifyContent:'space-between',padding:'12px 2px 16px',borderTop:'1px solid var(--border)',fontSize:'13px',fontWeight:'700',color:'var(--text-1)'}}>
+              <span>{sel.length} seleccionado{sel.length!==1?'s':''}</span>
+              <span style={{fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(total)}</span>
+            </div>
+            <div style={{display:'flex',gap:'10px'}}>
+              <button type="button" onClick={()=>setModalCopy(null)} style={{flex:1,padding:'9px',borderRadius:'10px',border:'1px solid var(--border)',background:'transparent',color:'var(--text-2)',fontWeight:'600',fontSize:'13px',cursor:'pointer'}}>Cancelar</button>
+              <button type="button" disabled={!sel.length} onClick={copiarSeleccion} style={{flex:1,padding:'9px',borderRadius:'10px',border:'none',background:'var(--accent)',color:'#fff',fontWeight:'700',fontSize:'13px',cursor:sel.length?'pointer':'default',opacity:sel.length?1:0.5}}>Copiar {sel.length||''}</button>
+            </div>
+          </Modal>
+        )
+      })()}
 
       {modalLim&&(
         <Modal title="Límites mensuales por categoría" onClose={()=>setModalLim(false)}>
