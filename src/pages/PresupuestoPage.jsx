@@ -167,7 +167,10 @@ export default function PresupuestoPage({ user }) {
 
   const totalIngresos  = ingMes.reduce((s,i)=>s+parseFloat(i.monto||0),0)
   const totalFijos     = gastosFijos.filter(g=>g.activo).reduce((s,g)=>s+parseFloat(g.monto||0),0)
-  const totalPrestamos = prestamos.reduce((s,p)=>s+parseFloat(p.cuota_mensual||0),0)
+  // Deudas con saldo 0 ya están pagadas: no cuentan en totales ni calendario
+  const prestActivos   = prestamos.filter(p=>parseFloat(p.saldo_actual||0)>0)
+  const prestPagados   = prestamos.filter(p=>parseFloat(p.saldo_actual||0)<=0)
+  const totalPrestamos = prestActivos.reduce((s,p)=>s+parseFloat(p.cuota_mensual||0),0)
   const totalVariables = varMes.reduce((s,g)=>s+parseFloat(g.monto||0),0)
   const totalAhorros   = ahoMes.reduce((s,a)=>s+parseFloat(a.aportado_mes||0),0)
   const totalGastosAll = totalFijos+totalPrestamos+totalVariables+totalAhorros
@@ -178,7 +181,7 @@ export default function PresupuestoPage({ user }) {
   const totalComp   = compActivos.reduce((s,c)=>s+parseFloat(c.monto||0),0)
 
   const resumenDeudas = TIPOS_DEUDA.map(tipo=>{
-    const items=prestamos.filter(p=>(p.tipo||'Préstamo')===tipo)
+    const items=prestActivos.filter(p=>(p.tipo||'Préstamo')===tipo)
     if(!items.length) return null
     return {tipo,count:items.length,
       totalOriginal:items.reduce((s,p)=>s+parseFloat(p.monto_original||0),0),
@@ -228,7 +231,7 @@ export default function PresupuestoPage({ user }) {
     const d=Math.min(g.dia_pago,daysInMonth)
     addCalEv(`${mes}-${String(d).padStart(2,'0')}`,{label:g.nombre,amount:g.monto,color:'var(--accent)',tipo:'Gasto Fijo'})
   })
-  prestamos.filter(p=>p.dia_pago).forEach(p=>{
+  prestActivos.filter(p=>p.dia_pago).forEach(p=>{
     const d=Math.min(p.dia_pago,daysInMonth)
     addCalEv(`${mes}-${String(d).padStart(2,'0')}`,{label:p.nombre,amount:p.cuota_mensual,color:'#ff9500',tipo:'Deuda'})
   })
@@ -920,8 +923,8 @@ export default function PresupuestoPage({ user }) {
                 </table>
               </div>
             )}
-            {prestamos.length===0
-              ?<p style={{fontSize:'13px',color:'var(--text-muted)',textAlign:'center',padding:'16px 0'}}>Sin deudas registradas</p>
+            {prestActivos.length===0
+              ?<p style={{fontSize:'13px',color:'var(--text-muted)',textAlign:'center',padding:'16px 0'}}>{prestamos.length?'Todas las deudas están pagadas':'Sin deudas registradas'}</p>
               :<div style={{overflowX:'auto'}}>
                 <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
                   <thead><tr style={{color:'var(--text-muted)',fontSize:'11px'}}>
@@ -930,7 +933,7 @@ export default function PresupuestoPage({ user }) {
                     ))}
                   </tr></thead>
                   <tbody>
-                    {prestamos.map(p=>{
+                    {prestActivos.map(p=>{
                       const tipo=p.tipo||'Préstamo'
                       const pct=p.monto_original>0?Math.min(((p.monto_original-p.saldo_actual)/p.monto_original)*100,100):0
                       return(
@@ -1014,6 +1017,53 @@ export default function PresupuestoPage({ user }) {
               </div>
             )}
           </div>
+
+          {prestPagados.length>0&&(
+            <div style={card}>
+              <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'4px'}}>
+                <span style={{fontSize:'11px',fontWeight:'700',letterSpacing:'0.06em',textTransform:'uppercase',color:'var(--text-2)'}}>Deudas pagadas</span>
+                <span style={{fontSize:'10px',fontWeight:'700',color:'var(--green)',background:'var(--green-glow)',padding:'1px 7px',borderRadius:'5px'}}>{prestPagados.length}</span>
+              </div>
+              <div style={{fontSize:'11px',color:'var(--text-muted)',marginBottom:'14px'}}>Saldo en 0 — ya no cuentan en cuotas ni en el calendario</div>
+              <div style={{overflowX:'auto'}}>
+                <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
+                  <thead><tr style={{color:'var(--text-muted)',fontSize:'11px'}}>
+                    {['Nombre','Tipo','Original','Cuota',''].map(h=>(
+                      <th key={h} style={{padding:'4px 8px 10px',fontWeight:'500',textAlign:'left',whiteSpace:'nowrap'}}>{h}</th>
+                    ))}
+                  </tr></thead>
+                  <tbody>
+                    {prestPagados.map(p=>{
+                      const tipo=p.tipo||'Préstamo'
+                      return(
+                        <tr key={p.id} style={{borderTop:'1px solid var(--border)'}}>
+                          <td style={{padding:'10px 8px'}}>
+                            <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                              <span style={{background:'var(--green)',borderRadius:'50%',width:'16px',height:'16px',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                              </span>
+                              <span style={{fontWeight:'500',color:'var(--text-2)'}}>{p.nombre}</span>
+                            </div>
+                          </td>
+                          <td style={{padding:'10px 8px',whiteSpace:'nowrap'}}>
+                            <span style={{fontSize:'11px',fontWeight:'600',color:TIPO_COLOR[tipo],background:'var(--inner-bg)',padding:'2px 7px',borderRadius:'6px',opacity:0.7}}>{tipo}</span>
+                          </td>
+                          <td style={{padding:'10px 8px',color:'var(--text-muted)',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(p.monto_original)}</td>
+                          <td style={{padding:'10px 8px',color:'var(--text-muted)',whiteSpace:'nowrap',textDecoration:'line-through',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(p.cuota_mensual)}</td>
+                          <td style={{padding:'10px 0 10px 4px'}}>
+                            <div style={{display:'flex',gap:'4px',justifyContent:'flex-end'}}>
+                              <button onClick={()=>{setFPrest({nombre:p.nombre,tipo,monto_original:String(p.monto_original),saldo_actual:String(p.saldo_actual),cuota_mensual:String(p.cuota_mensual),meses_restantes:p.meses_restantes!=null?String(p.meses_restantes):'',dia_pago:p.dia_pago!=null?String(p.dia_pago):''});setModalPrest(p)}} style={bEdit}><IcoEdit/></button>
+                              <button onClick={()=>askDel(`"${p.nombre}" se eliminará.`,()=>del('budget_prestamos',p.id,setPrestamos))} style={bDel}><IcoDel/></button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
