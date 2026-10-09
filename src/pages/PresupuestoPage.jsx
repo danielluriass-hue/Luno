@@ -113,7 +113,8 @@ export default function PresupuestoPage({ user }) {
   const budgetUid = user.email === 'suleciojh@gmail.com' ? SHARED_BUDGET_OWNER : user.id
 
   const [tab,        setTab]        = useState(()=>localStorage.getItem('presupuesto_tab')||'ingresos')
-  const [mes,        setMes]        = useState(()=>localStorage.getItem('presupuesto_mes')||thisMes)
+  // Recordar el mes visto solo durante el mes en curso; al cambiar de mes real, abrir en el mes actual
+  const [mes,        setMes]        = useState(()=>localStorage.getItem('presupuesto_mes_visto')===thisMes&&localStorage.getItem('presupuesto_mes')||thisMes)
   const [loading,    setLoading]    = useState(true)
   const [selectedDay,setSelectedDay]= useState(null)
   const [calSelDay,     setCalSelDay]     = useState(null)
@@ -150,7 +151,7 @@ export default function PresupuestoPage({ user }) {
   const [fComp,  setFComp]  = useState({persona:'',descripcion:'',monto:'',fecha_aprox:'',notas:''})
 
   useEffect(()=>{localStorage.setItem('presupuesto_tab',tab)},[tab])
-  useEffect(()=>{localStorage.setItem('presupuesto_mes',mes);setSelectedDay(null);setCalSelDay(null);setIngSelDay(null)},[mes])
+  useEffect(()=>{localStorage.setItem('presupuesto_mes',mes);localStorage.setItem('presupuesto_mes_visto',thisMes);setSelectedDay(null);setCalSelDay(null);setIngSelDay(null)},[mes])
 
   useEffect(()=>{
     const uid=budgetUid; setLoading(true)
