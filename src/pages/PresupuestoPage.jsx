@@ -19,6 +19,7 @@ const TABS = [
   {key:'gastos',  label:'Gastos'},
   {key:'ahorros', label:'Ahorros'},
   {key:'deudas',  label:'Deudas'},
+  {key:'pagos',   label:'Pagos'},
   {key:'resumen', label:'Resumen'},
 ]
 
@@ -126,6 +127,9 @@ export default function PresupuestoPage({ user }) {
   const [prestamos,   setPrestamos]   = useState([])
   const [ahorros,     setAhorros]     = useState([])
   const [compromisos, setCompromisos] = useState([])
+  const [pagos,       setPagos]       = useState([])
+  const [pagosErr,    setPagosErr]    = useState(false)
+  const [pagoBusy,    setPagoBusy]    = useState(null)
 
   const [modalIng,   setModalIng]   = useState(null)
   const [modalFij,   setModalFij]   = useState(null)
@@ -154,9 +158,11 @@ export default function PresupuestoPage({ user }) {
       supabase.from('budget_prestamos').select('*').eq('user_id',uid).order('created_at'),
       supabase.from('budget_ahorros').select('*').eq('user_id',uid).order('created_at'),
       supabase.from('budget_compromisos').select('*').eq('user_id',uid).order('created_at'),
-    ]).then(([ing,fij,varG,prest,aho,comp])=>{
+      supabase.from('budget_pagos').select('*').eq('user_id',uid),
+    ]).then(([ing,fij,varG,prest,aho,comp,pag])=>{
       setIngresos(ing.data||[]);setGastosFijos(fij.data||[]);setGastosVar(varG.data||[])
       setPrestamos(prest.data||[]);setAhorros(aho.data||[]);setCompromisos(comp.data||[])
+      setPagos(pag.data||[]);setPagosErr(!!pag.error)
       setLoading(false)
     })
   },[user.id])
@@ -254,6 +260,31 @@ export default function PresupuestoPage({ user }) {
   })
   const ingSelEvents = ingSelDay?(ingCalEvents[ingSelDay]||[]):[]
 
+  // ── Checklist de pagos del mes (gastos fijos + cuotas de deudas) ──
+  const pagosMes = pagos.filter(p=>p.mes===mes)
+  const pagoDe   = (origen,id)=>pagosMes.find(p=>p.origen===origen&&p.ref_id===id)
+  const checklist = [
+    ...gastosFijos.filter(g=>g.activo).map(g=>({origen:'fijo',id:g.id,nombre:g.nombre,detalle:g.categoria||'Gasto fijo',monto:parseFloat(g.monto||0),dia:g.dia_pago})),
+    // Deudas activas, o pagadas este mes aunque su saldo ya llegó a 0
+    ...prestamos.filter(p=>parseFloat(p.saldo_actual||0)>0||pagoDe('deuda',p.id)).map(p=>({origen:'deuda',id:p.id,nombre:p.nombre,detalle:p.tipo||'Préstamo',monto:parseFloat(p.cuota_mensual||0),dia:p.dia_pago})),
+  ].map(it=>({...it,dia:it.dia?Math.min(it.dia,daysInMonth):null,pago:pagoDe(it.origen,it.id)}))
+   .sort((a,b)=>(a.dia||99)-(b.dia||99))
+  const hoyDia = parseInt(today.slice(8,10))
+  const estadoPago = (it)=>{
+    if(it.pago) return 'pagado'
+    if(!it.dia) return 'sin_dia'
+    if(mes<thisMes) return 'vencido'
+    if(mes>thisMes) return 'pendiente'
+    if(it.dia<hoyDia) return 'vencido'
+    if(it.dia===hoyDia) return 'hoy'
+    return it.dia-hoyDia<=3?'pronto':'pendiente'
+  }
+  const chkPendientes = checklist.filter(it=>!it.pago)
+  const chkPagados    = checklist.filter(it=> it.pago)
+  const chkTotal      = checklist.reduce((s,it)=>s+(it.pago?parseFloat(it.pago.monto||0):it.monto),0)
+  const chkPagado     = chkPagados.reduce((s,it)=>s+parseFloat(it.pago.monto||0),0)
+  const chkVencidos   = chkPendientes.filter(it=>estadoPago(it)==='vencido')
+
   // ── Nav ──
   const prevMes=()=>{const[y,m]=mes.split('-').map(Number);const d=new Date(y,m-2);setMes(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`)}
   const nextMes=()=>{const[y,m]=mes.split('-').map(Number);const d=new Date(y,m);  setMes(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`)}
@@ -308,6 +339,18 @@ export default function PresupuestoPage({ user }) {
 
   const toggleFijo  =async(g)=>{const{data}=await supabase.from('budget_gastos_fijos').update({activo:!g.activo}).eq('id',g.id).select().single();if(data)setGastosFijos(p=>p.map(x=>x.id===data.id?data:x))}
   const togglePagado=async(c)=>{const{data}=await supabase.from('budget_compromisos').update({pagado:!c.pagado}).eq('id',c.id).select().single();if(data)setCompromisos(p=>p.map(x=>x.id===data.id?data:x))}
+  const togglePagoMes=async(it)=>{
+    if(pagoBusy) return
+    setPagoBusy(it.origen+it.id)
+    if(it.pago){
+      const{error}=await supabase.from('budget_pagos').delete().eq('id',it.pago.id)
+      if(!error) setPagos(p=>p.filter(x=>x.id!==it.pago.id))
+    }else{
+      const{data,error}=await supabase.from('budget_pagos').insert({user_id:budgetUid,mes,origen:it.origen,ref_id:it.id,monto:it.monto,fecha_pago:today}).select().single()
+      if(!error&&data) setPagos(p=>[...p,data])
+    }
+    setPagoBusy(null)
+  }
   const openAddVar  =(dateStr)=>{setFVar({nombre:'',categoria:'Alimentación',monto:'',fecha:dateStr||today,medio_pago:'Efectivo',tarjeta:'',fecha_pago:''});setModalVar({})}
 
   function isPróximo(f){if(!f)return false;const diff=(new Date(f+'T00:00:00')-new Date())/86400000;return diff>=0&&diff<=30}
@@ -521,6 +564,95 @@ export default function PresupuestoPage({ user }) {
           }}>{label}</button>
         ))}
       </div>
+
+      {/* ══ TAB: PAGOS (checklist del mes) ══ */}
+      {tab==='pagos'&&(()=>{
+        const pct=chkTotal>0?Math.min((chkPagado/chkTotal)*100,100):0
+        const ESTADO={
+          vencido:{txt:'Vencido',color:'var(--red)',bg:'rgba(255,59,48,0.12)'},
+          hoy:    {txt:'Hoy',color:'#ff9500',bg:'rgba(255,149,0,0.14)'},
+          pronto: {txt:'Pronto',color:'var(--yellow)',bg:'rgba(255,204,0,0.12)'},
+        }
+        const fila=(it)=>{
+          const est=estadoPago(it),badge=ESTADO[est],pagado=!!it.pago,busy=pagoBusy===it.origen+it.id
+          return(
+            <div key={it.origen+it.id} onClick={()=>togglePagoMes(it)} style={{display:'flex',alignItems:'center',gap:'12px',padding:'12px 4px',borderTop:'1px solid var(--border)',cursor:busy?'wait':'pointer',opacity:busy?0.5:1}}>
+              <span style={{width:'22px',height:'22px',borderRadius:'50%',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',background:pagado?'var(--green)':'transparent',border:pagado?'none':`2px solid ${est==='vencido'?'var(--red)':'var(--border-card)'}`,transition:'all 0.15s'}}>
+                {pagado&&<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.2" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>}
+              </span>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:'flex',alignItems:'center',gap:'7px',flexWrap:'wrap'}}>
+                  <span style={{fontSize:'13.5px',fontWeight:'600',color:pagado?'var(--text-muted)':'var(--text-1)',textDecoration:pagado?'line-through':'none'}}>{it.nombre}</span>
+                  {badge&&<span style={{fontSize:'10px',fontWeight:'700',color:badge.color,background:badge.bg,padding:'1px 7px',borderRadius:'5px'}}>{badge.txt}</span>}
+                </div>
+                <div style={{fontSize:'11px',color:'var(--text-muted)',marginTop:'2px'}}>
+                  <span style={{color:it.origen==='deuda'?'#ff9500':'var(--accent-bright)',fontWeight:'600'}}>{it.origen==='deuda'?'Deuda':'Fijo'}</span>
+                  {' · '}{it.detalle}
+                  {pagado&&<span style={{fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{' · pagado el '}{new Date(it.pago.fecha_pago+'T00:00:00').toLocaleDateString('es-GT',{day:'numeric',month:'short'})}</span>}
+                </div>
+              </div>
+              <div style={{textAlign:'right',flexShrink:0}}>
+                <div style={{fontSize:'14px',fontWeight:'700',color:pagado?'var(--text-muted)':'var(--text-1)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(pagado?it.pago.monto:it.monto)}</div>
+                <div style={{fontSize:'10.5px',color:'var(--text-muted)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{it.dia?`día ${it.dia}`:'sin día'}</div>
+              </div>
+            </div>
+          )
+        }
+        return(
+          <div style={{display:'flex',flexDirection:'column',gap:'16px'}}>
+            {pagosErr&&(
+              <div style={{...card,border:'1px solid rgba(255,59,48,0.35)',background:'rgba(255,59,48,0.06)',fontSize:'13px',color:'var(--text-2)'}}>
+                Falta crear la tabla <b>budget_pagos</b> en Supabase — corre el SQL de <code>Referencias/budget_pagos.sql</code>. Mientras tanto no se podrán guardar los pagos.
+              </div>
+            )}
+
+            {/* Progreso del mes */}
+            <div className="glow-tile" style={{...card,'--tile-glow':'var(--green-glow)'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end',gap:'12px',flexWrap:'wrap',position:'relative'}}>
+                <div>
+                  <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em'}}>Pagado · {fmtMes(mes)}</div>
+                  <div style={{marginTop:'6px',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>
+                    <span style={{fontSize:'30px',fontWeight:'800',letterSpacing:'-0.03em',color:'var(--green)'}}>{q(chkPagado)}</span>
+                    <span style={{fontSize:'14px',color:'var(--text-muted)',marginLeft:'8px'}}>de {q(chkTotal)}</span>
+                  </div>
+                </div>
+                <div style={{display:'flex',gap:'18px'}}>
+                  <div style={{textAlign:'right'}}>
+                    <div style={{fontSize:'10px',color:'var(--text-muted)'}}>Falta pagar</div>
+                    <div style={{fontSize:'15px',fontWeight:'700',color:'var(--text-1)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(chkTotal-chkPagado)}</div>
+                  </div>
+                  {chkVencidos.length>0&&(
+                    <div style={{textAlign:'right'}}>
+                      <div style={{fontSize:'10px',color:'var(--text-muted)'}}>Vencidos</div>
+                      <div style={{fontSize:'15px',fontWeight:'700',color:'var(--red)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{chkVencidos.length}</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div style={{height:'8px',background:'var(--inner-bg)',borderRadius:'4px',marginTop:'14px',overflow:'hidden',position:'relative'}}>
+                <div style={{height:'8px',width:`${pct}%`,background:'var(--green)',borderRadius:'4px',transition:'width 0.3s'}}/>
+              </div>
+              <div style={{fontSize:'11px',color:'var(--text-muted)',marginTop:'6px',position:'relative',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{chkPagados.length} de {checklist.length} pagos · {pct.toFixed(0)}%</div>
+            </div>
+
+            {/* Pendientes */}
+            <div style={card}>
+              <SubHead label={`Pendientes (${chkPendientes.length})`} total={chkTotal-chkPagado}/>
+              {chkPendientes.length===0
+                ?<p style={{fontSize:'13px',color:'var(--green)',textAlign:'center',padding:'12px 0',fontWeight:'600'}}>{checklist.length?'Todo pagado este mes':'Sin gastos fijos ni deudas activas'}</p>
+                :chkPendientes.map(fila)}
+            </div>
+
+            {/* Pagados */}
+            {chkPagados.length>0&&(
+              <div style={card}>
+                <SubHead label={`Pagados (${chkPagados.length})`} total={chkPagado}/>
+                {chkPagados.map(fila)}
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* ══ TAB: RESUMEN ══ */}
       {tab==='resumen'&&(
