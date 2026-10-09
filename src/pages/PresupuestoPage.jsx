@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { localDateStr } from '../lib/dateUtils'
 import { useIsMobile } from '../lib/useIsMobile'
@@ -130,6 +130,9 @@ export default function PresupuestoPage({ user }) {
   const [pagos,       setPagos]       = useState([])
   const [pagosErr,    setPagosErr]    = useState(false)
   const [pagoBusy,    setPagoBusy]    = useState(null)
+  const [modalPago,   setModalPago]   = useState(null)   // item de deuda a registrar
+  const [fPago,       setFPago]       = useState({monto:'',restar:'',restarEditado:false})
+  const [histDeuda,   setHistDeuda]   = useState(null)   // id de deuda con historial abierto
 
   const [modalIng,   setModalIng]   = useState(null)
   const [modalFij,   setModalFij]   = useState(null)
@@ -339,18 +342,60 @@ export default function PresupuestoPage({ user }) {
 
   const toggleFijo  =async(g)=>{const{data}=await supabase.from('budget_gastos_fijos').update({activo:!g.activo}).eq('id',g.id).select().single();if(data)setGastosFijos(p=>p.map(x=>x.id===data.id?data:x))}
   const togglePagado=async(c)=>{const{data}=await supabase.from('budget_compromisos').update({pagado:!c.pagado}).eq('id',c.id).select().single();if(data)setCompromisos(p=>p.map(x=>x.id===data.id?data:x))}
+  const setSaldoLocal=(data)=>setPrestamos(p=>p.map(x=>x.id===data.id?data:x))
   const togglePagoMes=async(it)=>{
     if(pagoBusy) return
+    // Deuda sin pagar → abrir modal para confirmar monto pagado y cuánto restar del saldo
+    if(!it.pago&&it.origen==='deuda'){
+      setFPago({monto:String(it.monto),restar:String(it.monto),restarEditado:false})
+      setModalPago(it); return
+    }
     setPagoBusy(it.origen+it.id)
     if(it.pago){
       const{error}=await supabase.from('budget_pagos').delete().eq('id',it.pago.id)
-      if(!error) setPagos(p=>p.filter(x=>x.id!==it.pago.id))
+      if(error){alert('No se pudo desmarcar: '+error.message);setPagoBusy(null);return}
+      setPagos(p=>p.filter(x=>x.id!==it.pago.id))
+      // Devolver al saldo lo que se le había restado al marcar
+      const devolver=parseFloat(it.pago.saldo_aplicado||0)
+      const prest=prestamos.find(x=>x.id===it.id)
+      if(it.origen==='deuda'&&devolver>0&&prest){
+        const nuevo=Math.round((parseFloat(prest.saldo_actual||0)+devolver)*100)/100
+        const{data}=await supabase.from('budget_prestamos').update({saldo_actual:nuevo}).eq('id',prest.id).select().single()
+        if(data) setSaldoLocal(data)
+      }
     }else{
       const{data,error}=await supabase.from('budget_pagos').insert({user_id:budgetUid,mes,origen:it.origen,ref_id:it.id,monto:it.monto,fecha_pago:today}).select().single()
-      if(!error&&data) setPagos(p=>[...p,data])
+      if(error) alert('No se pudo marcar: '+error.message)
+      else if(data) setPagos(p=>[...p,data])
     }
     setPagoBusy(null)
   }
+  const registrarPagoDeuda=async(e)=>{
+    e.preventDefault()
+    const it=modalPago, prest=prestamos.find(x=>x.id===it.id)
+    if(!prest||pagoBusy) return
+    setPagoBusy(it.origen+it.id)
+    const saldo=parseFloat(prest.saldo_actual||0)
+    const restar=Math.min(Math.max(parseFloat(fPago.restar||0),0),saldo)
+    const nuevo=Math.round((saldo-restar)*100)/100
+    const{data:pago,error}=await supabase.from('budget_pagos').insert({
+      user_id:budgetUid,mes,origen:'deuda',ref_id:prest.id,
+      monto:parseFloat(fPago.monto||0),saldo_aplicado:Math.round(restar*100)/100,fecha_pago:today,
+    }).select().single()
+    if(error){alert('No se pudo registrar el pago: '+error.message);setPagoBusy(null);return}
+    const{data:upd,error:e2}=await supabase.from('budget_prestamos').update({saldo_actual:nuevo}).eq('id',prest.id).select().single()
+    if(e2){
+      // Revertir el pago para no dejar datos a medias
+      await supabase.from('budget_pagos').delete().eq('id',pago.id)
+      alert('No se pudo actualizar el saldo: '+e2.message)
+    }else{
+      setPagos(p=>[...p,pago]); if(upd) setSaldoLocal(upd)
+      setModalPago(null)
+    }
+    setPagoBusy(null)
+  }
+  // Abre el registro de pago desde la pestaña Deudas (mes seleccionado)
+  const abrirPagoDesdeDeuda=(p)=>togglePagoMes({origen:'deuda',id:p.id,nombre:p.nombre,detalle:p.tipo||'Préstamo',monto:parseFloat(p.cuota_mensual||0),dia:p.dia_pago,pago:pagoDe('deuda',p.id)})
   const openAddVar  =(dateStr)=>{setFVar({nombre:'',categoria:'Alimentación',monto:'',fecha:dateStr||today,medio_pago:'Efectivo',tarjeta:'',fecha_pago:''});setModalVar({})}
 
   function isPróximo(f){if(!f)return false;const diff=(new Date(f+'T00:00:00')-new Date())/86400000;return diff>=0&&diff<=30}
@@ -589,6 +634,7 @@ export default function PresupuestoPage({ user }) {
                   <span style={{color:it.origen==='deuda'?'#ff9500':'var(--accent-bright)',fontWeight:'600'}}>{it.origen==='deuda'?'Deuda':'Fijo'}</span>
                   {' · '}{it.detalle}
                   {pagado&&<span style={{fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{' · pagado el '}{new Date(it.pago.fecha_pago+'T00:00:00').toLocaleDateString('es-GT',{day:'numeric',month:'short'})}</span>}
+                  {pagado&&parseFloat(it.pago.saldo_aplicado||0)>0&&<span style={{fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{' · −'}{q(it.pago.saldo_aplicado)}{' al saldo'}</span>}
                 </div>
               </div>
               <div style={{textAlign:'right',flexShrink:0}}>
@@ -1068,10 +1114,17 @@ export default function PresupuestoPage({ user }) {
                     {prestActivos.map(p=>{
                       const tipo=p.tipo||'Préstamo'
                       const pct=p.monto_original>0?Math.min(((p.monto_original-p.saldo_actual)/p.monto_original)*100,100):0
+                      const pagoEsteMes=pagoDe('deuda',p.id)
+                      const hist=pagos.filter(x=>x.origen==='deuda'&&x.ref_id===p.id).sort((a,b)=>b.mes.localeCompare(a.mes)||String(b.fecha_pago).localeCompare(String(a.fecha_pago)))
+                      const histAbierto=histDeuda===p.id
                       return(
-                        <tr key={p.id} style={{borderTop:'1px solid var(--border)'}}>
+                        <Fragment key={p.id}>
+                        <tr style={{borderTop:'1px solid var(--border)'}}>
                           <td style={{padding:'11px 8px'}}>
-                            <div style={{fontWeight:'500',color:'var(--text-1)'}}>{p.nombre}</div>
+                            <div onClick={()=>hist.length&&setHistDeuda(histAbierto?null:p.id)} style={{fontWeight:'500',color:'var(--text-1)',cursor:hist.length?'pointer':'default',display:'flex',alignItems:'center',gap:'5px'}}>
+                              {p.nombre}
+                              {hist.length>0&&<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2.5" strokeLinecap="round">{histAbierto?<polyline points="18 15 12 9 6 15"/>:<polyline points="6 9 12 15 18 9"/>}</svg>}
+                            </div>
                             <div style={{marginTop:'5px',height:'3px',background:'var(--inner-bg)',borderRadius:'2px',width:'70px'}}>
                               <div style={{height:'3px',background:'var(--green)',borderRadius:'2px',width:`${pct}%`}}/>
                             </div>
@@ -1086,11 +1139,30 @@ export default function PresupuestoPage({ user }) {
                           <td style={{padding:'11px 8px',color:'var(--text-muted)',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{p.meses_restantes??'—'}</td>
                           <td style={{padding:'11px 0 11px 4px'}}>
                             <div style={{display:'flex',gap:'4px'}}>
+                              {pagoEsteMes
+                                ?<span title={`Pagado en ${fmtMes(mes)}`} style={{display:'flex',alignItems:'center',gap:'4px',fontSize:'11px',fontWeight:'700',color:'var(--green)',background:'rgba(52,199,89,0.12)',padding:'5px 8px',borderRadius:'7px',whiteSpace:'nowrap'}}>
+                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>Pagado
+                                </span>
+                                :<button onClick={()=>abrirPagoDesdeDeuda(p)} style={{background:'var(--green)',border:'none',color:'#fff',cursor:'pointer',padding:'5px 9px',borderRadius:'7px',fontSize:'11px',fontWeight:'700',whiteSpace:'nowrap'}}>Pagar</button>}
                               <button onClick={()=>{setFPrest({nombre:p.nombre,tipo,monto_original:String(p.monto_original),saldo_actual:String(p.saldo_actual),cuota_mensual:String(p.cuota_mensual),meses_restantes:p.meses_restantes!=null?String(p.meses_restantes):'',dia_pago:p.dia_pago!=null?String(p.dia_pago):''});setModalPrest(p)}} style={bEdit}><IcoEdit/></button>
                               <button onClick={()=>askDel(`"${p.nombre}" se eliminará.`,()=>del('budget_prestamos',p.id,setPrestamos))} style={bDel}><IcoDel/></button>
                             </div>
                           </td>
                         </tr>
+                        {histAbierto&&(
+                          <tr><td colSpan={8} style={{padding:'0 8px 12px'}}>
+                            <div style={{background:'var(--inner-bg)',borderRadius:'10px',padding:'10px 14px'}}>
+                              <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'6px'}}>Historial de pagos</div>
+                              {hist.map(h=>(
+                                <div key={h.id} style={{display:'flex',justifyContent:'space-between',gap:'10px',padding:'6px 0',borderTop:'1px solid var(--border)',fontSize:'12px',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>
+                                  <span style={{color:'var(--text-2)'}}>{fmtMes(h.mes)}<span style={{color:'var(--text-muted)'}}>{' · '}{new Date(h.fecha_pago+'T00:00:00').toLocaleDateString('es-GT',{day:'numeric',month:'short'})}</span></span>
+                                  <span><span style={{color:'var(--text-1)',fontWeight:'600'}}>{q(h.monto)}</span>{parseFloat(h.saldo_aplicado||0)>0&&<span style={{color:'var(--green)',marginLeft:'10px'}}>−{q(h.saldo_aplicado)} saldo</span>}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </td></tr>
+                        )}
+                        </Fragment>
                       )
                     })}
                   </tbody>
@@ -1640,6 +1712,40 @@ export default function PresupuestoPage({ user }) {
           </form>
         </Modal>
       )}
+
+      {modalPago&&(()=>{
+        const prest=prestamos.find(x=>x.id===modalPago.id)
+        const saldo=parseFloat(prest?.saldo_actual||0)
+        const restar=Math.min(Math.max(parseFloat(fPago.restar||0),0),saldo)
+        const nuevo=saldo-restar
+        const mono={fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}
+        return(
+          <Modal title={`Registrar pago — ${modalPago.nombre}`} onClose={()=>setModalPago(null)}>
+            <form onSubmit={registrarPagoDeuda}>
+              <div style={{fontSize:'12px',color:'var(--text-muted)',marginBottom:'16px'}}>{fmtMes(mes)} · cuota {q(modalPago.monto)}</div>
+              <FormField label="Monto pagado *">
+                <input required autoFocus type="number" step="0.01" min="0" style={inp} value={fPago.monto}
+                  onChange={e=>{const v=e.target.value;setFPago(p=>({...p,monto:v,restar:p.restarEditado?p.restar:v}))}}/>
+              </FormField>
+              <FormField label="Restar del saldo">
+                <input type="number" step="0.01" min="0" style={inp} value={fPago.restar}
+                  onChange={e=>setFPago(p=>({...p,restar:e.target.value,restarEditado:true}))}/>
+                <div style={{fontSize:'11px',color:'var(--text-muted)',marginTop:'5px',lineHeight:1.4}}>Si la cuota incluye intereses, pon solo lo que fue a capital.</div>
+              </FormField>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'12px 14px',background:'var(--inner-bg)',borderRadius:'10px',marginBottom:'16px'}}>
+                <span style={{fontSize:'12px',color:'var(--text-muted)'}}>Saldo</span>
+                <span style={{fontSize:'13px',...mono}}>
+                  <span style={{color:'var(--text-muted)'}}>{q(saldo)}</span>
+                  <span style={{color:'var(--text-muted)',margin:'0 8px'}}>→</span>
+                  <span style={{fontWeight:'700',color:nuevo<=0?'var(--green)':'var(--text-1)'}}>{q(nuevo)}</span>
+                </span>
+              </div>
+              {nuevo<=0&&<div style={{fontSize:'12px',color:'var(--green)',fontWeight:'600',marginBottom:'14px'}}>Con este pago la deuda queda saldada y pasa a "Deudas pagadas".</div>}
+              <ModalBtns onClose={()=>setModalPago(null)}/>
+            </form>
+          </Modal>
+        )
+      })()}
 
       {confirmDel&&(
         <ConfirmModal

@@ -26,3 +26,7 @@ create policy "budget_shared_joselin" on budget_pagos for all
   with check (user_id = 'ca354bf9-9e8b-43d9-b10d-d1e6b0db792b' and auth.uid() = '96ac1020-d3aa-4e0f-92f2-5b42e759f0d6');
 
 create index if not exists budget_pagos_user_mes on budget_pagos (user_id, mes);
+
+-- Paso 2 (2026-10-09): cuánto se restó del saldo de la deuda al registrar el pago.
+-- Al desmarcar el pago se devuelve exactamente este monto al saldo.
+alter table budget_pagos add column if not exists saldo_aplicado numeric(14,2) not null default 0;
