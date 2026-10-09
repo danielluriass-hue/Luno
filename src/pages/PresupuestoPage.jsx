@@ -128,6 +128,9 @@ export default function PresupuestoPage({ user }) {
   const [ahorros,     setAhorros]     = useState([])
   const [compromisos, setCompromisos] = useState([])
   const [pagos,       setPagos]       = useState([])
+  const [limites,     setLimites]     = useState([])     // límite mensual por categoría de gasto variable
+  const [modalLim,    setModalLim]    = useState(false)
+  const [fLim,        setFLim]        = useState({})
   const [pagoBusy,    setPagoBusy]    = useState(null)
   const [modalPago,   setModalPago]   = useState(null)   // item de deuda a registrar
   const [fPago,       setFPago]       = useState({monto:'',restar:'',restarEditado:false})
@@ -161,7 +164,9 @@ export default function PresupuestoPage({ user }) {
       supabase.from('budget_ahorros').select('*').eq('user_id',uid).order('created_at'),
       supabase.from('budget_compromisos').select('*').eq('user_id',uid).order('created_at'),
       supabase.from('budget_pagos').select('*').eq('user_id',uid),
-    ]).then(([ing,fij,varG,prest,aho,comp,pag])=>{
+      supabase.from('budget_limites').select('*').eq('user_id',uid),
+    ]).then(([ing,fij,varG,prest,aho,comp,pag,lim])=>{
+      setLimites(lim.data||[])
       setIngresos(ing.data||[]);setGastosFijos(fij.data||[]);setGastosVar(varG.data||[])
       setPrestamos(prest.data||[]);setAhorros(aho.data||[]);setCompromisos(comp.data||[])
       setPagos(pag.data||[])
@@ -261,6 +266,12 @@ export default function PresupuestoPage({ user }) {
     if(key)(ingCalEvents[key]=ingCalEvents[key]||[]).push({label:i.nombre,amount:i.monto,tipo:i.tipo==='fijo'?'Fijo':'Variable'})
   })
   const ingSelEvents = ingSelDay?(ingCalEvents[ingSelDay]||[]):[]
+
+  // ── Límites por categoría (gastos variables del mes) ──
+  const limiteDe   = (cat)=>{const l=limites.find(x=>x.categoria===cat);return l?parseFloat(l.limite||0):null}
+  const gastadoCat = (cat)=>varMes.filter(g=>(g.categoria||'Otro')===cat).reduce((s,g)=>s+parseFloat(g.monto||0),0)
+  const catsLimite = [...CATS_VAR,...new Set(varMes.map(g=>g.categoria||'Otro').filter(c=>!CATS_VAR.includes(c)))]
+  const colorLimite= (pct)=>pct>100?'var(--red)':pct>=80?'var(--yellow)':'var(--green)'
 
   // ── Pagos de cuotas de deudas en el mes seleccionado ──
   const pagosMes = pagos.filter(p=>p.mes===mes)
@@ -382,6 +393,26 @@ export default function PresupuestoPage({ user }) {
       setModalPago(null)
     }
     setPagoBusy(null)
+  }
+  const abrirLimites=()=>{
+    const f={};CATS_VAR.forEach(c=>{const l=limiteDe(c);f[c]=l!=null?String(l):''})
+    setFLim(f);setModalLim(true)
+  }
+  const saveLimites=async(e)=>{
+    e.preventDefault()
+    const upserts=[],borrar=[]
+    Object.entries(fLim).forEach(([categoria,v])=>{
+      const n=parseFloat(v)
+      if(v!==''&&n>0) upserts.push({user_id:budgetUid,categoria,limite:n})
+      else if(limiteDe(categoria)!=null) borrar.push(categoria)
+    })
+    if(upserts.length){
+      const{error}=await supabase.from('budget_limites').upsert(upserts,{onConflict:'user_id,categoria'})
+      if(error){alert('No se pudieron guardar los límites: '+error.message);return}
+    }
+    if(borrar.length) await supabase.from('budget_limites').delete().eq('user_id',budgetUid).in('categoria',borrar)
+    const{data}=await supabase.from('budget_limites').select('*').eq('user_id',budgetUid)
+    setLimites(data||[]);setModalLim(false)
   }
   const openAddVar  =(dateStr)=>{setFVar({nombre:'',categoria:'Alimentación',monto:'',fecha:dateStr||today,medio_pago:'Efectivo',tarjeta:'',fecha_pago:''});setModalVar({})}
 
@@ -1176,6 +1207,56 @@ export default function PresupuestoPage({ user }) {
       {tab==='gastos'&&(
         <div style={{display:'flex',flexDirection:'column',gap:'20px'}}>
 
+          {/* Límites del mes por categoría */}
+          {(()=>{
+            const conLim=catsLimite.filter(c=>limiteDe(c)!=null)
+            const sinLim=catsLimite.filter(c=>limiteDe(c)==null)
+            const totLim=conLim.reduce((s,c)=>s+limiteDe(c),0)
+            const totGas=conLim.reduce((s,c)=>s+gastadoCat(c),0)
+            const mono={fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}
+            return(
+              <div style={card}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:conLim.length?'18px':'8px',gap:'10px'}}>
+                  <div>
+                    <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em'}}>Límites del mes</div>
+                    {conLim.length>0&&<div style={{fontSize:'13px',color:'var(--text-2)',marginTop:'4px',...mono}}>
+                      <span style={{fontWeight:'700',color:colorLimite(totLim>0?totGas/totLim*100:0)}}>{q(totGas)}</span>
+                      <span style={{color:'var(--text-muted)'}}> de {q(totLim)}</span>
+                    </div>}
+                  </div>
+                  <button onClick={abrirLimites} style={{background:'var(--accent-soft)',color:'var(--accent-bright)',border:'none',borderRadius:'8px',padding:'5px 12px',fontSize:'12px',fontWeight:'600',cursor:'pointer',whiteSpace:'nowrap'}}>{conLim.length?'Editar límites':'+ Definir límites'}</button>
+                </div>
+                {conLim.length===0
+                  ?<p style={{fontSize:'12.5px',color:'var(--text-muted)',margin:0,lineHeight:1.5}}>Pon un tope mensual a cada categoría (Alimentación, Transporte…) y aquí verás cuánto llevas gastado y cuánto te queda.</p>
+                  :<div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:'16px 24px'}}>
+                    {conLim.map(cat=>{
+                      const lim=limiteDe(cat),gas=gastadoCat(cat),pct=lim>0?gas/lim*100:0,col=colorLimite(pct),resta=lim-gas
+                      return(
+                        <div key={cat}>
+                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:'6px',gap:'8px'}}>
+                            <span style={{fontSize:'13px',fontWeight:'600',color:'var(--text-1)'}}>{cat}</span>
+                            <span style={{fontSize:'12px',...mono}}><span style={{fontWeight:'700',color:col}}>{q(gas)}</span><span style={{color:'var(--text-muted)'}}> / {q(lim)}</span></span>
+                          </div>
+                          <div style={{height:'7px',background:'var(--inner-bg)',borderRadius:'4px',overflow:'hidden'}}>
+                            <div style={{height:'7px',width:`${Math.min(pct,100)}%`,background:col,borderRadius:'4px',transition:'width 0.3s'}}/>
+                          </div>
+                          <div style={{fontSize:'11px',marginTop:'5px',color:resta<0?'var(--red)':'var(--text-muted)',fontWeight:resta<0?'600':'400',...mono}}>
+                            {resta<0?`Te pasaste por ${q(-resta)}`:`Te quedan ${q(resta)}`} · {pct.toFixed(0)}%
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                }
+                {conLim.length>0&&sinLim.some(c=>gastadoCat(c)>0)&&(
+                  <div style={{fontSize:'11px',color:'var(--text-muted)',marginTop:'16px',paddingTop:'12px',borderTop:'1px solid var(--border)',...mono}}>
+                    Sin límite: {sinLim.filter(c=>gastadoCat(c)>0).map(c=>`${c} ${q(gastadoCat(c))}`).join(' · ')}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+
           {/* Calendario grande Gastos Variables */}
           <div style={card}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'20px'}}>
@@ -1544,6 +1625,21 @@ export default function PresupuestoPage({ user }) {
             <FormField label="Descripción *"><input required style={inp} value={fVar.nombre} onChange={e=>setFVar(p=>({...p,nombre:e.target.value}))} placeholder="ej. Supermercado, Gasolina..."/></FormField>
             <FormField label="Categoría"><select style={inp} value={fVar.categoria} onChange={e=>setFVar(p=>({...p,categoria:e.target.value}))}>{CATS_VAR.map(c=><option key={c} value={c}>{c}</option>)}</select></FormField>
             <FormField label="Monto *"><input required type="number" step="0.01" min="0" style={inp} value={fVar.monto} onChange={e=>setFVar(p=>({...p,monto:e.target.value}))} placeholder="0.00"/></FormField>
+            {(()=>{
+              const lim=limiteDe(fVar.categoria)
+              if(lim==null) return null
+              const mesG=fVar.fecha?fVar.fecha.slice(0,7):mes
+              // Gastado en la categoría ese mes, sin contar el gasto que se está editando
+              const llevas=gastosVar.filter(g=>g.mes===mesG&&(g.categoria||'Otro')===fVar.categoria&&g.id!==modalVar?.id).reduce((s,g)=>s+parseFloat(g.monto||0),0)
+              const despues=llevas+(parseFloat(fVar.monto)||0)
+              const quedan=lim-despues,col=colorLimite(despues/lim*100)
+              return(
+                <div style={{margin:'-6px 0 14px',padding:'9px 12px',borderRadius:'9px',background:'var(--inner-bg)',fontSize:'11.5px',color:'var(--text-2)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums',borderLeft:`3px solid ${col}`}}>
+                  {fVar.categoria}: llevas {q(llevas)} de {q(lim)}
+                  {parseFloat(fVar.monto)>0&&<> · {quedan<0?<b style={{color:'var(--red)'}}>te pasarías por {q(-quedan)}</b>:<>te quedarían <b style={{color:col}}>{q(quedan)}</b></>}</>}
+                </div>
+              )
+            })()}
             <FormField label="Fecha del gasto *"><input required type="date" style={inp} value={fVar.fecha} onChange={e=>setFVar(p=>({...p,fecha:e.target.value}))}/></FormField>
             <FormField label="Medio de pago">
               <select style={inp} value={fVar.medio_pago} onChange={e=>setFVar(p=>({...p,medio_pago:e.target.value,tarjeta:'',fecha_pago:''}))}>
@@ -1609,6 +1705,23 @@ export default function PresupuestoPage({ user }) {
             <FormField label="Fecha aproximada (opcional)"><input type="date" style={inp} value={fComp.fecha_aprox} onChange={e=>setFComp(p=>({...p,fecha_aprox:e.target.value}))}/></FormField>
             <FormField label="Notas (opcional)"><input type="text" style={inp} value={fComp.notas} onChange={e=>setFComp(p=>({...p,notas:e.target.value}))} placeholder="ej. Me dijo que en julio..."/></FormField>
             <ModalBtns onClose={()=>setModalComp(null)}/>
+          </form>
+        </Modal>
+      )}
+
+      {modalLim&&(
+        <Modal title="Límites mensuales por categoría" onClose={()=>setModalLim(false)}>
+          <form onSubmit={saveLimites}>
+            <div style={{fontSize:'12px',color:'var(--text-muted)',marginBottom:'16px',lineHeight:1.5}}>Aplican a los gastos variables y se repiten cada mes. Deja vacío para no poner límite.</div>
+            {CATS_VAR.map(c=>(
+              <div key={c} style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'10px'}}>
+                <label style={{flex:1,fontSize:'13px',color:'var(--text-1)',fontWeight:'500'}}>{c}</label>
+                <input type="number" step="0.01" min="0" placeholder="Sin límite" style={{...inp,width:'150px',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}
+                  value={fLim[c]??''} onChange={e=>setFLim(p=>({...p,[c]:e.target.value}))}/>
+              </div>
+            ))}
+            <div style={{height:'8px'}}/>
+            <ModalBtns onClose={()=>setModalLim(false)}/>
           </form>
         </Modal>
       )}
