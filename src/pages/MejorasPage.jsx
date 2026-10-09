@@ -113,6 +113,27 @@ export default function MejorasPage({ user }) {
 
   const [toDelete, setToDelete] = useState(null)
 
+  // Edición en línea de una celda del historial: { id, key, value }
+  const [cell, setCell] = useState(null)
+  const saveCell = async () => {
+    if (!cell) return
+    const { id, key, value } = cell
+    const entry = entries.find(e => e.id === id)
+    setCell(null)
+    let v
+    if (key === 'comentario') v = value.trim() || null
+    else v = value === '' ? null : parseFloat(value)
+    if (v !== null && key !== 'comentario' && isNaN(v)) return
+    if ((entry?.[key] ?? null) === v) return
+    const { data, error } = await supabase.from('body_measurements').update({ [key]: v }).eq('id', id).select().single()
+    if (error) { alert('No se pudo guardar: ' + error.message); return }
+    if (data) setEntries(prev => prev.map(e => e.id === id ? data : e))
+  }
+  const cellKeys = (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); saveCell() }
+    if (e.key === 'Escape') setCell(null)
+  }
+
   const del = async (id) => {
     await supabase.from('body_measurements').delete().eq('id', id)
     setEntries(prev => prev.filter(e => e.id !== id))
@@ -211,24 +232,39 @@ export default function MejorasPage({ user }) {
         {/* Historial — ordenado por fecha ascendente */}
         {entries.length > 0 && (
           <div style={{ ...card }}>
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Historial</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Historial</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Toca un valor para editarlo · Enter guarda · Esc cancela</div>
+            </div>
             <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+              <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: '12px' }}>
                 <thead>
                   <tr>
-                    <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--text-muted)', fontWeight: '500', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>Fecha</th>
+                    <th style={{ position: 'sticky', left: 0, zIndex: 2, background: 'var(--card-bg)', textAlign: 'left', padding: '6px 8px', color: 'var(--text-muted)', fontWeight: '500', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>Fecha</th>
                     {FIELDS.map(f => (
                       <th key={f.key} style={{ textAlign: 'right', padding: '6px 8px', color: 'var(--text-muted)', fontWeight: '500', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{f.label}</th>
                     ))}
                     <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--text-muted)', fontWeight: '500', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>Comentario</th>
-                    <th style={{ borderBottom: '1px solid var(--border)', width: '60px' }} />
                   </tr>
                 </thead>
                 <tbody>
-                  {entries.map((entry, idx) => (
+                  {entries.map((entry, idx) => {
+                    const editInput = (key, align, extra = {}) => (
+                      <input autoFocus value={cell.value} onChange={e => setCell(c => ({ ...c, value: e.target.value }))}
+                        onKeyDown={cellKeys} onBlur={saveCell} inputMode={key === 'comentario' ? 'text' : 'decimal'}
+                        style={{ width: key === 'comentario' ? '180px' : '64px', padding: '4px 6px', borderRadius: '6px', border: '1px solid var(--accent-bright)', background: 'var(--inner-bg)', color: 'var(--text-1)', fontSize: '12px', textAlign: align, fontFamily: key === 'comentario' ? 'inherit' : 'var(--font-mono)', outline: 'none', ...extra }} />
+                    )
+                    const editando = (key) => cell && cell.id === entry.id && cell.key === key
+                    return (
                     <tr key={entry.id}>
-                      <td style={{ padding: '9px 8px', color: 'var(--text-2)', whiteSpace: 'nowrap', borderBottom: '1px solid var(--border)', fontWeight: '500', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>
-                        {new Date(entry.date + 'T12:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: '2-digit' })}
+                      <td style={{ position: 'sticky', left: 0, zIndex: 1, background: 'var(--card-bg)', padding: '7px 8px', color: 'var(--text-2)', whiteSpace: 'nowrap', borderBottom: '1px solid var(--border)', fontWeight: '500', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          {new Date(entry.date + 'T12:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: '2-digit' })}
+                          <button title="Editar medición completa" onClick={() => { setForm({ date: entry.date, ...Object.fromEntries(FIELDS.map(f => [f.key, entry[f.key] ?? ''])), comentario: entry.comentario || '' }); setEditing(entry.id); setShowForm(true) }}
+                            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '12px', cursor: 'pointer', padding: '2px 3px' }}>✏️</button>
+                          <button title="Eliminar medición" onClick={() => setToDelete(entry)}
+                            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '12px', cursor: 'pointer', padding: '2px 3px' }}>🗑️</button>
+                        </div>
                       </td>
                       {FIELDS.map(f => {
                         const c = entry[f.key]
@@ -237,24 +273,21 @@ export default function MejorasPage({ user }) {
                         const improved = d != null && d !== 0 && (f.goodDown ? d < 0 : d > 0)
                         const worsened = d != null && d !== 0 && (f.goodDown ? d > 0 : d < 0)
                         return (
-                          <td key={f.key} style={{ padding: '9px 8px', textAlign: 'right', borderBottom: '1px solid var(--border)', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', color: c != null ? (improved ? 'var(--green)' : worsened ? 'var(--red)' : 'var(--text-1)') : 'var(--text-muted)' }}>
-                            {c != null ? c : '—'}
+                          <td key={f.key} onClick={() => !editando(f.key) && setCell({ id: entry.id, key: f.key, value: c != null ? String(c) : '' })}
+                            title={editando(f.key) ? undefined : `Editar ${f.label}`}
+                            style={{ padding: '7px 8px', textAlign: 'right', borderBottom: '1px solid var(--border)', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', cursor: 'text', color: c != null ? (improved ? 'var(--green)' : worsened ? 'var(--red)' : 'var(--text-1)') : 'var(--text-muted)' }}>
+                            {editando(f.key) ? editInput(f.key, 'right') : (c != null ? c : '—')}
                           </td>
                         )
                       })}
-                      <td title={entry.comentario || undefined} style={{ padding: '9px 8px', borderBottom: '1px solid var(--border)', color: entry.comentario ? 'var(--text-2)' : 'var(--text-muted)', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {entry.comentario || '—'}
-                      </td>
-                      <td style={{ padding: '9px 4px', borderBottom: '1px solid var(--border)' }}>
-                        <div style={{ display: 'flex', gap: '2px' }}>
-                          <button onClick={() => { setForm({ date: entry.date, ...Object.fromEntries(FIELDS.map(f => [f.key, entry[f.key] ?? ''])), comentario: entry.comentario || '' }); setEditing(entry.id); setShowForm(true) }}
-                            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '12px', cursor: 'pointer', padding: '2px 4px' }}>✏️</button>
-                          <button onClick={() => setToDelete(entry)}
-                            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '12px', cursor: 'pointer', padding: '2px 4px' }}>🗑️</button>
-                        </div>
+                      <td onClick={() => !editando('comentario') && setCell({ id: entry.id, key: 'comentario', value: entry.comentario || '' })}
+                        title={editando('comentario') ? undefined : (entry.comentario || 'Agregar comentario')}
+                        style={{ padding: '7px 8px', borderBottom: '1px solid var(--border)', color: entry.comentario ? 'var(--text-2)' : 'var(--text-muted)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'text' }}>
+                        {editando('comentario') ? editInput('comentario', 'left') : (entry.comentario || '—')}
                       </td>
                     </tr>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
