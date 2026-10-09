@@ -722,7 +722,8 @@ export default function PresupuestoPage({ user }) {
           <button onClick={prevMes} style={navBtn}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg></button>
           <div style={{fontSize:'14px',fontWeight:'600',color:'var(--text-1)',minWidth:'140px',textAlign:'center',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{fmtMes(mes)}</div>
           <button onClick={nextMes} style={navBtn}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg></button>
-          <button onClick={()=>openAddVar(today.startsWith(mes)?today:`${mes}-01`)} style={{marginLeft:'auto',background:'var(--accent)',color:'#fff',border:'none',borderRadius:'10px',padding:'8px 16px',fontSize:'13px',fontWeight:'700',cursor:'pointer',boxShadow:'0 4px 14px -4px var(--accent-glow)',whiteSpace:'nowrap'}}>+ Gasto</button>
+          <button onClick={()=>{setFIng({nombre:'',tipo:'fijo',monto:'',dia:'',fecha:''});setModalIng({})}} style={{marginLeft:'auto',background:'var(--green)',color:'#fff',border:'none',borderRadius:'10px',padding:'8px 16px',fontSize:'13px',fontWeight:'700',cursor:'pointer',boxShadow:'0 4px 14px -4px var(--green-glow)',whiteSpace:'nowrap'}}>+ Ingreso</button>
+          <button onClick={()=>openAddVar(today.startsWith(mes)?today:`${mes}-01`)} style={{background:'var(--accent)',color:'#fff',border:'none',borderRadius:'10px',padding:'8px 16px',fontSize:'13px',fontWeight:'700',cursor:'pointer',boxShadow:'0 4px 14px -4px var(--accent-glow)',whiteSpace:'nowrap'}}>+ Gasto</button>
         </div>
       </div>
 
