@@ -10,6 +10,9 @@ const FIELDS = [
   { key: 'weight',       label: 'Peso',           unit: 'lbs', step: '0.1', goodDown: true,  color: '#7b79f7' },
   { key: 'body_fat',     label: 'Grasa corporal', unit: '%',   step: '0.1', goodDown: true,  color: '#f87171' },
   { key: 'visceral_fat', label: 'Grasa visceral', unit: 'pts', step: '1',   goodDown: true,  color: '#fb923c' },
+  { key: 'muscle_mass',  label: 'Masa muscular',  unit: 'lbs', step: '0.1', goodDown: false, color: '#22d3ee' },
+  { key: 'lean_mass',    label: 'Peso sin grasa', unit: 'lbs', step: '0.1', goodDown: false, color: '#4ade80' },
+  { key: 'metabolic_age',label: 'Edad metabólica',unit: 'años',step: '1',   goodDown: true,  color: '#e879f9' },
   { key: 'waist_cm',     label: 'Cintura',        unit: 'cm',  step: '0.5', goodDown: true,  color: '#fbbf24' },
   { key: 'chest_cm',     label: 'Pecho',          unit: 'cm',  step: '0.5', goodDown: false, color: '#34d399' },
   { key: 'glutes_cm',    label: 'Glúteo',         unit: 'cm',  step: '0.5', goodDown: false, color: '#f472b6' },
@@ -17,7 +20,7 @@ const FIELDS = [
   { key: 'leg_cm',       label: 'Muslo',          unit: 'cm',  step: '0.5', goodDown: false, color: '#a78bfa' },
 ]
 
-const emptyForm = () => ({ date: localDateStr(), ...Object.fromEntries(FIELDS.map(f => [f.key, ''])) })
+const emptyForm = () => ({ date: localDateStr(), ...Object.fromEntries(FIELDS.map(f => [f.key, ''])), comentario: '' })
 
 function LineChart({ data, field, color, unit }) {
   if (!data || data.length < 2) return (
@@ -95,11 +98,14 @@ export default function MejorasPage({ user }) {
       if (payload[f.key] === '' || payload[f.key] === null) payload[f.key] = null
       else payload[f.key] = parseFloat(payload[f.key])
     })
+    payload.comentario = (payload.comentario || '').trim() || null
     if (editing) {
-      const { data } = await supabase.from('body_measurements').update(payload).eq('id', editing).select().single()
+      const { data, error } = await supabase.from('body_measurements').update(payload).eq('id', editing).select().single()
+      if (error) { alert('No se pudo guardar la medición: ' + error.message); return }
       if (data) setEntries(prev => prev.map(e => e.id === editing ? data : e).sort((a,b) => a.date.localeCompare(b.date)))
     } else {
-      const { data } = await supabase.from('body_measurements').insert(payload).select().single()
+      const { data, error } = await supabase.from('body_measurements').insert(payload).select().single()
+      if (error) { alert('No se pudo guardar la medición: ' + error.message); return }
       if (data) setEntries(prev => [...prev, data].sort((a,b) => a.date.localeCompare(b.date)))
     }
     setForm(emptyForm()); setShowForm(false); setEditing(null)
@@ -193,6 +199,12 @@ export default function MejorasPage({ user }) {
                 )
               })}
             </div>
+            {latest.comentario && (
+              <div style={{ marginTop: '12px', padding: '10px 14px', borderRadius: '12px', background: 'var(--inner-bg)', borderLeft: '3px solid var(--accent-bright)', fontSize: '13px', color: 'var(--text-2)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '3px' }}>Comentario</span>
+                {latest.comentario}
+              </div>
+            )}
           </div>
         )}
 
@@ -208,6 +220,7 @@ export default function MejorasPage({ user }) {
                     {FIELDS.map(f => (
                       <th key={f.key} style={{ textAlign: 'right', padding: '6px 8px', color: 'var(--text-muted)', fontWeight: '500', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{f.label}</th>
                     ))}
+                    <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--text-muted)', fontWeight: '500', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>Comentario</th>
                     <th style={{ borderBottom: '1px solid var(--border)', width: '60px' }} />
                   </tr>
                 </thead>
@@ -229,9 +242,12 @@ export default function MejorasPage({ user }) {
                           </td>
                         )
                       })}
+                      <td title={entry.comentario || undefined} style={{ padding: '9px 8px', borderBottom: '1px solid var(--border)', color: entry.comentario ? 'var(--text-2)' : 'var(--text-muted)', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {entry.comentario || '—'}
+                      </td>
                       <td style={{ padding: '9px 4px', borderBottom: '1px solid var(--border)' }}>
                         <div style={{ display: 'flex', gap: '2px' }}>
-                          <button onClick={() => { setForm({ date: entry.date, ...Object.fromEntries(FIELDS.map(f => [f.key, entry[f.key] ?? ''])) }); setEditing(entry.id); setShowForm(true) }}
+                          <button onClick={() => { setForm({ date: entry.date, ...Object.fromEntries(FIELDS.map(f => [f.key, entry[f.key] ?? ''])), comentario: entry.comentario || '' }); setEditing(entry.id); setShowForm(true) }}
                             style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '12px', cursor: 'pointer', padding: '2px 4px' }}>✏️</button>
                           <button onClick={() => setToDelete(entry)}
                             style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '12px', cursor: 'pointer', padding: '2px 4px' }}>🗑️</button>
@@ -328,6 +344,12 @@ export default function MejorasPage({ user }) {
                       style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', background: 'var(--inner-bg)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: '13px' }} />
                   </div>
                 ))}
+              </div>
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-2)', display: 'block', marginBottom: '5px' }}>Comentario <span style={{ color: 'var(--text-muted)' }}>(opcional)</span></label>
+                <textarea rows={3} value={form.comentario} onChange={e => setForm(p => ({ ...p, comentario: e.target.value }))}
+                  placeholder="ej. Medido en ayunas, después de semana de viaje…"
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', background: 'var(--inner-bg)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: '13px', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }} />
               </div>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button type="button" onClick={() => { setShowForm(false); setEditing(null) }}
