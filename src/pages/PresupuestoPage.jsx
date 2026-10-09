@@ -19,7 +19,6 @@ const TABS = [
   {key:'gastos',  label:'Gastos'},
   {key:'ahorros', label:'Ahorros'},
   {key:'deudas',  label:'Deudas'},
-  {key:'pagos',   label:'Pagos'},
   {key:'resumen', label:'Resumen'},
 ]
 
@@ -69,18 +68,18 @@ function Modal({ title, onClose, children }) {
   )
 }
 
-function ConfirmModal({ msg, onConfirm, onCancel }) {
+function ConfirmModal({ msg, onConfirm, onCancel, title='¿Eliminar este registro?', btn='Eliminar' }) {
   return (
     <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.65)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:200}}>
       <div style={{background:'var(--card-bg)',borderRadius:'20px',padding:'28px',width:'min(360px,calc(100vw - 24px))',border:'1px solid var(--border-card)',textAlign:'center'}}>
         <div style={{width:'46px',height:'46px',borderRadius:'50%',background:'rgba(255,59,48,0.12)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 16px'}}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--red)" strokeWidth="2.2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
         </div>
-        <div style={{fontSize:'15px',fontWeight:'700',color:'var(--text-1)',marginBottom:'8px'}}>¿Eliminar este registro?</div>
+        <div style={{fontSize:'15px',fontWeight:'700',color:'var(--text-1)',marginBottom:'8px'}}>{title}</div>
         <div style={{fontSize:'13px',color:'var(--text-muted)',marginBottom:'24px',lineHeight:'1.5'}}>{msg}</div>
         <div style={{display:'flex',gap:'10px'}}>
           <button onClick={onCancel}  style={{flex:1,padding:'10px',borderRadius:'10px',border:'1px solid var(--border)',background:'transparent',color:'var(--text-2)',fontWeight:'600',fontSize:'13px',cursor:'pointer'}}>Cancelar</button>
-          <button onClick={onConfirm} style={{flex:1,padding:'10px',borderRadius:'10px',border:'none',background:'var(--red)',color:'#fff',fontWeight:'700',fontSize:'13px',cursor:'pointer'}}>Eliminar</button>
+          <button onClick={onConfirm} style={{flex:1,padding:'10px',borderRadius:'10px',border:'none',background:'var(--red)',color:'#fff',fontWeight:'700',fontSize:'13px',cursor:'pointer'}}>{btn}</button>
         </div>
       </div>
     </div>
@@ -112,7 +111,7 @@ export default function PresupuestoPage({ user }) {
   // Solo Joselin usa el ID de Daniel. Todos los demás (incluyendo Daniel) usan su propio ID.
   const budgetUid = user.email === 'suleciojh@gmail.com' ? SHARED_BUDGET_OWNER : user.id
 
-  const [tab,        setTab]        = useState(()=>localStorage.getItem('presupuesto_tab')||'ingresos')
+  const [tab,        setTab]        = useState(()=>{const t=localStorage.getItem('presupuesto_tab');return TABS.some(x=>x.key===t)?t:'ingresos'})
   // Recordar el mes visto solo durante el mes en curso; al cambiar de mes real, abrir en el mes actual
   const [mes,        setMes]        = useState(()=>localStorage.getItem('presupuesto_mes_visto')===thisMes&&localStorage.getItem('presupuesto_mes')||thisMes)
   const [loading,    setLoading]    = useState(true)
@@ -129,7 +128,6 @@ export default function PresupuestoPage({ user }) {
   const [ahorros,     setAhorros]     = useState([])
   const [compromisos, setCompromisos] = useState([])
   const [pagos,       setPagos]       = useState([])
-  const [pagosErr,    setPagosErr]    = useState(false)
   const [pagoBusy,    setPagoBusy]    = useState(null)
   const [modalPago,   setModalPago]   = useState(null)   // item de deuda a registrar
   const [fPago,       setFPago]       = useState({monto:'',restar:'',restarEditado:false})
@@ -166,7 +164,7 @@ export default function PresupuestoPage({ user }) {
     ]).then(([ing,fij,varG,prest,aho,comp,pag])=>{
       setIngresos(ing.data||[]);setGastosFijos(fij.data||[]);setGastosVar(varG.data||[])
       setPrestamos(prest.data||[]);setAhorros(aho.data||[]);setCompromisos(comp.data||[])
-      setPagos(pag.data||[]);setPagosErr(!!pag.error)
+      setPagos(pag.data||[])
       setLoading(false)
     })
   },[user.id])
@@ -264,30 +262,21 @@ export default function PresupuestoPage({ user }) {
   })
   const ingSelEvents = ingSelDay?(ingCalEvents[ingSelDay]||[]):[]
 
-  // ── Checklist de pagos del mes (gastos fijos + cuotas de deudas) ──
+  // ── Pagos de cuotas de deudas en el mes seleccionado ──
   const pagosMes = pagos.filter(p=>p.mes===mes)
   const pagoDe   = (origen,id)=>pagosMes.find(p=>p.origen===origen&&p.ref_id===id)
-  const checklist = [
-    ...gastosFijos.filter(g=>g.activo).map(g=>({origen:'fijo',id:g.id,nombre:g.nombre,detalle:g.categoria||'Gasto fijo',monto:parseFloat(g.monto||0),dia:g.dia_pago})),
-    // Deudas activas, o pagadas este mes aunque su saldo ya llegó a 0
-    ...prestamos.filter(p=>parseFloat(p.saldo_actual||0)>0||pagoDe('deuda',p.id)).map(p=>({origen:'deuda',id:p.id,nombre:p.nombre,detalle:p.tipo||'Préstamo',monto:parseFloat(p.cuota_mensual||0),dia:p.dia_pago})),
-  ].map(it=>({...it,dia:it.dia?Math.min(it.dia,daysInMonth):null,pago:pagoDe(it.origen,it.id)}))
-   .sort((a,b)=>(a.dia||99)-(b.dia||99))
-  const hoyDia = parseInt(today.slice(8,10))
-  const estadoPago = (it)=>{
-    if(it.pago) return 'pagado'
-    if(!it.dia) return 'sin_dia'
-    if(mes<thisMes) return 'vencido'
-    if(mes>thisMes) return 'pendiente'
-    if(it.dia<hoyDia) return 'vencido'
-    if(it.dia===hoyDia) return 'hoy'
-    return it.dia-hoyDia<=3?'pronto':'pendiente'
+  const hoyDia   = parseInt(today.slice(8,10))
+  // Cuota sin pagar cuyo día ya pasó en el mes seleccionado
+  const cuotaVencida = (p)=>{
+    if(pagoDe('deuda',p.id)||!p.dia_pago) return false
+    if(mes<thisMes) return true
+    return mes===thisMes&&Math.min(p.dia_pago,daysInMonth)<hoyDia
   }
-  const chkPendientes = checklist.filter(it=>!it.pago)
-  const chkPagados    = checklist.filter(it=> it.pago)
-  const chkTotal      = checklist.reduce((s,it)=>s+(it.pago?parseFloat(it.pago.monto||0):it.monto),0)
-  const chkPagado     = chkPagados.reduce((s,it)=>s+parseFloat(it.pago.monto||0),0)
-  const chkVencidos   = chkPendientes.filter(it=>estadoPago(it)==='vencido')
+  // Meses restantes ≈ saldo ÷ cuota (aprox.: en préstamos la cuota incluye intereses)
+  const mesesRestantes = (p)=>{
+    const saldo=parseFloat(p.saldo_actual||0),cuota=parseFloat(p.cuota_mensual||0)
+    return cuota>0&&saldo>0?Math.ceil(saldo/cuota-0.001):null
+  }
 
   // ── Nav ──
   const prevMes=()=>{const[y,m]=mes.split('-').map(Number);const d=new Date(y,m-2);setMes(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`)}
@@ -344,33 +333,32 @@ export default function PresupuestoPage({ user }) {
   const toggleFijo  =async(g)=>{const{data}=await supabase.from('budget_gastos_fijos').update({activo:!g.activo}).eq('id',g.id).select().single();if(data)setGastosFijos(p=>p.map(x=>x.id===data.id?data:x))}
   const togglePagado=async(c)=>{const{data}=await supabase.from('budget_compromisos').update({pagado:!c.pagado}).eq('id',c.id).select().single();if(data)setCompromisos(p=>p.map(x=>x.id===data.id?data:x))}
   const setSaldoLocal=(data)=>setPrestamos(p=>p.map(x=>x.id===data.id?data:x))
-  const togglePagoMes=async(it)=>{
+  // Abrir modal para registrar la cuota del mes seleccionado (monto pagado + cuánto restar del saldo)
+  const abrirPagoDesdeDeuda=(p)=>{
+    const cuota=parseFloat(p.cuota_mensual||0)
+    setFPago({monto:String(cuota),restar:String(cuota),restarEditado:false})
+    setModalPago({origen:'deuda',id:p.id,nombre:p.nombre,monto:cuota})
+  }
+  // Quitar el pago del mes y devolver al saldo lo que se le había restado
+  const deshacerPago=async(p,pago)=>{
     if(pagoBusy) return
-    // Deuda sin pagar → abrir modal para confirmar monto pagado y cuánto restar del saldo
-    if(!it.pago&&it.origen==='deuda'){
-      setFPago({monto:String(it.monto),restar:String(it.monto),restarEditado:false})
-      setModalPago(it); return
-    }
-    setPagoBusy(it.origen+it.id)
-    if(it.pago){
-      const{error}=await supabase.from('budget_pagos').delete().eq('id',it.pago.id)
-      if(error){alert('No se pudo desmarcar: '+error.message);setPagoBusy(null);return}
-      setPagos(p=>p.filter(x=>x.id!==it.pago.id))
-      // Devolver al saldo lo que se le había restado al marcar
-      const devolver=parseFloat(it.pago.saldo_aplicado||0)
-      const prest=prestamos.find(x=>x.id===it.id)
-      if(it.origen==='deuda'&&devolver>0&&prest){
-        const nuevo=Math.round((parseFloat(prest.saldo_actual||0)+devolver)*100)/100
-        const{data}=await supabase.from('budget_prestamos').update({saldo_actual:nuevo}).eq('id',prest.id).select().single()
-        if(data) setSaldoLocal(data)
-      }
-    }else{
-      const{data,error}=await supabase.from('budget_pagos').insert({user_id:budgetUid,mes,origen:it.origen,ref_id:it.id,monto:it.monto,fecha_pago:today}).select().single()
-      if(error) alert('No se pudo marcar: '+error.message)
-      else if(data) setPagos(p=>[...p,data])
+    setPagoBusy('deuda'+p.id)
+    const{error}=await supabase.from('budget_pagos').delete().eq('id',pago.id)
+    if(error){alert('No se pudo deshacer el pago: '+error.message);setPagoBusy(null);return}
+    setPagos(x=>x.filter(y=>y.id!==pago.id))
+    const devolver=parseFloat(pago.saldo_aplicado||0)
+    if(devolver>0){
+      const nuevo=Math.round((parseFloat(p.saldo_actual||0)+devolver)*100)/100
+      const{data}=await supabase.from('budget_prestamos').update({saldo_actual:nuevo}).eq('id',p.id).select().single()
+      if(data) setSaldoLocal(data)
     }
     setPagoBusy(null)
   }
+  const askDeshacer=(p,pago)=>setConfirmDel({
+    title:'¿Deshacer este pago?',btn:'Deshacer pago',
+    msg:`Se quitará el pago de ${fmtMes(mes)} de "${p.nombre}"${parseFloat(pago.saldo_aplicado||0)>0?` y se devolverán ${q(pago.saldo_aplicado)} al saldo`:''}.`,
+    onConfirm:()=>deshacerPago(p,pago),
+  })
   const registrarPagoDeuda=async(e)=>{
     e.preventDefault()
     const it=modalPago, prest=prestamos.find(x=>x.id===it.id)
@@ -395,8 +383,6 @@ export default function PresupuestoPage({ user }) {
     }
     setPagoBusy(null)
   }
-  // Abre el registro de pago desde la pestaña Deudas (mes seleccionado)
-  const abrirPagoDesdeDeuda=(p)=>togglePagoMes({origen:'deuda',id:p.id,nombre:p.nombre,detalle:p.tipo||'Préstamo',monto:parseFloat(p.cuota_mensual||0),dia:p.dia_pago,pago:pagoDe('deuda',p.id)})
   const openAddVar  =(dateStr)=>{setFVar({nombre:'',categoria:'Alimentación',monto:'',fecha:dateStr||today,medio_pago:'Efectivo',tarjeta:'',fecha_pago:''});setModalVar({})}
 
   function isPróximo(f){if(!f)return false;const diff=(new Date(f+'T00:00:00')-new Date())/86400000;return diff>=0&&diff<=30}
@@ -610,96 +596,6 @@ export default function PresupuestoPage({ user }) {
           }}>{label}</button>
         ))}
       </div>
-
-      {/* ══ TAB: PAGOS (checklist del mes) ══ */}
-      {tab==='pagos'&&(()=>{
-        const pct=chkTotal>0?Math.min((chkPagado/chkTotal)*100,100):0
-        const ESTADO={
-          vencido:{txt:'Vencido',color:'var(--red)',bg:'rgba(255,59,48,0.12)'},
-          hoy:    {txt:'Hoy',color:'#ff9500',bg:'rgba(255,149,0,0.14)'},
-          pronto: {txt:'Pronto',color:'var(--yellow)',bg:'rgba(255,204,0,0.12)'},
-        }
-        const fila=(it)=>{
-          const est=estadoPago(it),badge=ESTADO[est],pagado=!!it.pago,busy=pagoBusy===it.origen+it.id
-          return(
-            <div key={it.origen+it.id} onClick={()=>togglePagoMes(it)} style={{display:'flex',alignItems:'center',gap:'12px',padding:'12px 4px',borderTop:'1px solid var(--border)',cursor:busy?'wait':'pointer',opacity:busy?0.5:1}}>
-              <span style={{width:'22px',height:'22px',borderRadius:'50%',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',background:pagado?'var(--green)':'transparent',border:pagado?'none':`2px solid ${est==='vencido'?'var(--red)':'var(--border-card)'}`,transition:'all 0.15s'}}>
-                {pagado&&<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.2" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>}
-              </span>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{display:'flex',alignItems:'center',gap:'7px',flexWrap:'wrap'}}>
-                  <span style={{fontSize:'13.5px',fontWeight:'600',color:pagado?'var(--text-muted)':'var(--text-1)',textDecoration:pagado?'line-through':'none'}}>{it.nombre}</span>
-                  {badge&&<span style={{fontSize:'10px',fontWeight:'700',color:badge.color,background:badge.bg,padding:'1px 7px',borderRadius:'5px'}}>{badge.txt}</span>}
-                </div>
-                <div style={{fontSize:'11px',color:'var(--text-muted)',marginTop:'2px'}}>
-                  <span style={{color:it.origen==='deuda'?'#ff9500':'var(--accent-bright)',fontWeight:'600'}}>{it.origen==='deuda'?'Deuda':'Fijo'}</span>
-                  {' · '}{it.detalle}
-                  {pagado&&<span style={{fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{' · pagado el '}{new Date(it.pago.fecha_pago+'T00:00:00').toLocaleDateString('es-GT',{day:'numeric',month:'short'})}</span>}
-                  {pagado&&parseFloat(it.pago.saldo_aplicado||0)>0&&<span style={{fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{' · −'}{q(it.pago.saldo_aplicado)}{' al saldo'}</span>}
-                </div>
-              </div>
-              <div style={{textAlign:'right',flexShrink:0}}>
-                <div style={{fontSize:'14px',fontWeight:'700',color:pagado?'var(--text-muted)':'var(--text-1)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(pagado?it.pago.monto:it.monto)}</div>
-                <div style={{fontSize:'10.5px',color:'var(--text-muted)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{it.dia?`día ${it.dia}`:'sin día'}</div>
-              </div>
-            </div>
-          )
-        }
-        return(
-          <div style={{display:'flex',flexDirection:'column',gap:'16px'}}>
-            {pagosErr&&(
-              <div style={{...card,border:'1px solid rgba(255,59,48,0.35)',background:'rgba(255,59,48,0.06)',fontSize:'13px',color:'var(--text-2)'}}>
-                Falta crear la tabla <b>budget_pagos</b> en Supabase — corre el SQL de <code>Referencias/budget_pagos.sql</code>. Mientras tanto no se podrán guardar los pagos.
-              </div>
-            )}
-
-            {/* Progreso del mes */}
-            <div className="glow-tile" style={{...card,'--tile-glow':'var(--green-glow)'}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end',gap:'12px',flexWrap:'wrap',position:'relative'}}>
-                <div>
-                  <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em'}}>Pagado · {fmtMes(mes)}</div>
-                  <div style={{marginTop:'6px',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>
-                    <span style={{fontSize:'30px',fontWeight:'800',letterSpacing:'-0.03em',color:'var(--green)'}}>{q(chkPagado)}</span>
-                    <span style={{fontSize:'14px',color:'var(--text-muted)',marginLeft:'8px'}}>de {q(chkTotal)}</span>
-                  </div>
-                </div>
-                <div style={{display:'flex',gap:'18px'}}>
-                  <div style={{textAlign:'right'}}>
-                    <div style={{fontSize:'10px',color:'var(--text-muted)'}}>Falta pagar</div>
-                    <div style={{fontSize:'15px',fontWeight:'700',color:'var(--text-1)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(chkTotal-chkPagado)}</div>
-                  </div>
-                  {chkVencidos.length>0&&(
-                    <div style={{textAlign:'right'}}>
-                      <div style={{fontSize:'10px',color:'var(--text-muted)'}}>Vencidos</div>
-                      <div style={{fontSize:'15px',fontWeight:'700',color:'var(--red)',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{chkVencidos.length}</div>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div style={{height:'8px',background:'var(--inner-bg)',borderRadius:'4px',marginTop:'14px',overflow:'hidden',position:'relative'}}>
-                <div style={{height:'8px',width:`${pct}%`,background:'var(--green)',borderRadius:'4px',transition:'width 0.3s'}}/>
-              </div>
-              <div style={{fontSize:'11px',color:'var(--text-muted)',marginTop:'6px',position:'relative',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{chkPagados.length} de {checklist.length} pagos · {pct.toFixed(0)}%</div>
-            </div>
-
-            {/* Pendientes */}
-            <div style={card}>
-              <SubHead label={`Pendientes (${chkPendientes.length})`} total={chkTotal-chkPagado}/>
-              {chkPendientes.length===0
-                ?<p style={{fontSize:'13px',color:'var(--green)',textAlign:'center',padding:'12px 0',fontWeight:'600'}}>{checklist.length?'Todo pagado este mes':'Sin gastos fijos ni deudas activas'}</p>
-                :chkPendientes.map(fila)}
-            </div>
-
-            {/* Pagados */}
-            {chkPagados.length>0&&(
-              <div style={card}>
-                <SubHead label={`Pagados (${chkPagados.length})`} total={chkPagado}/>
-                {chkPagados.map(fila)}
-              </div>
-            )}
-          </div>
-        )
-      })()}
 
       {/* ══ TAB: RESUMEN ══ */}
       {tab==='resumen'&&(
@@ -1136,14 +1032,14 @@ export default function PresupuestoPage({ user }) {
                           <td style={{padding:'11px 8px',color:'var(--text-2)',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(p.monto_original)}</td>
                           <td style={{padding:'11px 8px',color:'var(--text-1)',fontWeight:'500',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(p.saldo_actual)}</td>
                           <td style={{padding:'11px 8px',color:'var(--accent)',fontWeight:'700',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(p.cuota_mensual)}</td>
-                          <td style={{padding:'11px 8px',color:'var(--text-muted)',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{p.dia_pago?`día ${p.dia_pago}`:'—'}</td>
-                          <td style={{padding:'11px 8px',color:'var(--text-muted)',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{p.meses_restantes??'—'}</td>
+                          <td title={cuotaVencida(p)?'Cuota vencida sin pagar':undefined} style={{padding:'11px 8px',color:cuotaVencida(p)?'var(--red)':'var(--text-muted)',fontWeight:cuotaVencida(p)?'700':'400',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{p.dia_pago?`día ${p.dia_pago}`:'—'}</td>
+                          <td title="Aproximado: saldo ÷ cuota" style={{padding:'11px 8px',color:'var(--text-2)',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{mesesRestantes(p)??'—'}</td>
                           <td style={{padding:'11px 0 11px 4px'}}>
                             <div style={{display:'flex',gap:'4px'}}>
                               {pagoEsteMes
-                                ?<span title={`Pagado en ${fmtMes(mes)}`} style={{display:'flex',alignItems:'center',gap:'4px',fontSize:'11px',fontWeight:'700',color:'var(--green)',background:'rgba(52,199,89,0.12)',padding:'5px 8px',borderRadius:'7px',whiteSpace:'nowrap'}}>
+                                ?<button onClick={()=>askDeshacer(p,pagoEsteMes)} title={`Pagado en ${fmtMes(mes)} — clic para deshacer`} style={{display:'flex',alignItems:'center',gap:'4px',fontSize:'11px',fontWeight:'700',color:'var(--green)',background:'rgba(52,199,89,0.12)',border:'none',cursor:'pointer',padding:'5px 8px',borderRadius:'7px',whiteSpace:'nowrap'}}>
                                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>Pagado
-                                </span>
+                                </button>
                                 :<button onClick={()=>abrirPagoDesdeDeuda(p)} style={{background:'var(--green)',border:'none',color:'#fff',cursor:'pointer',padding:'5px 9px',borderRadius:'7px',fontSize:'11px',fontWeight:'700',whiteSpace:'nowrap'}}>Pagar</button>}
                               <button onClick={()=>{setFPrest({nombre:p.nombre,tipo,monto_original:String(p.monto_original),saldo_actual:String(p.saldo_actual),cuota_mensual:String(p.cuota_mensual),meses_restantes:p.meses_restantes!=null?String(p.meses_restantes):'',dia_pago:p.dia_pago!=null?String(p.dia_pago):''});setModalPrest(p)}} style={bEdit}><IcoEdit/></button>
                               <button onClick={()=>askDel(`"${p.nombre}" se eliminará.`,()=>del('budget_prestamos',p.id,setPrestamos))} style={bDel}><IcoDel/></button>
@@ -1240,6 +1136,7 @@ export default function PresupuestoPage({ user }) {
                   <tbody>
                     {prestPagados.map(p=>{
                       const tipo=p.tipo||'Préstamo'
+                      const pagoEsteMes=pagoDe('deuda',p.id)
                       return(
                         <tr key={p.id} style={{borderTop:'1px solid var(--border)'}}>
                           <td style={{padding:'10px 8px'}}>
@@ -1257,6 +1154,9 @@ export default function PresupuestoPage({ user }) {
                           <td style={{padding:'10px 8px',color:'var(--text-muted)',whiteSpace:'nowrap',textDecoration:'line-through',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(p.cuota_mensual)}</td>
                           <td style={{padding:'10px 0 10px 4px'}}>
                             <div style={{display:'flex',gap:'4px',justifyContent:'flex-end'}}>
+                              {pagoEsteMes&&(
+                                <button onClick={()=>askDeshacer(p,pagoEsteMes)} title={`Saldada con el pago de ${fmtMes(mes)} — clic para deshacer`} style={{fontSize:'11px',fontWeight:'600',color:'var(--text-2)',background:'var(--inner-bg)',border:'none',cursor:'pointer',padding:'5px 8px',borderRadius:'7px',whiteSpace:'nowrap'}}>Deshacer pago</button>
+                              )}
                               <button onClick={()=>{setFPrest({nombre:p.nombre,tipo,monto_original:String(p.monto_original),saldo_actual:String(p.saldo_actual),cuota_mensual:String(p.cuota_mensual),meses_restantes:p.meses_restantes!=null?String(p.meses_restantes):'',dia_pago:p.dia_pago!=null?String(p.dia_pago):''});setModalPrest(p)}} style={bEdit}><IcoEdit/></button>
                               <button onClick={()=>askDel(`"${p.nombre}" se eliminará.`,()=>del('budget_prestamos',p.id,setPrestamos))} style={bDel}><IcoDel/></button>
                             </div>
@@ -1678,7 +1578,6 @@ export default function PresupuestoPage({ user }) {
             <FormField label="Monto original *"><input required type="number" step="0.01" min="0" style={inp} value={fPrest.monto_original} onChange={e=>setFPrest(p=>({...p,monto_original:e.target.value}))} placeholder="0.00"/></FormField>
             <FormField label="Saldo actual *"><input required type="number" step="0.01" min="0" style={inp} value={fPrest.saldo_actual} onChange={e=>setFPrest(p=>({...p,saldo_actual:e.target.value}))} placeholder="0.00"/></FormField>
             <FormField label="Cuota mensual *"><input required type="number" step="0.01" min="0" style={inp} value={fPrest.cuota_mensual} onChange={e=>setFPrest(p=>({...p,cuota_mensual:e.target.value}))} placeholder="0.00"/></FormField>
-            <FormField label="Meses restantes"><input type="number" min="0" style={inp} value={fPrest.meses_restantes} onChange={e=>setFPrest(p=>({...p,meses_restantes:e.target.value}))} placeholder="ej. 24"/></FormField>
             <FormField label="Día de pago (opcional)">
               <select style={inp} value={fPrest.dia_pago} onChange={e=>setFPrest(p=>({...p,dia_pago:e.target.value}))}>
                 <option value="">Sin día específico</option>
@@ -1751,6 +1650,8 @@ export default function PresupuestoPage({ user }) {
       {confirmDel&&(
         <ConfirmModal
           msg={confirmDel.msg}
+          title={confirmDel.title}
+          btn={confirmDel.btn}
           onConfirm={()=>{confirmDel.onConfirm();setConfirmDel(null)}}
           onCancel={()=>setConfirmDel(null)}
         />
