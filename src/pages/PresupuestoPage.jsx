@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { localDateStr } from '../lib/dateUtils'
 import { useIsMobile } from '../lib/useIsMobile'
@@ -36,6 +36,21 @@ const bDel  = {background:'rgba(255,59,48,0.10)',border:'none',color:'var(--red)
 
 const IcoEdit = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
 const IcoDel = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+
+// Anillo de progreso SVG con contenido centrado
+function Ring({ pct, size=56, stroke=6, color='var(--green)', children }) {
+  const r=(size-stroke)/2, c=2*Math.PI*r, p=Math.max(0,Math.min(pct,100))
+  return (
+    <div style={{position:'relative',width:size,height:size,flexShrink:0}}>
+      <svg width={size} height={size} style={{transform:'rotate(-90deg)'}}>
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="var(--border)" strokeWidth={stroke}/>
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round"
+          strokeDasharray={c} strokeDashoffset={c*(1-p/100)} style={{transition:'stroke-dashoffset 0.5s'}}/>
+      </svg>
+      <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{children}</div>
+    </div>
+  )
+}
 
 function SubHead({ label, total, onAdd }) {
   return (
@@ -486,6 +501,39 @@ export default function PresupuestoPage({ user }) {
     </div>
   )
 
+  // Tarjeta de total destacado al inicio de cada pestaña
+  const heroTotal=({label,value,color,glow,sub,stats=[]})=>{
+    const mono={fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}
+    return(
+      <div className="glow-tile" style={{...card,padding:'22px 24px','--tile-glow':glow}}>
+        <div style={{display:'flex',alignItems:'flex-end',justifyContent:'space-between',gap:'18px 28px',flexWrap:'wrap',position:'relative'}}>
+          <div style={{minWidth:0}}>
+            <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em'}}>{label} · {fmtMes(mes)}</div>
+            <div style={{fontSize:isMobile?'30px':'36px',fontWeight:'800',letterSpacing:'-0.03em',color,marginTop:'4px',...mono}}>{q(value)}</div>
+            {sub&&<div style={{fontSize:'12px',color:'var(--text-muted)',marginTop:'2px',...mono}}>{sub}</div>}
+          </div>
+          {stats.length>0&&(
+            <div style={{display:'flex',gap:'26px',flexWrap:'wrap'}}>
+              {stats.map(([l,v,c,s])=>(
+                <div key={l} style={{minWidth:0}}>
+                  <div style={{fontSize:'10.5px',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'4px'}}>{l}</div>
+                  <div style={{fontSize:'17px',fontWeight:'800',color:c,letterSpacing:'-0.02em',...mono}}>{v}</div>
+                  {s&&<div style={{fontSize:'11px',color:'var(--text-muted)',marginTop:'2px',...mono}}>{s}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+  // Diferencia contra el mes anterior, en texto
+  const vsAnterior=(actual,anterior)=>{
+    if(!anterior) return null
+    const d=actual-anterior
+    return `${d>=0?'+':'−'}${q(Math.abs(d))} vs ${MESES[parseInt(mesAnterior.slice(5))-1].toLowerCase()}`
+  }
+
   // Botón "Copiar de <mes anterior>" — solo si el mes anterior tiene registros
   const btnCopiar=(tipo)=>{
     const n=(tipo==='ingresos'?ingresos:ahorros).filter(x=>x.mes===mesAnterior).length
@@ -910,6 +958,13 @@ export default function PresupuestoPage({ user }) {
       {/* ══ TAB: INGRESOS ══ */}
       {tab==='ingresos'&&(
         <div style={{display:'flex',flexDirection:'column',gap:'16px'}}>
+          {(()=>{
+            const fijos=ingMes.filter(i=>i.tipo==='fijo').reduce((s,i)=>s+parseFloat(i.monto||0),0)
+            const ant=ingresos.filter(i=>i.mes===mesAnterior).reduce((s,i)=>s+parseFloat(i.monto||0),0)
+            return heroTotal({label:'Ingresos',value:totalIngresos,color:'var(--green)',glow:'var(--green-glow)',
+              sub:vsAnterior(totalIngresos,ant),
+              stats:[['Fijos',q(fijos),'var(--text-1)'],['Variables',q(totalIngresos-fijos),'var(--text-1)'],['Registros',ingMes.length,'var(--text-2)']]})
+          })()}
 
           {/* Calendario de ingresos */}
           <div style={card}>
@@ -1059,105 +1114,146 @@ export default function PresupuestoPage({ user }) {
       {tab==='deudas'&&(
         <div style={{display:'flex',flexDirection:'column',gap:'20px'}}>
 
-          <div style={card}>
-            <SubHead label="Deudas Formales" total={totalPrestamos} onAdd={()=>{setFPrest({nombre:'',tipo:'Préstamo',monto_original:'',saldo_actual:'',cuota_mensual:'',meses_restantes:'',dia_pago:''});setModalPrest({})}}/>
-            {resumenDeudas.length>0&&(
-              <div style={{marginBottom:'16px',padding:'12px 14px',background:'var(--inner-bg)',borderRadius:'10px',overflowX:'auto'}}>
-                <table style={{width:'100%',borderCollapse:'collapse',fontSize:'12.5px'}}>
-                  <thead><tr style={{color:'var(--text-muted)',fontSize:'11px'}}>
-                    <th style={{padding:'0 10px 8px 0',fontWeight:'500',textAlign:'left'}}>Tipo</th>
-                    <th style={{padding:'0 10px 8px',fontWeight:'500',textAlign:'right',whiteSpace:'nowrap'}}>Original</th>
-                    <th style={{padding:'0 10px 8px',fontWeight:'500',textAlign:'right',whiteSpace:'nowrap'}}>Saldo</th>
-                    <th style={{padding:'0 0 8px 10px',fontWeight:'500',textAlign:'right',whiteSpace:'nowrap'}}>Cuota/mes</th>
-                  </tr></thead>
-                  <tbody>
-                    {resumenDeudas.map(({tipo,count,totalOriginal,totalSaldo,totalCuota})=>(
-                      <tr key={tipo} style={{borderTop:'1px solid var(--border)'}}>
-                        <td style={{padding:'8px 10px 8px 0'}}>
-                          <span style={{fontSize:'11px',fontWeight:'600',color:TIPO_COLOR[tipo],background:'var(--card-bg)',padding:'2px 7px',borderRadius:'6px'}}>{tipo}</span>
-                          <span style={{fontSize:'10px',color:'var(--text-muted)',marginLeft:'6px'}}>{count}</span>
-                        </td>
-                        <td style={{padding:'8px 10px',textAlign:'right',color:'var(--text-2)',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(totalOriginal)}</td>
-                        <td style={{padding:'8px 10px',textAlign:'right',color:'var(--text-1)',fontWeight:'500',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(totalSaldo)}</td>
-                        <td style={{padding:'8px 0 8px 10px',textAlign:'right',color:'var(--accent)',fontWeight:'700',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(totalCuota)}</td>
-                      </tr>
-                    ))}
-                    <tr style={{borderTop:'2px solid var(--border-card)'}}>
-                      <td style={{padding:'8px 10px 8px 0',fontWeight:'700',color:'var(--text-1)',fontSize:'12px'}}>Total</td>
-                      <td style={{padding:'8px 10px',textAlign:'right',fontWeight:'600',color:'var(--text-2)',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(resumenDeudas.reduce((s,r)=>s+r.totalOriginal,0))}</td>
-                      <td style={{padding:'8px 10px',textAlign:'right',fontWeight:'600',color:'var(--text-1)',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(resumenDeudas.reduce((s,r)=>s+r.totalSaldo,0))}</td>
-                      <td style={{padding:'8px 0 8px 10px',textAlign:'right',fontWeight:'800',color:'var(--red)',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(totalPrestamos)}</td>
-                    </tr>
-                  </tbody>
-                </table>
+          {/* ── Resumen de deudas ── */}
+          {(()=>{
+            const mono={fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}
+            const totOrig=prestActivos.reduce((s,p)=>s+parseFloat(p.monto_original||0),0)
+            const totSaldo=prestActivos.reduce((s,p)=>s+parseFloat(p.saldo_actual||0),0)
+            const pctGlobal=totOrig>0?(totOrig-totSaldo)/totOrig*100:0
+            const pagadasMes=prestActivos.filter(p=>pagoDe('deuda',p.id)).length+prestPagados.filter(p=>pagoDe('deuda',p.id)).length
+            const cuotasMes=prestActivos.length+prestPagados.filter(p=>pagoDe('deuda',p.id)).length
+            const pagadoMes=pagosMes.filter(x=>x.origen==='deuda').reduce((s,x)=>s+parseFloat(x.monto||0),0)
+            const vencidas=prestActivos.filter(cuotaVencida).length
+            const stat=(label,value,color,sub)=>(
+              <div style={{minWidth:0}}>
+                <div style={{fontSize:'10.5px',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'4px'}}>{label}</div>
+                <div style={{fontSize:'18px',fontWeight:'800',color,letterSpacing:'-0.02em',...mono}}>{value}</div>
+                {sub&&<div style={{fontSize:'11px',color:'var(--text-muted)',marginTop:'2px',...mono}}>{sub}</div>}
               </div>
-            )}
-            {prestActivos.length===0
-              ?<p style={{fontSize:'13px',color:'var(--text-muted)',textAlign:'center',padding:'16px 0'}}>{prestamos.length?'Todas las deudas están pagadas':'Sin deudas registradas'}</p>
-              :<div style={{overflowX:'auto'}}>
-                <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
-                  <thead><tr style={{color:'var(--text-muted)',fontSize:'11px'}}>
-                    {['Nombre','Tipo','Original','Saldo','Cuota','Día','Meses',''].map(h=>(
-                      <th key={h} style={{padding:'4px 8px 10px',fontWeight:'500',textAlign:'left',whiteSpace:'nowrap'}}>{h}</th>
+            )
+            return(
+              <div className="glow-tile" style={{...card,padding:'22px 24px','--tile-glow':'var(--yellow-glow)'}}>
+                <div style={{display:'flex',alignItems:'center',gap:'22px',flexWrap:'wrap',position:'relative'}}>
+                  <Ring pct={pctGlobal} size={isMobile?84:104} stroke={9} color="var(--green)">
+                    <div style={{textAlign:'center',lineHeight:1.1}}>
+                      <div style={{fontSize:isMobile?'18px':'22px',fontWeight:'800',color:'var(--text-1)'}}>{pctGlobal.toFixed(0)}%</div>
+                      <div style={{fontSize:'9px',color:'var(--text-muted)',fontFamily:'inherit'}}>pagado</div>
+                    </div>
+                  </Ring>
+                  <div style={{flex:'1 1 200px',minWidth:0}}>
+                    <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em'}}>Saldo total de deudas</div>
+                    <div style={{fontSize:isMobile?'28px':'34px',fontWeight:'800',letterSpacing:'-0.03em',color:'var(--text-1)',marginTop:'4px',...mono}}>{q(totSaldo)}</div>
+                    <div style={{fontSize:'12px',color:'var(--text-muted)',marginTop:'2px',...mono}}>de {q(totOrig)} originales · {prestActivos.length} activa{prestActivos.length!==1?'s':''}</div>
+                  </div>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,auto)',gap:'8px 26px',flex:isMobile?'1 1 100%':'0 0 auto'}}>
+                    {stat('Cuotas / mes',q(totalPrestamos),'#ff9500')}
+                    {stat('Pagado mes',q(pagadoMes),'var(--green)',`${pagadasMes} de ${cuotasMes} cuotas`)}
+                    {stat('Vencidas',vencidas,vencidas?'var(--red)':'var(--text-muted)',vencidas?'sin pagar':'al día')}
+                  </div>
+                </div>
+                {resumenDeudas.length>0&&(
+                  <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginTop:'18px',paddingTop:'16px',borderTop:'1px solid var(--border)',position:'relative'}}>
+                    {resumenDeudas.map(({tipo,count,totalSaldo,totalCuota})=>(
+                      <div key={tipo} style={{flex:'1 1 160px',padding:'10px 12px',borderRadius:'10px',background:'var(--inner-bg)',borderLeft:`3px solid ${TIPO_COLOR[tipo]}`}}>
+                        <div style={{fontSize:'11.5px',fontWeight:'700',color:TIPO_COLOR[tipo]}}>{tipo} <span style={{color:'var(--text-muted)',fontWeight:'500'}}>· {count}</span></div>
+                        <div style={{fontSize:'14px',fontWeight:'700',color:'var(--text-1)',marginTop:'3px',...mono}}>{q(totalSaldo)}</div>
+                        <div style={{fontSize:'10.5px',color:'var(--text-muted)',...mono}}>{q(totalCuota)} / mes</div>
+                      </div>
                     ))}
-                  </tr></thead>
-                  <tbody>
-                    {prestActivos.map(p=>{
-                      const tipo=p.tipo||'Préstamo'
-                      const pct=p.monto_original>0?Math.min(((p.monto_original-p.saldo_actual)/p.monto_original)*100,100):0
-                      const pagoEsteMes=pagoDe('deuda',p.id)
-                      const hist=pagos.filter(x=>x.origen==='deuda'&&x.ref_id===p.id).sort((a,b)=>b.mes.localeCompare(a.mes)||String(b.fecha_pago).localeCompare(String(a.fecha_pago)))
-                      const histAbierto=histDeuda===p.id
-                      return(
-                        <Fragment key={p.id}>
-                        <tr style={{borderTop:'1px solid var(--border)'}}>
-                          <td style={{padding:'11px 8px'}}>
-                            <div onClick={()=>hist.length&&setHistDeuda(histAbierto?null:p.id)} style={{fontWeight:'500',color:'var(--text-1)',cursor:hist.length?'pointer':'default',display:'flex',alignItems:'center',gap:'5px'}}>
-                              {p.nombre}
-                              {hist.length>0&&<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2.5" strokeLinecap="round">{histAbierto?<polyline points="18 15 12 9 6 15"/>:<polyline points="6 9 12 15 18 9"/>}</svg>}
-                            </div>
-                            <div style={{marginTop:'5px',height:'3px',background:'var(--inner-bg)',borderRadius:'2px',width:'70px'}}>
-                              <div style={{height:'3px',background:'var(--green)',borderRadius:'2px',width:`${pct}%`}}/>
-                            </div>
-                          </td>
-                          <td style={{padding:'11px 8px',whiteSpace:'nowrap'}}>
-                            <span style={{fontSize:'11px',fontWeight:'600',color:TIPO_COLOR[tipo],background:'var(--inner-bg)',padding:'2px 7px',borderRadius:'6px'}}>{tipo}</span>
-                          </td>
-                          <td style={{padding:'11px 8px',color:'var(--text-2)',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(p.monto_original)}</td>
-                          <td style={{padding:'11px 8px',color:'var(--text-1)',fontWeight:'500',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(p.saldo_actual)}</td>
-                          <td style={{padding:'11px 8px',color:'var(--accent)',fontWeight:'700',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{q(p.cuota_mensual)}</td>
-                          <td title={cuotaVencida(p)?'Cuota vencida sin pagar':undefined} style={{padding:'11px 8px',color:cuotaVencida(p)?'var(--red)':'var(--text-muted)',fontWeight:cuotaVencida(p)?'700':'400',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{p.dia_pago?`día ${p.dia_pago}`:'—'}</td>
-                          <td title="Aproximado: saldo ÷ cuota" style={{padding:'11px 8px',color:'var(--text-2)',whiteSpace:'nowrap',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>{mesesRestantes(p)??'—'}</td>
-                          <td style={{padding:'11px 0 11px 4px'}}>
-                            <div style={{display:'flex',gap:'4px'}}>
-                              {pagoEsteMes
-                                ?<button onClick={()=>askDeshacer(p,pagoEsteMes)} title={`Pagado en ${fmtMes(mes)} — clic para deshacer`} style={{display:'flex',alignItems:'center',gap:'4px',fontSize:'11px',fontWeight:'700',color:'var(--green)',background:'rgba(52,199,89,0.12)',border:'none',cursor:'pointer',padding:'5px 8px',borderRadius:'7px',whiteSpace:'nowrap'}}>
-                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>Pagado
-                                </button>
-                                :<button onClick={()=>abrirPagoDesdeDeuda(p)} style={{background:'var(--green)',border:'none',color:'#fff',cursor:'pointer',padding:'5px 9px',borderRadius:'7px',fontSize:'11px',fontWeight:'700',whiteSpace:'nowrap'}}>Pagar</button>}
-                              <button onClick={()=>{setFPrest({nombre:p.nombre,tipo,monto_original:String(p.monto_original),saldo_actual:String(p.saldo_actual),cuota_mensual:String(p.cuota_mensual),meses_restantes:p.meses_restantes!=null?String(p.meses_restantes):'',dia_pago:p.dia_pago!=null?String(p.dia_pago):''});setModalPrest(p)}} style={bEdit}><IcoEdit/></button>
-                              <button onClick={()=>askDel(`"${p.nombre}" se eliminará.`,()=>del('budget_prestamos',p.id,setPrestamos))} style={bDel}><IcoDel/></button>
-                            </div>
-                          </td>
-                        </tr>
-                        {histAbierto&&(
-                          <tr><td colSpan={8} style={{padding:'0 8px 12px'}}>
-                            <div style={{background:'var(--inner-bg)',borderRadius:'10px',padding:'10px 14px'}}>
-                              <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'6px'}}>Historial de pagos</div>
-                              {hist.map(h=>(
-                                <div key={h.id} style={{display:'flex',justifyContent:'space-between',gap:'10px',padding:'6px 0',borderTop:'1px solid var(--border)',fontSize:'12px',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>
-                                  <span style={{color:'var(--text-2)'}}>{fmtMes(h.mes)}<span style={{color:'var(--text-muted)'}}>{' · '}{new Date(h.fecha_pago+'T00:00:00').toLocaleDateString('es-GT',{day:'numeric',month:'short'})}</span></span>
-                                  <span><span style={{color:'var(--text-1)',fontWeight:'600'}}>{q(h.monto)}</span>{parseFloat(h.saldo_aplicado||0)>0&&<span style={{color:'var(--green)',marginLeft:'10px'}}>−{q(h.saldo_aplicado)} saldo</span>}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </td></tr>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+
+          {/* ── Tarjetas de deudas activas ── */}
+          <div>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}}>
+              <div style={{fontSize:'12px',fontWeight:'700',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em'}}>Deudas activas ({prestActivos.length})</div>
+              <button onClick={()=>{setFPrest({nombre:'',tipo:'Préstamo',monto_original:'',saldo_actual:'',cuota_mensual:'',meses_restantes:'',dia_pago:''});setModalPrest({})}} style={{background:'var(--accent-soft)',color:'var(--accent-bright)',border:'none',borderRadius:'8px',padding:'6px 12px',fontSize:'12px',fontWeight:'600',cursor:'pointer'}}>+ Agregar deuda</button>
+            </div>
+            {prestActivos.length===0
+              ?<div style={{...card,textAlign:'center',fontSize:'13px',color:'var(--text-muted)'}}>{prestamos.length?'Todas las deudas están pagadas':'Sin deudas registradas'}</div>
+              :<div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(2,minmax(0,1fr))',gap:'12px'}}>
+                {[...prestActivos].sort((a,b)=>{
+                  const pa=pagoDe('deuda',a.id)?1:0,pb=pagoDe('deuda',b.id)?1:0
+                  return pa-pb||(a.dia_pago||99)-(b.dia_pago||99)
+                }).map(p=>{
+                  const tipo=p.tipo||'Préstamo'
+                  const orig=parseFloat(p.monto_original||0),saldo=parseFloat(p.saldo_actual||0)
+                  const pct=orig>0?Math.min((orig-saldo)/orig*100,100):0
+                  const pagoEsteMes=pagoDe('deuda',p.id),vencida=cuotaVencida(p),meses=mesesRestantes(p)
+                  const hist=pagos.filter(x=>x.origen==='deuda'&&x.ref_id===p.id).sort((a,b)=>b.mes.localeCompare(a.mes)||String(b.fecha_pago).localeCompare(String(a.fecha_pago)))
+                  const histAbierto=histDeuda===p.id
+                  const mono={fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}
+                  const borde=vencida?'rgba(255,59,48,0.45)':pagoEsteMes?'rgba(52,199,89,0.35)':'var(--border-card)'
+                  return(
+                    <div key={p.id} style={{background:'var(--card-bg)',borderRadius:'16px',border:`1px solid ${borde}`,padding:'16px 18px',display:'flex',flexDirection:'column',gap:'14px'}}>
+                      {/* Encabezado */}
+                      <div style={{display:'flex',alignItems:'center',gap:'14px'}}>
+                        <Ring pct={pct} size={58} stroke={6} color={pct>=75?'var(--green)':TIPO_COLOR[tipo]==='var(--text-muted)'?'var(--accent-bright)':TIPO_COLOR[tipo]}>
+                          <span style={{fontSize:'13px',fontWeight:'800',color:'var(--text-1)'}}>{pct.toFixed(0)}%</span>
+                        </Ring>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:'14.5px',fontWeight:'700',color:'var(--text-1)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}} title={p.nombre}>{p.nombre}</div>
+                          <div style={{display:'flex',alignItems:'center',gap:'6px',marginTop:'4px',flexWrap:'wrap'}}>
+                            <span style={{fontSize:'10.5px',fontWeight:'700',color:TIPO_COLOR[tipo],background:'var(--inner-bg)',padding:'2px 7px',borderRadius:'6px'}}>{tipo}</span>
+                            <span style={{fontSize:'11px',color:vencida?'var(--red)':'var(--text-muted)',fontWeight:vencida?'700':'500',...mono}}>{p.dia_pago?`día ${p.dia_pago}`:'sin día'}</span>
+                            {vencida&&<span style={{fontSize:'10px',fontWeight:'700',color:'var(--red)',background:'rgba(255,59,48,0.12)',padding:'1px 7px',borderRadius:'5px'}}>Vencida</span>}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Saldo */}
+                      <div>
+                        <div style={{fontSize:'10.5px',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.05em'}}>Saldo</div>
+                        <div style={{display:'flex',alignItems:'baseline',gap:'8px',flexWrap:'wrap'}}>
+                          <span style={{fontSize:'24px',fontWeight:'800',letterSpacing:'-0.02em',color:'var(--text-1)',...mono}}>{q(saldo)}</span>
+                          <span style={{fontSize:'11.5px',color:'var(--text-muted)',...mono}}>de {q(orig)}</span>
+                        </div>
+                      </div>
+
+                      {/* Mini datos */}
+                      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'8px',padding:'10px 12px',borderRadius:'10px',background:'var(--inner-bg)'}}>
+                        {[['Cuota',q(p.cuota_mensual),'#ff9500'],['Meses',meses!=null?`≈ ${meses}`:'—','var(--text-1)'],['Pagado',q(orig-saldo),'var(--green)']].map(([l,v,c])=>(
+                          <div key={l} style={{minWidth:0}}>
+                            <div style={{fontSize:'10px',color:'var(--text-muted)'}}>{l}</div>
+                            <div style={{fontSize:'12.5px',fontWeight:'700',color:c,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',...mono}}>{v}</div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Acciones */}
+                      <div style={{display:'flex',gap:'6px',alignItems:'center'}}>
+                        {pagoEsteMes
+                          ?<button onClick={()=>askDeshacer(p,pagoEsteMes)} title="Clic para deshacer el pago" style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:'6px',fontSize:'12.5px',fontWeight:'700',color:'var(--green)',background:'rgba(52,199,89,0.12)',border:'none',cursor:'pointer',padding:'9px',borderRadius:'10px'}}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>Pagado en {MESES[parseInt(mes.slice(5))-1].toLowerCase()}
+                          </button>
+                          :<button onClick={()=>abrirPagoDesdeDeuda(p)} style={{flex:1,background:'var(--green)',border:'none',color:'#fff',cursor:'pointer',padding:'9px',borderRadius:'10px',fontSize:'12.5px',fontWeight:'700',boxShadow:'0 4px 14px -6px var(--green-glow)'}}>Pagar {q(p.cuota_mensual)}</button>}
+                        {hist.length>0&&(
+                          <button onClick={()=>setHistDeuda(histAbierto?null:p.id)} title="Historial de pagos" style={{...bEdit,padding:'8px 9px',color:histAbierto?'var(--accent-bright)':'var(--text-2)'}}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
+                          </button>
                         )}
-                        </Fragment>
-                      )
-                    })}
-                  </tbody>
-                </table>
+                        <button onClick={()=>{setFPrest({nombre:p.nombre,tipo,monto_original:String(p.monto_original),saldo_actual:String(p.saldo_actual),cuota_mensual:String(p.cuota_mensual),meses_restantes:p.meses_restantes!=null?String(p.meses_restantes):'',dia_pago:p.dia_pago!=null?String(p.dia_pago):''});setModalPrest(p)}} style={{...bEdit,padding:'8px 9px'}}><IcoEdit/></button>
+                        <button onClick={()=>askDel(`"${p.nombre}" se eliminará.`,()=>del('budget_prestamos',p.id,setPrestamos))} style={{...bDel,padding:'8px 9px'}}><IcoDel/></button>
+                      </div>
+
+                      {/* Historial */}
+                      {histAbierto&&(
+                        <div style={{background:'var(--inner-bg)',borderRadius:'10px',padding:'10px 12px',marginTop:'-4px'}}>
+                          <div style={{fontSize:'10.5px',fontWeight:'700',color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'4px'}}>Historial de pagos</div>
+                          {hist.map(h=>(
+                            <div key={h.id} style={{display:'flex',justifyContent:'space-between',gap:'10px',padding:'6px 0',borderTop:'1px solid var(--border)',fontSize:'11.5px',...mono}}>
+                              <span style={{color:'var(--text-2)'}}>{fmtMes(h.mes)}<span style={{color:'var(--text-muted)'}}>{' · '}{new Date(h.fecha_pago+'T00:00:00').toLocaleDateString('es-GT',{day:'numeric',month:'short'})}</span></span>
+                              <span><span style={{color:'var(--text-1)',fontWeight:'600'}}>{q(h.monto)}</span>{parseFloat(h.saldo_aplicado||0)>0&&<span style={{color:'var(--green)',marginLeft:'8px'}}>−{q(h.saldo_aplicado)}</span>}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             }
           </div>
@@ -1269,6 +1365,13 @@ export default function PresupuestoPage({ user }) {
       {/* ══ TAB: GASTOS ══ */}
       {tab==='gastos'&&(
         <div style={{display:'flex',flexDirection:'column',gap:'20px'}}>
+          {(()=>{
+            const ant=gastosVar.filter(g=>g.mes===mesAnterior).reduce((s,g)=>s+parseFloat(g.monto||0),0)
+            const pctIng=totalIngresos>0?(totalFijos+totalVariables)/totalIngresos*100:null
+            return heroTotal({label:'Gastos',value:totalFijos+totalVariables,color:'var(--red)',glow:'var(--accent-glow)',
+              sub:pctIng!=null?`${pctIng.toFixed(0)}% de tus ingresos del mes`:null,
+              stats:[['Variables',q(totalVariables),'var(--text-1)',vsAnterior(totalVariables,ant)],['Fijos',q(totalFijos),'var(--text-1)',`${gastosFijos.filter(g=>g.activo).length} activos`],['Movimientos',varMes.length,'var(--text-2)']]})
+          })()}
 
           {/* Límites del mes por categoría */}
           {(()=>{
@@ -1608,6 +1711,14 @@ export default function PresupuestoPage({ user }) {
 
       {/* ══ TAB: AHORROS ══ */}
       {tab==='ahorros'&&(
+        <div style={{display:'flex',flexDirection:'column',gap:'16px'}}>
+        {(()=>{
+          const acumulado=ahorros.reduce((s,a)=>s+parseFloat(a.aportado_mes||0),0)
+          const pctIng=totalIngresos>0?totalAhorros/totalIngresos*100:null
+          return heroTotal({label:'Ahorrado',value:totalAhorros,color:'var(--accent-bright)',glow:'var(--accent-glow)',
+            sub:pctIng!=null?`${pctIng.toFixed(0)}% de tus ingresos del mes`:null,
+            stats:[['Acumulado total',q(acumulado),'var(--green)'],['Metas',new Set(ahorros.map(a=>a.nombre)).size,'var(--text-2)']]})
+        })()}
         <div style={card}>
           <SubHead label="Ahorros" total={totalAhorros} onAdd={()=>{setFAho({nombre:'',meta_total:'',aportado_mes:''});setModalAho({})}}/>
           {btnCopiar('ahorros')}
@@ -1618,7 +1729,12 @@ export default function PresupuestoPage({ user }) {
               const pct=a.meta_total>0?Math.min((ahoTotal/a.meta_total)*100,100):0
               return(
                 <div key={a.id} style={{padding:'12px 0',borderBottom:'1px solid var(--border)'}}>
-                  <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
+                    {a.meta_total>0&&(
+                      <Ring pct={pct} size={44} stroke={5} color={pct>=100?'var(--green)':'var(--accent-bright)'}>
+                        <span style={{fontSize:'10.5px',fontWeight:'800',color:'var(--text-1)'}}>{pct.toFixed(0)}%</span>
+                      </Ring>
+                    )}
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:'13.5px',fontWeight:'500',color:'var(--text-1)'}}>{a.nombre}</div>
                       {a.meta_total>0&&<div style={{fontSize:'11px',color:'var(--text-muted)',marginTop:'2px',fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums'}}>Meta: {q(a.meta_total)} · Acumulado: {q(ahoTotal)} · {pct.toFixed(0)}%</div>}
@@ -1629,11 +1745,11 @@ export default function PresupuestoPage({ user }) {
                       <button onClick={()=>askDel(`"${a.nombre}" se eliminará.`,()=>del('budget_ahorros',a.id,setAhorros))} style={bDel}><IcoDel/></button>
                     </div>
                   </div>
-                  {a.meta_total>0&&<div style={{marginTop:'8px',height:'5px',background:'var(--inner-bg)',borderRadius:'3px'}}><div style={{height:'5px',background:'var(--green)',borderRadius:'3px',width:`${pct}%`,transition:'width 0.3s'}}/></div>}
                 </div>
               )
             })
           }
+        </div>
         </div>
       )}
 
